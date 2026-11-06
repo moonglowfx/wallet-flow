@@ -14,17 +14,21 @@ import {
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
   formatCurrency,
+  DEFAULT_USD_COP_RATE,
 } from '../data/mockData.js';
 
 export const TransactionModal = ({
   isOpen,
   onClose,
   accounts = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onSaveTransaction,
 }) => {
   const [type, setType] = useState('expense'); // 'income' or 'expense'
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
+  const [inputCurrency, setInputCurrency] = useState(currency || 'USD');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -37,9 +41,10 @@ export const TransactionModal = ({
       if ((!accountId || !accounts.some((a) => a.id === accountId)) && accounts.length > 0) {
         setAccountId(accounts[0].id);
       }
+      setInputCurrency(currency || 'USD');
       setError('');
     }
-  }, [isOpen, accounts]);
+  }, [isOpen, accounts, currency]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -83,9 +88,15 @@ export const TransactionModal = ({
       return;
     }
 
+    // Convert to USD base if entered in COP
+    const amountInUSD =
+      inputCurrency === 'COP'
+        ? Math.round((numericAmount / exchangeRate) * 100) / 100
+        : Math.round(numericAmount * 100) / 100;
+
     onSaveTransaction({
       title: title.trim(),
-      amount: numericAmount,
+      amount: amountInUSD,
       type,
       category,
       accountId,
@@ -204,22 +215,48 @@ export const TransactionModal = ({
 
           {/* Amount input prominent */}
           <div>
-            <label className="block text-zinc-300 font-semibold mb-1.5">
-              Monto del Movimiento ($ MXN) *
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-zinc-300 font-semibold">
+                Monto del Movimiento *
+              </label>
+              <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setInputCurrency('USD')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    inputCurrency === 'USD'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  USD $
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputCurrency('COP')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    inputCurrency === 'COP'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  COP $
+                </button>
+              </div>
+            </div>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-purple-400">
-                $
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-purple-400">
+                {inputCurrency === 'COP' ? 'COP $' : '$'}
               </span>
               <input
                 type="number"
                 step="any"
                 required
                 autoFocus
-                placeholder="0.00"
+                placeholder={inputCurrency === 'COP' ? '50,000' : '25.00'}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-black/60 backdrop-blur-md border border-white/15 focus:border-purple-500/70 focus:ring-2 focus:ring-purple-500/20 rounded-2xl pl-9 pr-4 py-3 text-xl font-black text-white placeholder-zinc-600 outline-none transition-all"
+                className={`w-full bg-black/60 backdrop-blur-md border border-white/15 focus:border-purple-500/70 focus:ring-2 focus:ring-purple-500/20 rounded-2xl ${inputCurrency === 'COP' ? 'pl-16' : 'pl-9'} pr-4 py-3 text-xl font-black text-white placeholder-zinc-600 outline-none transition-all`}
               />
             </div>
           </div>
@@ -254,7 +291,7 @@ export const TransactionModal = ({
               >
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name} ({formatCurrency(acc.balance)})
+                    {acc.name} ({formatCurrency(acc.balance, currency, exchangeRate)})
                   </option>
                 ))}
               </select>

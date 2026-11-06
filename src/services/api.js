@@ -131,6 +131,19 @@ export const api = {
     return payment;
   },
 
+  // Bulk Import / Sync
+  async bulkImport(data, mode = 'replace') {
+    try {
+      const res = await fetch(`${API_BASE}/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, mode }),
+      });
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    return null;
+  },
+
   // Reset Demo
   async resetDemo() {
     try {

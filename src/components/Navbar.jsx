@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
-import { formatCurrency } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 const NAV_ITEMS = [
   {
@@ -51,6 +51,8 @@ export const Navbar = ({
   onOpenNewTransaction,
   netWorth,
   antExpenseAlertCount,
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
 }) => {
   return (
     <>
@@ -154,7 +156,7 @@ export const Navbar = ({
                 </span>
               </div>
               <p className="text-xl font-bold tracking-tight text-white">
-                {formatCurrency(netWorth)}
+                {formatCurrency(netWorth, currency, exchangeRate)}
               </p>
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 pt-1 border-t border-white/10">
                 <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />

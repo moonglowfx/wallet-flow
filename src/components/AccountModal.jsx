@@ -8,20 +8,30 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+import { DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const AccountModal = ({
   isOpen,
   onClose,
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onSaveAccount,
 }) => {
   const [name, setName] = useState('');
   const [institution, setInstitution] = useState('');
   const [type, setType] = useState('bank'); // 'cash', 'bank', 'credit'
   const [balance, setBalance] = useState('');
+  const [accountCurrency, setAccountCurrency] = useState(currency || 'USD');
   const [creditLimit, setCreditLimit] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [yieldRate, setYieldRate] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setAccountCurrency(currency || 'USD');
+    }
+  }, [isOpen, currency]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -44,7 +54,14 @@ export const AccountModal = ({
       return;
     }
 
-    const rawBalance = parseFloat(balance) || 0;
+    let rawBalance = parseFloat(balance) || 0;
+    let rawCreditLimit = parseFloat(creditLimit) || 15000;
+
+    if (accountCurrency === 'COP') {
+      rawBalance = rawBalance / exchangeRate;
+      rawCreditLimit = rawCreditLimit / exchangeRate;
+    }
+
     // For credit accounts, user usually inputs positive debt, but system tracks as negative balance
     const finalBalance = type === 'credit' ? -Math.abs(rawBalance) : Math.abs(rawBalance);
 
@@ -53,8 +70,8 @@ export const AccountModal = ({
       name: name.trim(),
       institution: institution.trim() || (type === 'cash' ? 'Billetera Líquida' : 'Entidad Financiera'),
       type,
-      balance: finalBalance,
-      creditLimit: type === 'credit' ? parseFloat(creditLimit) || 15000 : undefined,
+      balance: Math.round(finalBalance * 100) / 100,
+      creditLimit: type === 'credit' ? Math.round(rawCreditLimit * 100) / 100 : undefined,
       yieldRate: type === 'bank' && yieldRate ? parseFloat(yieldRate) : undefined,
       accountNumber: accountNumber.trim() || (type === 'cash' ? 'CASH' : `•••• ${Math.floor(1000 + Math.random() * 9000)}`),
       accentGradient:
@@ -207,21 +224,47 @@ export const AccountModal = ({
           {/* Balance & Limits */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-zinc-300 font-medium mb-1">
-                {type === 'credit' ? 'Saldo Deudor Actual ($)' : 'Saldo Inicial ($) *'}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-zinc-300 font-medium">
+                  {type === 'credit' ? 'Saldo Deudor Actual' : 'Saldo Inicial *'}
+                </label>
+                <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setAccountCurrency('USD')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      accountCurrency === 'USD'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    USD $
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountCurrency('COP')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      accountCurrency === 'COP'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    COP $
+                  </button>
+                </div>
+              </div>
               <input
                 type="number"
                 step="any"
                 required
-                placeholder="0.00"
+                placeholder={accountCurrency === 'COP' ? 'ej. 5,000,000' : '0.00'}
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
                 className="liquid-input text-xs font-bold"
               />
               {type === 'credit' && (
                 <p className="text-[10px] text-zinc-400 mt-1">
-                  Ingresa lo que adeudas actualmente
+                  Ingresa lo que adeudas actualmente ({accountCurrency})
                 </p>
               )}
             </div>
@@ -229,12 +272,12 @@ export const AccountModal = ({
             {type === 'credit' ? (
               <div>
                 <label className="block text-zinc-300 font-medium mb-1">
-                  Límite de Crédito Autorizado ($)
+                  Límite de Crédito ({accountCurrency})
                 </label>
                 <input
                   type="number"
                   step="any"
-                  placeholder="ej. 50000"
+                  placeholder={accountCurrency === 'COP' ? 'ej. 15,000,000' : 'ej. 3,500'}
                   value={creditLimit}
                   onChange={(e) => setCreditLimit(e.target.value)}
                   className="liquid-input text-xs font-bold"

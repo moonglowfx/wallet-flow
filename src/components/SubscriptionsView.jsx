@@ -10,12 +10,14 @@ import {
   DollarSign,
   TrendingUp,
 } from 'lucide-react';
-import { formatCurrency } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const SubscriptionsView = ({
   subscriptions = [],
   setSubscriptions,
   accounts = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterMode, setFilterMode] = useState('all'); // all, essential, optional
@@ -24,6 +26,7 @@ export const SubscriptionsView = ({
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Streaming & Media');
   const [amount, setAmount] = useState('');
+  const [subCurrency, setSubCurrency] = useState('USD');
   const [billingDay, setBillingDay] = useState('5');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [essential, setEssential] = useState(false);
@@ -62,11 +65,14 @@ export const SubscriptionsView = ({
     e.preventDefault();
     if (!name.trim() || !amount) return;
 
+    const numAmount = parseFloat(amount);
+    const finalUSDAmount = subCurrency === 'COP' ? numAmount / exchangeRate : numAmount;
+
     const newSub = {
       id: `sub-${Date.now()}`,
       name: name.trim(),
       category,
-      amount: parseFloat(amount),
+      amount: Math.round(finalUSDAmount * 100) / 100,
       billingDay: parseInt(billingDay, 10) || 1,
       accountId: accountId || accounts[0]?.id || '',
       active: true,
@@ -119,7 +125,7 @@ export const SubscriptionsView = ({
             </div>
           </div>
           <p className="text-3xl font-black text-white tracking-tight">
-            {formatCurrency(totalMonthlyImpact)}
+            {formatCurrency(totalMonthlyImpact, currency, exchangeRate)}
           </p>
           <p className="text-[11px] text-zinc-400">
             Pasivo fijo recurrente que debes cubrir cada 30 días
@@ -134,7 +140,7 @@ export const SubscriptionsView = ({
             </div>
           </div>
           <p className="text-3xl font-black text-purple-200 tracking-tight">
-            {formatCurrency(annualProjectedImpact)}
+            {formatCurrency(annualProjectedImpact, currency, exchangeRate)}
           </p>
           <p className="text-[11px] text-zinc-400">
             Costo proyectado de mantener estos servicios durante 12 meses
@@ -151,11 +157,11 @@ export const SubscriptionsView = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-400">Esencial (Renta, Salud, Fibra)</span>
-              <span className="font-semibold text-white">{formatCurrency(essentialAmount)}</span>
+              <span className="font-semibold text-white">{formatCurrency(essentialAmount, currency, exchangeRate)}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-400">Opcional (Streaming, Gym, Ocio)</span>
-              <span className="font-semibold text-fuchsia-300">{formatCurrency(optionalAmount)}</span>
+              <span className="font-semibold text-fuchsia-300">{formatCurrency(optionalAmount, currency, exchangeRate)}</span>
             </div>
             <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden flex">
               <div
@@ -264,7 +270,7 @@ export const SubscriptionsView = ({
                   <div>
                     <span className="text-[11px] text-zinc-400 block">Cobro Mensual</span>
                     <span className="text-xl font-bold text-white">
-                      {formatCurrency(sub.amount)}
+                      {formatCurrency(sub.amount, currency, exchangeRate)}
                     </span>
                   </div>
 
@@ -338,14 +344,34 @@ export const SubscriptionsView = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Monto Mensual ($ MXN)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-300 font-medium">Monto Mensual</label>
+                    <div className="flex items-center gap-1 bg-black/50 rounded-lg p-0.5 border border-white/10 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setSubCurrency('USD')}
+                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                          subCurrency === 'USD' ? 'bg-purple-600 text-white font-bold' : 'text-zinc-400'
+                        }`}
+                      >
+                        USD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubCurrency('COP')}
+                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                          subCurrency === 'COP' ? 'bg-emerald-600 text-white font-bold' : 'text-zinc-400'
+                        }`}
+                      >
+                        COP
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="number"
                     step="any"
                     required
-                    placeholder="ej. 549"
+                    placeholder={subCurrency === 'USD' ? 'ej. 19.99' : 'ej. 80000'}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="liquid-input text-xs"

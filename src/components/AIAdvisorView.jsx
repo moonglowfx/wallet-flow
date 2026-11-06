@@ -15,13 +15,15 @@ import {
   Target,
   RefreshCw,
 } from 'lucide-react';
-import { formatCurrency } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const AIAdvisorView = ({
   accounts = [],
   transactions = [],
   subscriptions = [],
   debts = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
 }) => {
   const [antReductionPercent, setAntReductionPercent] = useState(40);
@@ -192,7 +194,7 @@ export const AIAdvisorView = ({
                     Gastos Hormiga al {antRatio}% de tus egresos
                   </h4>
                   <p className="text-2xl font-black text-rose-400 mt-1">
-                    {formatCurrency(antExpenses)} al mes
+                    {formatCurrency(antExpenses, currency, exchangeRate)} al mes
                   </p>
                 </div>
 
@@ -201,7 +203,7 @@ export const AIAdvisorView = ({
                     <strong className="text-white">Problema detectado:</strong> Microconsumos diarios en cafeterías de especialidad, traslados y apps de delivery nocturno.
                   </p>
                   <p className="text-rose-300/90 font-medium">
-                    Impacto: Esta cifra drena {formatCurrency(antExpenses * 12)} anuales sin generar ningún activo duradero.
+                    Impacto: Esta cifra drena {formatCurrency(antExpenses * 12, currency, exchangeRate)} anuales sin generar ningún activo duradero.
                   </p>
                 </div>
               </div>
@@ -222,7 +224,7 @@ export const AIAdvisorView = ({
                     Sobreutilización de Crédito Revolvente ({creditUtilization}%)
                   </h4>
                   <p className="text-2xl font-black text-amber-300 mt-1">
-                    {formatCurrency(totalCreditDebt)} en deuda
+                    {formatCurrency(totalCreditDebt, currency, exchangeRate)} en deuda
                   </p>
                 </div>
 
@@ -252,7 +254,7 @@ export const AIAdvisorView = ({
                     {subscriptions.length} Suscripciones activas
                   </h4>
                   <p className="text-2xl font-black text-purple-300 mt-1">
-                    {formatCurrency(totalFixedExpenses)} comprometidos
+                    {formatCurrency(totalFixedExpenses, currency, exchangeRate)} comprometidos
                   </p>
                 </div>
 
@@ -334,7 +336,7 @@ export const AIAdvisorView = ({
               <div className="liquid-pill p-4 space-y-1">
                 <span className="text-zinc-400 text-xs block">Liquidez Mensual Recuperada</span>
                 <p className="text-2xl font-black text-emerald-400">
-                  +{formatCurrency(monthlyAntSavings)}
+                  +{formatCurrency(monthlyAntSavings, currency, exchangeRate)}
                 </p>
                 <span className="text-[11px] text-zinc-400">
                   disponibles cada mes en tu cuenta líquida
@@ -344,19 +346,19 @@ export const AIAdvisorView = ({
               <div className="liquid-pill p-4 space-y-1">
                 <span className="text-zinc-400 text-xs block">Ahorro Neto Anual (12 Meses)</span>
                 <p className="text-2xl font-black text-purple-300">
-                  +{formatCurrency(annualAntSavings)}
+                  +{formatCurrency(annualAntSavings, currency, exchangeRate)}
                 </p>
                 <span className="text-[11px] text-zinc-400">
-                  suficiente para liquidar la TDC Nu Morada
+                  suficiente para liquidar pasivos revolventes
                 </span>
               </div>
 
               <div className="liquid-pill p-4 space-y-1 border-fuchsia-500/30 bg-fuchsia-950/20">
                 <span className="text-fuchsia-200 text-xs block font-medium">
-                  Proyección a 5 Años en Cajita Turbo (14.25%)
+                  Proyección a 5 Años en Rendimiento (14.25%)
                 </span>
                 <p className="text-2xl font-black text-white">
-                  {formatCurrency(fiveYearInvestmentValue)}
+                  {formatCurrency(fiveYearInvestmentValue, currency, exchangeRate)}
                 </p>
                 <span className="text-[11px] text-zinc-400">
                   capital acumulado con interés compuesto
@@ -374,7 +376,7 @@ export const AIAdvisorView = ({
                   Auditoría Matemática Regla 50 / 30 / 20
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Ingreso total registrado: {formatCurrency(totalIncomes)}
+                  Ingreso total registrado: {formatCurrency(totalIncomes, currency, exchangeRate)}
                 </p>
               </div>
             </div>
@@ -392,7 +394,9 @@ export const AIAdvisorView = ({
                     {needsPercent}% Actual
                   </span>
                 </div>
-                <p className="text-xl font-bold text-zinc-200">{formatCurrency(needsExpense)}</p>
+                <p className="text-xl font-bold text-zinc-200">
+                  {formatCurrency(needsExpense, currency, exchangeRate)}
+                </p>
                 <p className="text-[11px] text-zinc-400">
                   Renta, servicios, seguros y despensa esencial
                 </p>
@@ -416,7 +420,9 @@ export const AIAdvisorView = ({
                     {wantsPercent}% Actual
                   </span>
                 </div>
-                <p className="text-xl font-bold text-zinc-200">{formatCurrency(wantsExpense)}</p>
+                <p className="text-xl font-bold text-zinc-200">
+                  {formatCurrency(wantsExpense, currency, exchangeRate)}
+                </p>
                 <p className="text-[11px] text-zinc-400">
                   Restaurantes, compras tech, salidas y ocio
                 </p>
@@ -441,7 +447,7 @@ export const AIAdvisorView = ({
                   </span>
                 </div>
                 <p className="text-xl font-bold text-emerald-300">
-                  {formatCurrency(actualSavings)}
+                  {formatCurrency(actualSavings, currency, exchangeRate)}
                 </p>
                 <p className="text-[11px] text-zinc-400">
                   Excedente libre para amortización y fondos de alta tasa

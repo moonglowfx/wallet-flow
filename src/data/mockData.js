@@ -200,14 +200,46 @@ export const EXPENSE_CATEGORIES = [
   'Abono a Deuda / TDC',
 ];
 
-export const formatCurrency = (value) => {
-  const num = Number(value) || 0;
+export const DEFAULT_USD_COP_RATE = 4150; // Tasa de cambio base: 1 USD = 4,150 COP
+
+export const formatCurrency = (
+  valueInUSD,
+  currency = 'USD',
+  rate = DEFAULT_USD_COP_RATE,
+  showCode = true
+) => {
+  const num = Number(valueInUSD) || 0;
+  const isNegative = num < 0;
   const absVal = Math.abs(num);
-  const formatted = new Intl.NumberFormat('es-MX', {
+
+  if (currency === 'COP') {
+    const copVal = Math.round(absVal * rate);
+    const formatted = new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(copVal);
+    const result = isNegative ? `-${formatted}` : formatted;
+    return showCode ? `${result} COP` : result;
+  }
+
+  // Moneda Principal: USD
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    currency: 'USD',
+    minimumFractionDigits: Math.abs(num % 1) > 0 ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(absVal);
-  return num < 0 ? `-${formatted}` : formatted;
+  const result = isNegative ? `-${formatted}` : formatted;
+  return showCode ? `${result} USD` : result;
+};
+
+export const formatSecondaryCurrency = (
+  valueInUSD,
+  activeCurrency = 'USD',
+  rate = DEFAULT_USD_COP_RATE
+) => {
+  const targetCurrency = activeCurrency === 'USD' ? 'COP' : 'USD';
+  return formatCurrency(valueInUSD, targetCurrency, rate, true);
 };

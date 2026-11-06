@@ -12,12 +12,14 @@ import {
 } from 'lucide-react';
 import { HeroCard } from './HeroCard.jsx';
 import { FluidLineChart, CategoryRingChart } from './Charts.jsx';
-import { formatCurrency, TIMEFRAME_CONFIG } from '../data/mockData.js';
+import { formatCurrency, TIMEFRAME_CONFIG, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const DashboardView = ({
   accounts = [],
   transactions = [],
   timeframe = 'monthly',
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
   onOpenNewAccount,
   onSelectAccount,
@@ -59,6 +61,8 @@ export const DashboardView = ({
       <HeroCard
         accounts={accounts}
         timeframe={timeframe}
+        currency={currency}
+        exchangeRate={exchangeRate}
         onSelectAccount={onSelectAccount}
         onOpenNewTransaction={onOpenNewTransaction}
         onOpenNewAccount={onOpenNewAccount}
@@ -75,7 +79,7 @@ export const DashboardView = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(totalIncomes * (multiplier === 0.25 ? 0.4 : multiplier === 1 ? 1 : multiplier * 0.9))}
+            {formatCurrency(totalIncomes * (multiplier === 0.25 ? 0.4 : multiplier === 1 ? 1 : multiplier * 0.9), currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
@@ -86,13 +90,13 @@ export const DashboardView = ({
         {/* Expenses Card */}
         <div className="liquid-glass p-5 space-y-3 relative overflow-hidden group hover:border-rose-500/40 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400">Gastos Conssolidados</span>
+            <span className="text-xs font-semibold text-zinc-400">Gastos Consolidados</span>
             <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300">
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(totalExpenses * (multiplier === 0.25 ? 0.35 : multiplier === 1 ? 1 : multiplier * 0.88))}
+            {formatCurrency(totalExpenses * (multiplier === 0.25 ? 0.35 : multiplier === 1 ? 1 : multiplier * 0.88), currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
@@ -132,7 +136,7 @@ export const DashboardView = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(antExpenses)}
+            {formatCurrency(antExpenses, currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-fuchsia-200 pt-1 border-t border-purple-400/20">
             <span>{antPercentageOfExpenses}% de egresos</span>
@@ -282,7 +286,9 @@ export const DashboardView = ({
                           isIncome ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
-                        {isIncome ? `+${formatCurrency(tx.amount)}` : `-${formatCurrency(tx.amount)}`}
+                        {isIncome
+                          ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
+                          : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
                       </p>
                       {tx.notes && (
                         <p className="text-[11px] text-zinc-500 truncate max-w-[200px]">

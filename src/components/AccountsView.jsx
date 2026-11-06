@@ -13,14 +13,18 @@ import {
   Percent,
   Calendar,
   AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { formatCurrency } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const AccountsView = ({
   accounts = [],
   transactions = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewAccount,
   onOpenNewTransaction,
+  onOpenImportModal,
   selectedAccountId,
   setSelectedAccountId,
 }) => {
@@ -81,7 +85,15 @@ export const AccountsView = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={onOpenImportModal}
+            className="liquid-pill px-3.5 py-2.5 text-xs font-semibold text-emerald-300 hover:text-white flex items-center gap-1.5 border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
+            title="Importar archivo Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Importar XLSX</span>
+          </button>
           <button
             onClick={onOpenNewAccount}
             className="liquid-pill px-4 py-2.5 text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-2 border-purple-500/40 hover:bg-purple-600/20 transition-all cursor-pointer"
@@ -209,7 +221,7 @@ export const AccountsView = ({
                       isNegative ? 'text-rose-400' : 'text-white'
                     }`}
                   >
-                    {formatCurrency(acc.balance)}
+                    {formatCurrency(acc.balance, currency, exchangeRate)}
                   </p>
                 </div>
 
@@ -224,7 +236,7 @@ export const AccountsView = ({
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-zinc-400">
-                          Límite {formatCurrency(acc.creditLimit)}
+                          Límite {formatCurrency(acc.creditLimit, currency, exchangeRate)}
                         </span>
                         <span className="text-rose-300 font-semibold">
                           {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}%
@@ -372,7 +384,9 @@ export const AccountsView = ({
                         isIncome ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >
-                      {isIncome ? `+${formatCurrency(tx.amount)}` : `-${formatCurrency(tx.amount)}`}
+                      {isIncome
+                        ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
+                        : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
                     </p>
                     {tx.notes && (
                       <p className="text-[11px] text-zinc-500 max-w-[240px] truncate">

@@ -245,6 +245,124 @@ app.post('/api/debts/:id/payment', async (req, res) => {
   }
 });
 
+// ----------------- BULK IMPORT / SYNC -----------------
+app.post('/api/import', async (req, res) => {
+  try {
+    const { accounts = [], transactions = [], subscriptions = [], debts = [], mode = 'replace' } = req.body;
+
+    if (mode === 'replace') {
+      await clearDatabase();
+    }
+
+    // Insert accounts
+    for (const acc of accounts) {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO accounts (id, name, institution, type, balance, creditLimit, cutOffDay, paymentDueDay, accountNumber, accentGradient, yieldRate)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          acc.id,
+          acc.name,
+          acc.institution || 'Entidad Financiera',
+          acc.type || 'bank',
+          acc.balance || 0,
+          acc.creditLimit || null,
+          acc.cutOffDay || null,
+          acc.paymentDueDay || null,
+          acc.accountNumber || '•••• 0000',
+          acc.accentGradient || null,
+          acc.yieldRate || null,
+        ],
+      });
+    }
+
+    // Insert transactions
+    for (const tx of transactions) {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO transactions (id, title, amount, type, category, accountId, date, notes, isAntExpense)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          tx.id,
+          tx.title,
+          tx.amount,
+          tx.type || 'expense',
+          tx.category || 'Otros',
+          tx.accountId,
+          tx.date || new Date().toISOString().split('T')[0],
+          tx.notes || null,
+          tx.isAntExpense ? 1 : 0,
+        ],
+      });
+    }
+
+    // Insert subscriptions
+    for (const sub of subscriptions) {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, billingDay, accountId, active, essential, badgeColor)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          sub.id,
+          sub.name,
+          sub.category || 'Servicios',
+          sub.amount,
+          sub.billingDay || 1,
+          sub.accountId,
+          sub.active ? 1 : 0,
+          sub.essential ? 1 : 0,
+          sub.badgeColor || '#A855F7',
+        ],
+      });
+    }
+
+    // Insert debts
+    for (const debt of debts) {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO debts (id, title, counterparty, category, totalAmount, paidAmount, interestRate, minimumMonthlyPayment, dueDate)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          debt.id,
+          debt.title,
+          debt.counterparty || 'Entidad',
+          debt.category || 'Préstamo',
+          debt.totalAmount,
+          debt.paidAmount || 0,
+          debt.interestRate || 0,
+          debt.minimumMonthlyPayment || 0,
+          debt.dueDate || '2027-12-31',
+        ],
+      });
+
+      if (debt.payments && Array.isArray(debt.payments)) {
+        for (const p of debt.payments) {
+          await db.execute({
+            sql: `INSERT OR REPLACE INTO debt_payments (id, debtId, amount, date, note, accountId)
+                  VALUES (?, ?, ?, ?, ?, ?)`,
+            args: [
+              p.id,
+              debt.id,
+              p.amount,
+              p.date,
+              p.note || 'Abono',
+              p.accountId || null,
+            ],
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      counts: {
+        accounts: accounts.length,
+        transactions: transactions.length,
+        subscriptions: subscriptions.length,
+        debts: debts.length,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ----------------- CLEAR & RESET DEMO -----------------
 app.post('/api/clear', async (req, res) => {
   try {

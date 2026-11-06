@@ -11,12 +11,14 @@ import {
   ShieldAlert,
   Clock,
 } from 'lucide-react';
-import { formatCurrency } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
 export const DebtsView = ({
   debts = [],
   setDebts,
   accounts = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
   onLogPaymentTransaction,
 }) => {
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState(null);
@@ -26,6 +28,7 @@ export const DebtsView = ({
 
   // Payment modal state
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentCurrency, setPaymentCurrency] = useState('USD');
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentAccount, setPaymentAccount] = useState(defaultLiquidAcc);
 
@@ -34,6 +37,7 @@ export const DebtsView = ({
   const [newCounterparty, setNewCounterparty] = useState('');
   const [newCategory, setNewCategory] = useState('Préstamo Personal');
   const [newTotal, setNewTotal] = useState('');
+  const [newDebtCurrency, setNewDebtCurrency] = useState('USD');
   const [newPaid, setNewPaid] = useState('0');
   const [newRate, setNewRate] = useState('12.5');
   const [newMinMonthly, setNewMinMonthly] = useState('');
@@ -67,12 +71,15 @@ export const DebtsView = ({
     e.preventDefault();
     if (!selectedDebtForPayment || !paymentAmount) return;
 
-    const amountNum = parseFloat(paymentAmount);
-    if (isNaN(amountNum) || amountNum <= 0) return;
+    const rawNum = parseFloat(paymentAmount);
+    if (isNaN(rawNum) || rawNum <= 0) return;
+
+    const amountNum = paymentCurrency === 'COP' ? rawNum / exchangeRate : rawNum;
+    const finalAmountUSD = Math.round(amountNum * 100) / 100;
 
     const newPayment = {
       id: `dp-${Date.now()}`,
-      amount: amountNum,
+      amount: finalAmountUSD,
       date: new Date().toISOString().split('T')[0],
       note: paymentNote.trim() || 'Abono a capital ordinario',
       accountId: paymentAccount,
@@ -81,7 +88,7 @@ export const DebtsView = ({
     setDebts((prevDebts) =>
       prevDebts.map((d) => {
         if (d.id === selectedDebtForPayment.id) {
-          const updatedPaid = Math.min(d.totalAmount, (d.paidAmount || 0) + amountNum);
+          const updatedPaid = Math.min(d.totalAmount, (d.paidAmount || 0) + finalAmountUSD);
           return {
             ...d,
             paidAmount: updatedPaid,
@@ -96,7 +103,7 @@ export const DebtsView = ({
     if (onLogPaymentTransaction) {
       onLogPaymentTransaction({
         title: `Abono a: ${selectedDebtForPayment.title}`,
-        amount: amountNum,
+        amount: finalAmountUSD,
         type: 'expense',
         category: 'Abono a Deuda / TDC',
         accountId: paymentAccount,
@@ -115,15 +122,25 @@ export const DebtsView = ({
     e.preventDefault();
     if (!newTitle.trim() || !newTotal) return;
 
+    let totalNum = parseFloat(newTotal);
+    let paidNum = parseFloat(newPaid) || 0;
+    let minMonthlyNum = parseFloat(newMinMonthly) || Math.round(totalNum * 0.05);
+
+    if (newDebtCurrency === 'COP') {
+      totalNum = totalNum / exchangeRate;
+      paidNum = paidNum / exchangeRate;
+      minMonthlyNum = minMonthlyNum / exchangeRate;
+    }
+
     const createdDebt = {
       id: `debt-${Date.now()}`,
       title: newTitle.trim(),
       counterparty: newCounterparty.trim() || 'Entidad Financiera',
       category: newCategory,
-      totalAmount: parseFloat(newTotal),
-      paidAmount: parseFloat(newPaid) || 0,
+      totalAmount: Math.round(totalNum * 100) / 100,
+      paidAmount: Math.round(paidNum * 100) / 100,
       interestRate: parseFloat(newRate) || 0,
-      minimumMonthlyPayment: parseFloat(newMinMonthly) || Math.round(parseFloat(newTotal) * 0.05),
+      minimumMonthlyPayment: Math.round(minMonthlyNum * 100) / 100,
       dueDate: newDueDate,
       payments: [],
     };
@@ -167,7 +184,7 @@ export const DebtsView = ({
             </span>
             <div className="flex items-baseline gap-3">
               <span className="text-3xl sm:text-4xl font-black text-white">
-                {formatCurrency(totalRemaining)}
+                {formatCurrency(totalRemaining, currency, exchangeRate)}
               </span>
               <span className="text-xs text-rose-300 font-medium">saldo insoluto pendiente</span>
             </div>
@@ -176,10 +193,10 @@ export const DebtsView = ({
           <div className="text-right sm:border-l sm:border-white/10 sm:pl-6">
             <span className="text-xs text-zinc-400 block">Total Liquidado a la fecha</span>
             <span className="text-2xl font-bold text-emerald-300">
-              {formatCurrency(totalAmortized)}
+              {formatCurrency(totalAmortized, currency, exchangeRate)}
             </span>
             <span className="text-[11px] text-zinc-400 block">
-              de {formatCurrency(totalPrincipal)} iniciales
+              de {formatCurrency(totalPrincipal, currency, exchangeRate)} iniciales
             </span>
           </div>
         </div>
@@ -269,13 +286,13 @@ export const DebtsView = ({
                     <div>
                       <span className="text-zinc-400 block text-[11px]">Resta por pagar</span>
                       <span className="text-2xl font-black text-rose-300">
-                        {formatCurrency(remaining)}
+                        {formatCurrency(remaining, currency, exchangeRate)}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="text-zinc-400 block text-[11px]">Pagado</span>
                       <span className="text-sm font-semibold text-emerald-300">
-                        {formatCurrency(debt.paidAmount)} / {formatCurrency(debt.totalAmount)}
+                        {formatCurrency(debt.paidAmount, currency, exchangeRate)} / {formatCurrency(debt.totalAmount, currency, exchangeRate)}
                       </span>
                     </div>
                   </div>
@@ -304,7 +321,7 @@ export const DebtsView = ({
                   <div>
                     <span className="text-zinc-400 block text-[10px]">Pago Mínimo</span>
                     <span className="font-semibold text-white">
-                      {formatCurrency(debt.minimumMonthlyPayment)}
+                      {formatCurrency(debt.minimumMonthlyPayment, currency, exchangeRate)}
                     </span>
                   </div>
                   <div>
@@ -335,7 +352,7 @@ export const DebtsView = ({
                         >
                           <div>
                             <span className="font-semibold text-emerald-300">
-                              +{formatCurrency(p.amount)}
+                              +{formatCurrency(p.amount, currency, exchangeRate)}
                             </span>
                             <span className="text-zinc-400 text-[11px] block truncate max-w-[200px]">
                               {p.note}
@@ -386,21 +403,53 @@ export const DebtsView = ({
               Saldo actual pendiente:{' '}
               <span className="font-bold text-white">
                 {formatCurrency(
-                  selectedDebtForPayment.totalAmount - selectedDebtForPayment.paidAmount
+                  selectedDebtForPayment.totalAmount - selectedDebtForPayment.paidAmount,
+                  currency,
+                  exchangeRate
                 )}
               </span>
             </div>
 
             <form onSubmit={handleAddPayment} className="space-y-4 text-xs">
               <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Monto del Abono ($ MXN)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-zinc-300 font-medium">
+                    Monto del Abono
+                  </label>
+                  <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentCurrency('USD')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                        paymentCurrency === 'USD'
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      USD $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentCurrency('COP')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                        paymentCurrency === 'COP'
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      COP $
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="number"
                   step="any"
                   required
-                  placeholder={`ej. ${selectedDebtForPayment.minimumMonthlyPayment}`}
+                  placeholder={
+                    paymentCurrency === 'COP'
+                      ? `ej. ${Math.round((selectedDebtForPayment.minimumMonthlyPayment || 100) * exchangeRate)}`
+                      : `ej. ${selectedDebtForPayment.minimumMonthlyPayment || 100}`
+                  }
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   className="liquid-input text-xs text-lg font-bold"
@@ -420,7 +469,7 @@ export const DebtsView = ({
                     .filter((a) => a.type !== 'credit')
                     .map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name} — Saldo: {formatCurrency(a.balance)}
+                        {a.name} — Saldo: {formatCurrency(a.balance, currency, exchangeRate)}
                       </option>
                     ))}
                 </select>
@@ -532,14 +581,40 @@ export const DebtsView = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Monto Total Original ($)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-300 font-medium">
+                      Monto Original
+                    </label>
+                    <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setNewDebtCurrency('USD')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          newDebtCurrency === 'USD'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        USD $
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewDebtCurrency('COP')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          newDebtCurrency === 'COP'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        COP $
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="number"
                     step="any"
                     required
-                    placeholder="ej. 50000"
+                    placeholder={newDebtCurrency === 'COP' ? 'ej. 20000000' : 'ej. 5000'}
                     value={newTotal}
                     onChange={(e) => setNewTotal(e.target.value)}
                     className="liquid-input text-xs"
@@ -547,7 +622,7 @@ export const DebtsView = ({
                 </div>
                 <div>
                   <label className="block text-zinc-300 font-medium mb-1">
-                    Ya Amortizado ($)
+                    Ya Amortizado ({newDebtCurrency})
                   </label>
                   <input
                     type="number"
@@ -575,11 +650,12 @@ export const DebtsView = ({
                 </div>
                 <div>
                   <label className="block text-zinc-300 font-medium mb-1">
-                    Pago Mínimo ($)
+                    Pago Mínimo ({newDebtCurrency})
                   </label>
                   <input
                     type="number"
                     step="any"
+                    placeholder={newDebtCurrency === 'COP' ? 'ej. 500000' : 'ej. 150'}
                     value={newMinMonthly}
                     onChange={(e) => setNewMinMonthly(e.target.value)}
                     className="liquid-input text-xs"

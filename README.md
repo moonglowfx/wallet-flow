@@ -1,32 +1,45 @@
 # Wallet Flow — Liquid Glass Personal Finance 💳✨
 
-Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la estética **Liquid Glass (Glassmorphism para iOS)**, 100% responsiva (Mobile-First) y optimizada para despliegue instantáneo en **Vercel** y control de versiones en **GitHub**.
+Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la estética **Liquid Glass (Glassmorphism para iOS)**, 100% responsiva (Mobile-First), con sistema dual de divisas (**USD principal / COP secundario**), importador masivo en **Excel (.xlsx)** y persistencia híbrida en **SQLite / LibSQL** y `localStorage`.
 
 ---
 
 ## 🚀 Características Principales
 
-1. **Dashboard Principal:**
+1. **Sistema Dual de Divisas (USD / COP):**
+   - **USD como moneda base y principal**, con **COP (Pesos Colombianos)** como moneda secundaria.
+   - Switcher interactivo instantáneo `[ USD $ | COP $ ]` en la barra superior con indicador de tipo de cambio en tiempo real (`1 USD = $4,150 COP`).
+   - Todos los módulos (Dashboard, Hero Card, Bóveda de Cuentas, Suscripciones, Deudas y Advisor IA) convierten y proyectan sus valores dinámicamente al cambiar de divisa.
+   - En modales de registro (movimientos, cuentas, abonos, suscripciones y deudas) el usuario puede ingresar el monto en USD o COP indistintamente.
+
+2. **Importador y Exportador Masivo en Excel (.xlsx):**
+   - Descarga de plantilla oficial en Excel estructurada en 4 hojas: `Cuentas`, `Transacciones`, `Suscripciones` y `Deudas`.
+   - Carga mediante arrastrar y soltar (drag & drop) o selector de archivo.
+   - Detección de moneda del archivo (USD o COP) con conversión automática al modelo interno.
+   - Modalidades de importación: **Reemplazo total** (limpieza y sobreescritura limpia) o **Fusión progresiva** (merge acumulativo sin duplicados).
+   - Sincronización instantánea con SQLite y `localStorage`.
+
+3. **Dashboard Principal:**
    - Filtro temporal global reactivo: Semanal, Mensual, Trimestral y Anual.
-   - **Hero Card (Capital Actual):** Balance total neto con desglose segmentado por cuentas (Bancos, Efectivo y Tarjetas de Crédito).
+   - **Hero Card (Capital Actual):** Balance total neto en la divisa activa con equivalencia secundaria automática (`≈ $X,XXX COP`).
    - Resumen visual con gráficos fluidos en SVG (Curvas Bezier de Ingresos vs. Gastos y Anillo Donut de distribución por categoría).
    - Feed de movimientos con filtro rápido (Todos, Ingresos, Gastos, Gastos Hormiga).
 
-2. **Gestión de Cuentas y Transacciones:**
+4. **Gestión de Cuentas y Transacciones:**
    - Soporte para **Efectivo**, **Cuentas Bancarias (Débito/Ahorro con tasas de rendimiento)** y **Tarjetas de Crédito (con límite y uso)**.
-   - Modal de registro rápido para **Entrada / Salida** con asignación obligatoria a cuenta, categoría, fecha y notas.
-   - Actualización en tiempo real del saldo de cada cuenta al registrar un movimiento.
+   - Modal de registro rápido para **Entrada / Salida** con asignación obligatoria a cuenta, categoría, fecha, notas y divisa.
+   - Actualización atómica en tiempo real del saldo de cada cuenta al registrar un movimiento.
 
-3. **Gastos Fijos y Suscripciones:**
+5. **Gastos Fijos y Suscripciones:**
    - Panel de control de pasivos recurrentes (renta, gimnasio, streaming, seguros).
    - Cálculo automático de impacto mensual y proyección anualizada.
-   - Diferenciación entre gastos esenciales y opcionales/optimizables.
+   - Interruptor de estado activo/pausado y categorización de esencialidad.
 
-4. **Gestor de Deudas y Abonos:**
+6. **Gestor de Deudas y Abonos:**
    - Amortización progresiva de créditos automotrices, préstamos personales y tarjetas.
-   - Registro de **abonos a capital** con barras de progreso hacia la liquidación total.
+   - Registro de **abonos a capital** con selector de cuenta de origen, fecha, notas y barras de progreso hacia la liquidación total.
 
-5. **Aura AI — Smart Financial Advisor:**
+7. **Aura AI — Smart Financial Advisor:**
    - Diagnóstico algorítmico de fugas ("Qué estás haciendo mal": detección de gastos hormiga y sobreutilización de crédito).
    - Simulador interactivo predictivo con slider de ahorro y cálculo con interés compuesto.
    - Auditoría matemática bajo la **Regla 50 / 30 / 20** y plan de acción escalonado (Método Avalancha).
@@ -35,12 +48,13 @@ Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la e
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend:** React 18 (JavaScript ES Modules & JSX)
+- **Frontend:** React 18 (JavaScript ES Modules & JSX sin TypeScript)
 - **Bundler:** Vite 6
 - **Estilos:** Tailwind CSS 3.4 con extensiones Liquid Glass personalizadas
+- **Procesamiento de Archivos:** SheetJS (`xlsx`) para lectura y generación de hojas de cálculo
 - **Iconos:** Lucide Icons
-- **Persistencia Actual:** `localStorage` en el navegador del cliente (offline-first, no pierde datos al recargar)
-- **Hosting y CI/CD:** Optimizado para Vercel & GitHub Actions
+- **Base de Datos:** SQLite / LibSQL con API REST Express en Node.js y fallback offline en `localStorage`
+- **Hosting y CI/CD:** Optimizado para Vercel y GitHub
 
 ---
 
@@ -48,8 +62,8 @@ Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la e
 
 ```bash
 # 1. Clonar el repositorio
-git clone <URL_DE_TU_REPOSITORIO>
-cd "WALLET FLOW"
+git clone https://github.com/moonglowfx/wallet-flow.git
+cd "wallet-flow"
 
 # 2. Instalar dependencias
 npm install
@@ -57,7 +71,10 @@ npm install
 # 3. Iniciar entorno de desarrollo
 npm run dev
 
-# 4. Compilar para producción
+# 4. Iniciar servidor SQLite local (opcional para API REST)
+npm run server
+
+# 5. Compilar para producción
 npm run build
 ```
 

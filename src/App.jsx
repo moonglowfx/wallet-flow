@@ -8,17 +8,25 @@ import { DebtsView } from './components/DebtsView.jsx';
 import { AIAdvisorView } from './components/AIAdvisorView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
+import { ExcelImportModal } from './components/ExcelImportModal.jsx';
 import {
   INITIAL_ACCOUNTS,
   INITIAL_TRANSACTIONS,
   INITIAL_SUBSCRIPTIONS,
   INITIAL_DEBTS,
+  DEFAULT_USD_COP_RATE,
 } from './data/mockData.js';
 import { api } from './services/api.js';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
+
+  // Currency State: USD as primary, COP as secondary
+  const [currency, setCurrency] = useState(() => {
+    return localStorage.getItem('wf_currency') || 'USD';
+  });
+  const [exchangeRate, setExchangeRate] = useState(DEFAULT_USD_COP_RATE);
 
   // Application State: Cleared of dummy data and ready for real accounts
   const [accounts, setAccounts] = useState(() => {
@@ -85,6 +93,7 @@ export function App() {
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Initial load from SQLite Database if server is running
@@ -97,14 +106,19 @@ export function App() {
           api.getSubscriptions(),
           api.getDebts(),
         ]);
-        if (accs) setAccounts(accs);
-        if (txs) setTransactions(txs);
-        if (subs) setSubscriptions(subs);
-        if (dts) setDebts(dts);
+        if (accs && accs.length > 0) setAccounts(accs);
+        if (txs && txs.length > 0) setTransactions(txs);
+        if (subs && subs.length > 0) setSubscriptions(subs);
+        if (dts && dts.length > 0) setDebts(dts);
       } catch (_) {}
     }
     loadData();
   }, []);
+
+  // Sync currency to local storage
+  useEffect(() => {
+    localStorage.setItem('wf_currency', currency);
+  }, [currency]);
 
   // Sync to local storage
   useEffect(() => {
@@ -181,7 +195,62 @@ export function App() {
     showToast(`Cuenta creada: ${newAcc.name}`);
   };
 
-  // Calculate Net Worth: sum of all account balances
+  // Handle importing Excel data
+  const handleImportData = async (parsedData, mode = 'replace') => {
+    let nextAccounts = [];
+    let nextTransactions = [];
+    let nextSubscriptions = [];
+    let nextDebts = [];
+
+    if (mode === 'replace') {
+      nextAccounts = parsedData.accounts || [];
+      nextTransactions = parsedData.transactions || [];
+      nextSubscriptions = parsedData.subscriptions || [];
+      nextDebts = parsedData.debts || [];
+    } else {
+      // Merge mode
+      const existingAccIds = new Set(accounts.map((a) => a.id));
+      const newAccs = (parsedData.accounts || []).filter((a) => !existingAccIds.has(a.id));
+      nextAccounts = [...accounts, ...newAccs];
+
+      const existingTxIds = new Set(transactions.map((t) => t.id));
+      const newTxs = (parsedData.transactions || []).filter((t) => !existingTxIds.has(t.id));
+      nextTransactions = [...newTxs, ...transactions];
+
+      const existingSubIds = new Set(subscriptions.map((s) => s.id));
+      const newSubs = (parsedData.subscriptions || []).filter((s) => !existingSubIds.has(s.id));
+      nextSubscriptions = [...subscriptions, ...newSubs];
+
+      const existingDebtIds = new Set(debts.map((d) => d.id));
+      const newDebts = (parsedData.debts || []).filter((d) => !existingDebtIds.has(d.id));
+      nextDebts = [...debts, ...newDebts];
+    }
+
+    setAccounts(nextAccounts);
+    setTransactions(nextTransactions);
+    setSubscriptions(nextSubscriptions);
+    setDebts(nextDebts);
+
+    // Save to localStorage
+    localStorage.setItem('wf_accounts', JSON.stringify(nextAccounts));
+    localStorage.setItem('wf_transactions', JSON.stringify(nextTransactions));
+    localStorage.setItem('wf_subscriptions', JSON.stringify(nextSubscriptions));
+    localStorage.setItem('wf_debts', JSON.stringify(nextDebts));
+
+    // Save to SQLite
+    await api.bulkImport({
+      accounts: nextAccounts,
+      transactions: nextTransactions,
+      subscriptions: nextSubscriptions,
+      debts: nextDebts,
+    }, mode);
+
+    showToast(
+      `Excel importado con éxito: ${nextAccounts.length} cuentas, ${nextTransactions.length} movimientos`
+    );
+  };
+
+  // Calculate Net Worth: sum of all account balances in USD base
   const netWorth = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
 
   // Ant expenses count for alert badges
@@ -203,6 +272,8 @@ export function App() {
         onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
         netWorth={netWorth}
         antExpenseAlertCount={antAlertCount}
+        currency={currency}
+        exchangeRate={exchangeRate}
       />
 
       {/* Main Content Area (offset by desktop sidebar) */}
@@ -211,7 +282,11 @@ export function App() {
           activeTab={activeTab}
           timeframe={timeframe}
           setTimeframe={setTimeframe}
+          currency={currency}
+          setCurrency={setCurrency}
+          exchangeRate={exchangeRate}
           onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+          onOpenImportModal={() => setIsImportModalOpen(true)}
           onResetDemoData={handleResetDemoData}
           onNavigateAI={() => setActiveTab('ai-advisor')}
         />
@@ -222,6 +297,8 @@ export function App() {
               accounts={accounts}
               transactions={transactions}
               timeframe={timeframe}
+              currency={currency}
+              exchangeRate={exchangeRate}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
               onSelectAccount={(accId) => {
@@ -236,8 +313,11 @@ export function App() {
             <AccountsView
               accounts={accounts}
               transactions={transactions}
+              currency={currency}
+              exchangeRate={exchangeRate}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenImportModal={() => setIsImportModalOpen(true)}
               selectedAccountId={selectedAccountId}
               setSelectedAccountId={setSelectedAccountId}
             />
@@ -248,6 +328,8 @@ export function App() {
               subscriptions={subscriptions}
               setSubscriptions={setSubscriptions}
               accounts={accounts}
+              currency={currency}
+              exchangeRate={exchangeRate}
             />
           )}
 
@@ -256,6 +338,8 @@ export function App() {
               debts={debts}
               setDebts={setDebts}
               accounts={accounts}
+              currency={currency}
+              exchangeRate={exchangeRate}
               onLogPaymentTransaction={handleSaveTransaction}
             />
           )}
@@ -266,6 +350,8 @@ export function App() {
               transactions={transactions}
               subscriptions={subscriptions}
               debts={debts}
+              currency={currency}
+              exchangeRate={exchangeRate}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
             />
           )}
@@ -277,6 +363,8 @@ export function App() {
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}
         accounts={accounts}
+        currency={currency}
+        exchangeRate={exchangeRate}
         onSaveTransaction={handleSaveTransaction}
       />
 
@@ -284,7 +372,18 @@ export function App() {
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
+        currency={currency}
+        exchangeRate={exchangeRate}
         onSaveAccount={handleSaveAccount}
+      />
+
+      {/* Excel (.xlsx) Import / Export Modal */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportData={handleImportData}
+        activeCurrency={currency}
+        exchangeRate={exchangeRate}
       />
 
       {/* Floating Toast Notification */}
