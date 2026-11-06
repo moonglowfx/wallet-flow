@@ -200,139 +200,158 @@ export const DebtsView = ({
       </div>
 
       {/* Debts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {debts.map((debt) => {
-          const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
-          const progress = Math.min(100, Math.round((debt.paidAmount / debt.totalAmount) * 100));
-          const isLiquidated = remaining === 0;
+      {debts.length === 0 ? (
+        <div className="liquid-glass p-8 text-center space-y-4 max-w-lg mx-auto">
+          <HandCoins className="w-10 h-10 text-purple-400 mx-auto" />
+          <div>
+            <h3 className="text-base font-bold text-white">Sin deudas ni pasivos registrados</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              ¡Excelente salud financiera! Puedes registrar créditos automotrices, hipotecas o compras a MSI para monitorear tu amortización.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowNewDebtModal(true)}
+            className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Registrar Crédito o Deuda</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {debts.map((debt) => {
+            const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
+            const progress = Math.min(100, Math.round((debt.paidAmount / debt.totalAmount) * 100));
+            const isLiquidated = remaining === 0;
 
-          return (
-            <div
-              key={debt.id}
-              className={`liquid-glass p-6 space-y-5 relative transition-all duration-300 ${
-                isLiquidated
-                  ? 'border-emerald-500/40 bg-emerald-950/10'
-                  : 'hover:border-purple-400/50'
-              }`}
-            >
-              {/* Header Row */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-white text-base tracking-tight">
-                      {debt.title}
-                    </h3>
-                    {isLiquidated && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Liquidada al 100%
+            return (
+              <div
+                key={debt.id}
+                className={`liquid-glass p-6 space-y-5 relative transition-all duration-300 ${
+                  isLiquidated
+                    ? 'border-emerald-500/40 bg-emerald-950/10'
+                    : 'hover:border-purple-400/50'
+                }`}
+              >
+                {/* Header Row */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-white text-base tracking-tight">
+                        {debt.title}
+                      </h3>
+                      {isLiquidated && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Liquidada al 100%
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Acreedor: <span className="text-purple-300 font-medium">{debt.counterparty}</span> • {debt.category}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedDebtForPayment(debt)}
+                    disabled={isLiquidated}
+                    className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
+                      isLiquidated ? 'opacity-40 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Ingresar Abono</span>
+                  </button>
+                </div>
+
+                {/* Balances and Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <div>
+                      <span className="text-zinc-400 block text-[11px]">Resta por pagar</span>
+                      <span className="text-2xl font-black text-rose-300">
+                        {formatCurrency(remaining)}
                       </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-zinc-400 block text-[11px]">Pagado</span>
+                      <span className="text-sm font-semibold text-emerald-300">
+                        {formatCurrency(debt.paidAmount)} / {formatCurrency(debt.totalAmount)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-2.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/10">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>{progress}% amortizado</span>
+                    <span>Meta: Liquidación total</span>
+                  </div>
+                </div>
+
+                {/* Debt Metadata Grid */}
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
+                  <div>
+                    <span className="text-zinc-400 block text-[10px]">Tasa Anual</span>
+                    <span className="font-semibold text-purple-200">
+                      {debt.interestRate > 0 ? `${debt.interestRate}%` : '0% MSI'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[10px]">Pago Mínimo</span>
+                    <span className="font-semibold text-white">
+                      {formatCurrency(debt.minimumMonthlyPayment)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[10px]">Vencimiento</span>
+                    <span className="font-semibold text-zinc-300">{debt.dueDate}</span>
+                  </div>
+                </div>
+
+                {/* Payments History Timeline */}
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-purple-400" />
+                      Historial de Abonos Registrados ({debt.payments?.length || 0})
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {(!debt.payments || debt.payments.length === 0) ? (
+                      <p className="text-[11px] text-zinc-500 italic py-1">
+                        Aún no hay abonos registrados para esta deuda
+                      </p>
+                    ) : (
+                      debt.payments.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] text-xs"
+                        >
+                          <div>
+                            <span className="font-semibold text-emerald-300">
+                              +{formatCurrency(p.amount)}
+                            </span>
+                            <span className="text-zinc-400 text-[11px] block truncate max-w-[200px]">
+                              {p.note}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-zinc-500 font-mono">{p.date}</span>
+                        </div>
+                      ))
                     )}
                   </div>
-                  <p className="text-xs text-zinc-400">
-                    Acreedor: <span className="text-purple-300 font-medium">{debt.counterparty}</span> • {debt.category}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setSelectedDebtForPayment(debt)}
-                  disabled={isLiquidated}
-                  className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
-                    isLiquidated ? 'opacity-40 cursor-not-allowed' : ''
-                  }`}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Ingresar Abono</span>
-                </button>
-              </div>
-
-              {/* Balances and Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between text-xs">
-                  <div>
-                    <span className="text-zinc-400 block text-[11px]">Resta por pagar</span>
-                    <span className="text-2xl font-black text-rose-300">
-                      {formatCurrency(remaining)}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-zinc-400 block text-[11px]">Pagado</span>
-                    <span className="text-sm font-semibold text-emerald-300">
-                      {formatCurrency(debt.paidAmount)} / {formatCurrency(debt.totalAmount)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full h-2.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/10">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full transition-all duration-500 shadow-sm"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>{progress}% amortizado</span>
-                  <span>Meta: Liquidación total</span>
                 </div>
               </div>
-
-              {/* Debt Metadata Grid */}
-              <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
-                <div>
-                  <span className="text-zinc-400 block text-[10px]">Tasa Anual</span>
-                  <span className="font-semibold text-purple-200">
-                    {debt.interestRate > 0 ? `${debt.interestRate}%` : '0% MSI'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-zinc-400 block text-[10px]">Pago Mínimo</span>
-                  <span className="font-semibold text-white">
-                    {formatCurrency(debt.minimumMonthlyPayment)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-zinc-400 block text-[10px]">Vencimiento</span>
-                  <span className="font-semibold text-zinc-300">{debt.dueDate}</span>
-                </div>
-              </div>
-
-              {/* Payments History Timeline */}
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-purple-400" />
-                    Historial de Abonos Registrados ({debt.payments?.length || 0})
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                  {(!debt.payments || debt.payments.length === 0) ? (
-                    <p className="text-[11px] text-zinc-500 italic py-1">
-                      Aún no hay abonos registrados para esta deuda
-                    </p>
-                  ) : (
-                    debt.payments.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] text-xs"
-                      >
-                        <div>
-                          <span className="font-semibold text-emerald-300">
-                            +{formatCurrency(p.amount)}
-                          </span>
-                          <span className="text-zinc-400 text-[11px] block truncate max-w-[200px]">
-                            {p.note}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-zinc-500 font-mono">{p.date}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal: Ingresar Abono a Deuda */}
       {selectedDebtForPayment && (

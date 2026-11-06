@@ -15,7 +15,7 @@ export const api = {
       const res = await fetch(`${API_BASE}/accounts`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) return data;
       }
     } catch (_) {}
     const saved = localStorage.getItem('wf_accounts');
@@ -40,7 +40,7 @@ export const api = {
       const res = await fetch(`${API_BASE}/transactions`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) return data;
       }
     } catch (_) {}
     const saved = localStorage.getItem('wf_transactions');
@@ -65,7 +65,7 @@ export const api = {
       const res = await fetch(`${API_BASE}/subscriptions`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) return data;
       }
     } catch (_) {}
     const saved = localStorage.getItem('wf_subscriptions');
@@ -100,7 +100,7 @@ export const api = {
       const res = await fetch(`${API_BASE}/debts`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) return data;
       }
     } catch (_) {}
     const saved = localStorage.getItem('wf_debts');

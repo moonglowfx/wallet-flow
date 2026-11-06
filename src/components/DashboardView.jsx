@@ -19,6 +19,7 @@ export const DashboardView = ({
   transactions = [],
   timeframe = 'monthly',
   onOpenNewTransaction,
+  onOpenNewAccount,
   onSelectAccount,
   onNavigateTab,
 }) => {
@@ -60,6 +61,7 @@ export const DashboardView = ({
         timeframe={timeframe}
         onSelectAccount={onSelectAccount}
         onOpenNewTransaction={onOpenNewTransaction}
+        onOpenNewAccount={onOpenNewAccount}
       />
 
       {/* 2. SUMMARY METRIC CARDS (4 Glass Cards) */}
@@ -215,68 +217,84 @@ export const DashboardView = ({
 
         {/* Transaction items list */}
         <div className="space-y-2.5">
-          {filteredTransactions.slice(0, 8).map((tx) => {
-            const acc = accounts.find((a) => a.id === tx.accountId);
-            const isIncome = tx.type === 'income';
-
-            return (
-              <div
-                key={tx.id}
-                className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-200"
+          {filteredTransactions.length === 0 ? (
+            <div className="p-8 text-center text-zinc-400 space-y-2">
+              <Layers className="w-8 h-8 text-purple-400 mx-auto" />
+              <p className="text-sm font-semibold text-white">No hay movimientos registrados</p>
+              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                Registra tus ingresos o gastos para que el sistema audite tu flujo y alimente las estadísticas.
+              </p>
+              <button
+                onClick={onOpenNewTransaction}
+                className="liquid-button-primary px-4 py-2 text-xs font-semibold mt-2 cursor-pointer inline-flex items-center gap-1.5"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                      isIncome
-                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                        : tx.isAntExpense
-                        ? 'bg-fuchsia-500/20 border-fuchsia-500/30 text-fuchsia-300'
-                        : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
-                    }`}
-                  >
-                    {isIncome ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                  </div>
+                <span>+ Registrar Primer Movimiento</span>
+              </button>
+            </div>
+          ) : (
+            filteredTransactions.slice(0, 8).map((tx) => {
+              const acc = accounts.find((a) => a.id === tx.accountId);
+              const isIncome = tx.type === 'income';
 
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
-                        {tx.title}
-                      </p>
-                      {tx.isAntExpense && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                          Gasto Hormiga
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5 flex-wrap">
-                      <span className="text-purple-300 font-medium">{tx.category}</span>
-                      <span>•</span>
-                      <span>{acc ? `${acc.name} (${acc.institution})` : 'Cuenta Principal'}</span>
-                      <span>•</span>
-                      <span>{tx.date}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
-                  <div className="text-right">
-                    <p
-                      className={`text-base font-bold tracking-tight ${
-                        isIncome ? 'text-emerald-400' : 'text-rose-400'
+              return (
+                <div
+                  key={tx.id}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-200"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                        isIncome
+                          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                          : tx.isAntExpense
+                          ? 'bg-fuchsia-500/20 border-fuchsia-500/30 text-fuchsia-300'
+                          : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
                       }`}
                     >
-                      {isIncome ? `+${formatCurrency(tx.amount)}` : `-${formatCurrency(tx.amount)}`}
-                    </p>
-                    {tx.notes && (
-                      <p className="text-[11px] text-zinc-500 truncate max-w-[200px]">
-                        {tx.notes}
+                      {isIncome ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
+                          {tx.title}
+                        </p>
+                        {tx.isAntExpense && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                            Gasto Hormiga
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5 flex-wrap">
+                        <span className="text-purple-300 font-medium">{tx.category}</span>
+                        <span>•</span>
+                        <span>{acc ? `${acc.name} (${acc.institution})` : 'Cuenta Principal'}</span>
+                        <span>•</span>
+                        <span>{tx.date}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                    <div className="text-right">
+                      <p
+                        className={`text-base font-bold tracking-tight ${
+                          isIncome ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {isIncome ? `+${formatCurrency(tx.amount)}` : `-${formatCurrency(tx.amount)}`}
                       </p>
-                    )}
+                      {tx.notes && (
+                        <p className="text-[11px] text-zinc-500 truncate max-w-[200px]">
+                          {tx.notes}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* View all footer CTA */}

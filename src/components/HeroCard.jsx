@@ -17,6 +17,7 @@ export const HeroCard = ({
   timeframe = 'monthly',
   onSelectAccount,
   onOpenNewTransaction,
+  onOpenNewAccount,
 }) => {
   const [showValues, setShowValues] = useState(true);
 
@@ -157,96 +158,114 @@ export const HeroCard = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {accounts.map((acc) => {
-            const Icon = getAccountIcon(acc.type);
-            const isNegative = (acc.balance || 0) < 0;
+        {accounts.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10 text-center space-y-3">
+            <Building2 className="w-8 h-8 text-purple-400 mx-auto" />
+            <div>
+              <p className="text-sm font-bold text-white">Aún no tienes cuentas registradas</p>
+              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                Comienza agregando tu primera cuenta de Efectivo, Cuenta Bancaria o Tarjeta de Crédito para activar el desglose patrimonial.
+              </p>
+            </div>
+            <button
+              onClick={onOpenNewAccount}
+              className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
+            >
+              <span>+ Crear Mi Primera Cuenta</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {accounts.map((acc) => {
+              const Icon = getAccountIcon(acc.type);
+              const isNegative = (acc.balance || 0) < 0;
 
-            return (
-              <div
-                key={acc.id}
-                onClick={() => onSelectAccount && onSelectAccount(acc.id)}
-                className="group relative p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-purple-400/40 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-liquid-purple"
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+              return (
+                <div
+                  key={acc.id}
+                  onClick={() => onSelectAccount && onSelectAccount(acc.id)}
+                  className="group relative p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-purple-400/40 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-liquid-purple"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          acc.type === 'credit'
+                            ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                            : acc.type === 'cash'
+                            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                            : 'bg-purple-500/20 border-purple-500/30 text-purple-200'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
+                          {acc.name}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 truncate">
+                          {acc.institution} • {acc.accountNumber}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
                         acc.type === 'credit'
-                          ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                          ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
                           : acc.type === 'cash'
-                          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                          : 'bg-purple-500/20 border-purple-500/30 text-purple-200'
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
-                        {acc.name}
-                      </p>
-                      <p className="text-[10px] text-zinc-400 truncate">
-                        {acc.institution} • {acc.accountNumber}
-                      </p>
-                    </div>
+                      {getTypeLabel(acc.type)}
+                    </span>
                   </div>
 
-                  <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
-                      acc.type === 'credit'
-                        ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
-                        : acc.type === 'cash'
-                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
-                    }`}
-                  >
-                    {getTypeLabel(acc.type)}
-                  </span>
+                  <div className="flex items-baseline justify-between pt-2 border-t border-white/[0.06]">
+                    <span className="text-[11px] text-zinc-400">Balance</span>
+                    <span
+                      className={`text-sm font-bold tracking-tight ${
+                        isNegative ? 'text-rose-400' : 'text-purple-100'
+                      }`}
+                    >
+                      {showValues ? formatCurrency(acc.balance) : '••••••••'}
+                    </span>
+                  </div>
+
+                  {acc.type === 'credit' && acc.creditLimit && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                        <span>Límite {formatCurrency(acc.creditLimit)}</span>
+                        <span className="text-rose-300 font-medium">
+                          {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}% Usado
+                        </span>
+                      </div>
+                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {acc.type === 'bank' && acc.yieldRate && (
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-emerald-300">
+                      <span>Rendimiento anual</span>
+                      <span className="font-semibold">+{acc.yieldRate}% Anual</span>
+                    </div>
+                  )}
                 </div>
-
-                <div className="flex items-baseline justify-between pt-2 border-t border-white/[0.06]">
-                  <span className="text-[11px] text-zinc-400">Balance</span>
-                  <span
-                    className={`text-sm font-bold tracking-tight ${
-                      isNegative ? 'text-rose-400' : 'text-purple-100'
-                    }`}
-                  >
-                    {showValues ? formatCurrency(acc.balance) : '••••••••'}
-                  </span>
-                </div>
-
-                {acc.type === 'credit' && acc.creditLimit && (
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                      <span>Límite {formatCurrency(acc.creditLimit)}</span>
-                      <span className="text-rose-300 font-medium">
-                        {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}% Usado
-                      </span>
-                    </div>
-                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {acc.type === 'bank' && acc.yieldRate && (
-                  <div className="mt-1.5 flex items-center justify-between text-[10px] text-emerald-300">
-                    <span>Rendimiento anual</span>
-                    <span className="font-semibold">+{acc.yieldRate}% Anual</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -156,8 +156,23 @@ export const TransactionModal = ({
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs relative z-10">
+        {accounts.length === 0 ? (
+          <div className="py-8 text-center space-y-3 relative z-10">
+            <Building2 className="w-8 h-8 text-purple-400 mx-auto" />
+            <p className="text-sm font-bold text-white">No tienes cuentas disponibles</p>
+            <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+              Todo movimiento financiero debe vincularse obligatoriamente a una cuenta (Efectivo, Banco o Tarjeta). Por favor crea una cuenta primero.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="liquid-button-primary px-5 py-2 text-xs font-semibold cursor-pointer"
+            >
+              Cerrar y Crear Cuenta
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs relative z-10">
           {/* Segmented Type Toggle (Entrada / Salida) */}
           <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-black/50 border border-white/10">
             <button
@@ -328,6 +343,7 @@ export const TransactionModal = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

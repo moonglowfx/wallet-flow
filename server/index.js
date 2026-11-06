@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { db, initDatabase, seedDatabase } from './db.js';
+import { db, initDatabase, seedDemoData, clearDatabase } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -245,11 +245,20 @@ app.post('/api/debts/:id/payment', async (req, res) => {
   }
 });
 
-// ----------------- RESET DEMO -----------------
+// ----------------- CLEAR & RESET DEMO -----------------
+app.post('/api/clear', async (req, res) => {
+  try {
+    await clearDatabase();
+    res.json({ message: 'Base de datos SQLite limpiada por completo' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/reset-demo', async (req, res) => {
   try {
-    await seedDatabase();
-    res.json({ message: 'Base de datos SQLite restaurada con datos demo' });
+    await seedDemoData();
+    res.json({ message: 'Base de datos SQLite cargada con datos demo' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

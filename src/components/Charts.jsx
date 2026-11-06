@@ -338,115 +338,125 @@ export const CategoryRingChart = ({ transactions = [] }) => {
       </div>
 
       {/* Donut and Legend Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center relative z-10">
-        {/* SVG Donut Ring */}
-        <div className="md:col-span-5 flex flex-col items-center justify-center relative">
-          <div className="relative w-48 h-48 flex items-center justify-center">
-            <svg
-              className="w-full h-full -rotate-90 transform"
-              viewBox={`0 0 ${size} ${size}`}
-            >
-              {/* Background circle track */}
-              <circle
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                stroke="rgba(255, 255, 255, 0.05)"
-                strokeWidth={strokeWidth}
-                fill="transparent"
-              />
+      {categoriesData.length === 0 ? (
+        <div className="py-12 text-center space-y-2 relative z-10">
+          <PieIcon className="w-8 h-8 text-purple-400 mx-auto" />
+          <p className="text-sm font-semibold text-white">Sin gastos en este periodo</p>
+          <p className="text-xs text-zinc-400 max-w-xs mx-auto">
+            Registra egresos para visualizar la distribución porcentual en el anillo interactivo Liquid Glass.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center relative z-10">
+          {/* SVG Donut Ring */}
+          <div className="md:col-span-5 flex flex-col items-center justify-center relative">
+            <div className="relative w-48 h-48 flex items-center justify-center">
+              <svg
+                className="w-full h-full -rotate-90 transform"
+                viewBox={`0 0 ${size} ${size}`}
+              >
+                {/* Background circle track */}
+                <circle
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  stroke="rgba(255, 255, 255, 0.05)"
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                />
 
-              {/* Category Segments */}
-              {segments.map((seg) => {
-                const isSelected = selectedCategory === seg.category;
-                return (
-                  <circle
-                    key={seg.category}
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke={seg.color}
-                    strokeWidth={isSelected ? strokeWidth + 4 : strokeWidth}
-                    strokeDasharray={seg.strokeDasharray}
-                    strokeDashoffset={seg.strokeDashoffset}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    onMouseEnter={() => setSelectedCategory(seg.category)}
-                    onMouseLeave={() => setSelectedCategory(null)}
-                    className="transition-all duration-300 cursor-pointer opacity-90 hover:opacity-100"
-                    style={{
-                      filter: isSelected ? `drop-shadow(0 0 8px ${seg.color})` : 'none',
-                    }}
-                  />
-                );
-              })}
-            </svg>
+                {/* Category Segments */}
+                {segments.map((seg) => {
+                  const isSelected = selectedCategory === seg.category;
+                  return (
+                    <circle
+                      key={seg.category}
+                      cx={size / 2}
+                      cy={size / 2}
+                      r={radius}
+                      stroke={seg.color}
+                      strokeWidth={isSelected ? strokeWidth + 4 : strokeWidth}
+                      strokeDasharray={seg.strokeDasharray}
+                      strokeDashoffset={seg.strokeDashoffset}
+                      strokeLinecap="round"
+                      fill="transparent"
+                      onMouseEnter={() => setSelectedCategory(seg.category)}
+                      onMouseLeave={() => setSelectedCategory(null)}
+                      className="transition-all duration-300 cursor-pointer opacity-90 hover:opacity-100"
+                      style={{
+                        filter: isSelected ? `drop-shadow(0 0 8px ${seg.color})` : 'none',
+                      }}
+                    />
+                  );
+                })}
+              </svg>
 
-            {/* Inner Center Label */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 pointer-events-none">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
-                {activeCategory ? activeCategory.category : 'Total'}
-              </span>
-              <span className="text-lg font-black text-white">
-                {activeCategory ? `${activeCategory.percentage}%` : '100%'}
-              </span>
-              <span className="text-[11px] text-purple-200 font-semibold">
-                {activeCategory ? formatCurrency(activeCategory.amount) : formatCurrency(totalExpense)}
-              </span>
+              {/* Inner Center Label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 pointer-events-none">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+                  {activeCategory ? activeCategory.category : 'Total'}
+                </span>
+                <span className="text-lg font-black text-white">
+                  {activeCategory ? `${activeCategory.percentage}%` : '100%'}
+                </span>
+                <span className="text-[11px] text-purple-200 font-semibold">
+                  {activeCategory ? formatCurrency(activeCategory.amount) : formatCurrency(totalExpense)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Categories List with Progress and Badges */}
-        <div className="md:col-span-7 space-y-2 max-h-56 overflow-y-auto pr-1">
-          {categoriesData.map((item) => {
-            const isHovered = selectedCategory === item.category;
-            return (
-              <div
-                key={item.category}
-                onMouseEnter={() => setSelectedCategory(item.category)}
-                onMouseLeave={() => setSelectedCategory(null)}
-                className={`p-2 rounded-xl transition-all duration-200 cursor-pointer flex flex-col gap-1 border ${
-                  isHovered
-                    ? 'bg-white/[0.08] border-purple-400/40 shadow-sm'
-                    : 'bg-white/[0.02] border-transparent hover:bg-white/[0.05]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
-                      style={{ backgroundColor: item.color }}
+          {/* Categories List with Progress and Badges */}
+          <div className="md:col-span-7 space-y-2 max-h-56 overflow-y-auto pr-1">
+            {categoriesData.map((item) => {
+              const isHovered = selectedCategory === item.category;
+              return (
+                <div
+                  key={item.category}
+                  onMouseEnter={() => setSelectedCategory(item.category)}
+                  onMouseLeave={() => setSelectedCategory(null)}
+                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer flex flex-col gap-1 border ${
+                    isHovered
+                      ? 'bg-white/[0.08] border-purple-400/40 shadow-sm'
+                      : 'bg-white/[0.02] border-transparent hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-zinc-200 font-medium truncate">
+                        {item.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-semibold text-white">
+                        {formatCurrency(item.amount)}
+                      </span>
+                      <span className="text-[11px] font-bold text-purple-300 w-8 text-right">
+                        {item.percentage}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mini progress bar */}
+                  <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${item.percentage}%`,
+                        backgroundColor: item.color,
+                      }}
                     />
-                    <span className="text-zinc-200 font-medium truncate">
-                      {item.category}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-semibold text-white">
-                      {formatCurrency(item.amount)}
-                    </span>
-                    <span className="text-[11px] font-bold text-purple-300 w-8 text-right">
-                      {item.percentage}%
-                    </span>
                   </div>
                 </div>
-
-                {/* Mini progress bar */}
-                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${item.percentage}%`,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

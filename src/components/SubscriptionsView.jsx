@@ -206,77 +206,96 @@ export const SubscriptionsView = ({
       </div>
 
       {/* Subscriptions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredSubs.map((sub) => {
-          const acc = accounts.find((a) => a.id === sub.accountId);
+      {filteredSubs.length === 0 ? (
+        <div className="liquid-glass p-8 text-center space-y-4 max-w-lg mx-auto">
+          <CalendarClock className="w-10 h-10 text-purple-400 mx-auto" />
+          <div>
+            <h3 className="text-base font-bold text-white">No tienes pagos fijos registrados</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Registra tu renta, internet, streaming o gimnasio para proyectar y controlar tu gasto fijo mensual.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Registrar Pago Fijo</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredSubs.map((sub) => {
+            const acc = accounts.find((a) => a.id === sub.accountId);
 
-          return (
-            <div
-              key={sub.id}
-              className={`liquid-glass p-5 space-y-4 relative transition-all duration-300 ${
-                !sub.active ? 'opacity-50 grayscale-[40%]' : 'hover:border-purple-400/50'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                    <Tv className="w-5 h-5" />
+            return (
+              <div
+                key={sub.id}
+                className={`liquid-glass p-5 space-y-4 relative transition-all duration-300 ${
+                  !sub.active ? 'opacity-50 grayscale-[40%]' : 'hover:border-purple-400/50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                      <Tv className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white text-sm truncate">{sub.name}</h3>
+                      <p className="text-xs text-zinc-400 truncate">{sub.category}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-white text-sm truncate">{sub.name}</h3>
-                    <p className="text-xs text-zinc-400 truncate">{sub.category}</p>
+
+                  <button
+                    onClick={() => toggleActive(sub.id)}
+                    title={sub.active ? 'Pausar cobro' : 'Reactivar cobro'}
+                    className="cursor-pointer transition-transform active:scale-90"
+                  >
+                    {sub.active ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-zinc-500" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Price and billing day */}
+                <div className="flex items-baseline justify-between pt-2 border-t border-white/10">
+                  <div>
+                    <span className="text-[11px] text-zinc-400 block">Cobro Mensual</span>
+                    <span className="text-xl font-bold text-white">
+                      {formatCurrency(sub.amount)}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[11px] text-zinc-400 block">Día de cobro</span>
+                    <span className="text-xs font-semibold text-purple-300">
+                      Día {sub.billingDay} de cada mes
+                    </span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => toggleActive(sub.id)}
-                  title={sub.active ? 'Pausar cobro' : 'Reactivar cobro'}
-                  className="cursor-pointer transition-transform active:scale-90"
-                >
-                  {sub.active ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-zinc-500" />
-                  )}
-                </button>
-              </div>
-
-              {/* Price and billing day */}
-              <div className="flex items-baseline justify-between pt-2 border-t border-white/10">
-                <div>
-                  <span className="text-[11px] text-zinc-400 block">Cobro Mensual</span>
-                  <span className="text-xl font-bold text-white">
-                    {formatCurrency(sub.amount)}
+                {/* Account and essential pill */}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-white/5">
+                  <span className="text-zinc-400 truncate">
+                    {acc ? acc.name : 'Tarjeta / Cuenta'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      sub.essential
+                        ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    {sub.essential ? 'Vital / Fijo' : 'Suscripción Cancelable'}
                   </span>
                 </div>
-
-                <div className="text-right">
-                  <span className="text-[11px] text-zinc-400 block">Día de cobro</span>
-                  <span className="text-xs font-semibold text-purple-300">
-                    Día {sub.billingDay} de cada mes
-                  </span>
-                </div>
               </div>
-
-              {/* Account and essential pill */}
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-white/5">
-                <span className="text-zinc-400 truncate">
-                  {acc ? acc.name : 'Tarjeta / Cuenta'}
-                </span>
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                    sub.essential
-                      ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                      : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                  }`}
-                >
-                  {sub.essential ? 'Vital / Fijo' : 'Suscripción Cancelable'}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add Subscription Modal */}
       {showAddModal && (

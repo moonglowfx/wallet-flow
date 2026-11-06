@@ -1,17 +1,14 @@
 import { createClient } from '@libsql/client';
 import dotenv from 'dotenv';
 import {
-  INITIAL_ACCOUNTS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_SUBSCRIPTIONS,
-  INITIAL_DEBTS,
+  DEMO_ACCOUNTS,
+  DEMO_TRANSACTIONS,
+  DEMO_SUBSCRIPTIONS,
+  DEMO_DEBTS,
 } from '../src/data/mockData.js';
 
 dotenv.config();
 
-// Connect to SQLite:
-// If DATABASE_URL is set (e.g. Turso on Vercel), it connects to that SQLite instance.
-// Otherwise, it creates/connects to a local SQLite database file: 'file:wallet_flow.db'.
 const url = process.env.DATABASE_URL || 'file:wallet_flow.db';
 const authToken = process.env.DATABASE_AUTH_TOKEN || undefined;
 
@@ -99,27 +96,22 @@ export async function initDatabase() {
     );
   `);
 
-  // Check if accounts exist; if empty, seed with initial enterprise data
-  const accountsCheck = await db.execute('SELECT COUNT(*) as count FROM accounts');
-  const count = Number(accountsCheck.rows[0].count);
-
-  if (count === 0) {
-    console.log('🌱 SQLite: Poblando base de datos con datos empresariales iniciales...');
-    await seedDatabase();
-    console.log('✅ SQLite: Base de datos inicializada y poblada con éxito.');
-  }
+  console.log('✅ SQLite: Tablas verificadas y listas para recibir tus datos reales.');
 }
 
-export async function seedDatabase() {
-  // Clear existing
+export async function clearDatabase() {
   await db.execute('DELETE FROM debt_payments');
   await db.execute('DELETE FROM debts');
   await db.execute('DELETE FROM subscriptions');
   await db.execute('DELETE FROM transactions');
   await db.execute('DELETE FROM accounts');
+  console.log('🧹 SQLite: Base de datos limpiada por completo.');
+}
 
-  // Insert Accounts
-  for (const acc of INITIAL_ACCOUNTS) {
+export async function seedDemoData() {
+  await clearDatabase();
+
+  for (const acc of DEMO_ACCOUNTS) {
     await db.execute({
       sql: `INSERT INTO accounts (id, name, institution, type, balance, creditLimit, cutOffDay, paymentDueDay, accountNumber, accentGradient, yieldRate)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -139,8 +131,7 @@ export async function seedDatabase() {
     });
   }
 
-  // Insert Transactions
-  for (const tx of INITIAL_TRANSACTIONS) {
+  for (const tx of DEMO_TRANSACTIONS) {
     await db.execute({
       sql: `INSERT INTO transactions (id, title, amount, type, category, accountId, date, notes, isAntExpense)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -158,8 +149,7 @@ export async function seedDatabase() {
     });
   }
 
-  // Insert Subscriptions
-  for (const sub of INITIAL_SUBSCRIPTIONS) {
+  for (const sub of DEMO_SUBSCRIPTIONS) {
     await db.execute({
       sql: `INSERT INTO subscriptions (id, name, category, amount, billingDay, accountId, active, essential, badgeColor)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -177,8 +167,7 @@ export async function seedDatabase() {
     });
   }
 
-  // Insert Debts & Payments
-  for (const debt of INITIAL_DEBTS) {
+  for (const debt of DEMO_DEBTS) {
     await db.execute({
       sql: `INSERT INTO debts (id, title, counterparty, category, totalAmount, paidAmount, interestRate, minimumMonthlyPayment, dueDate)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -194,15 +183,5 @@ export async function seedDatabase() {
         debt.dueDate,
       ],
     });
-
-    if (debt.payments && debt.payments.length > 0) {
-      for (const p of debt.payments) {
-        await db.execute({
-          sql: `INSERT INTO debt_payments (id, debtId, amount, date, note, accountId)
-                VALUES (?, ?, ?, ?, ?, ?)`,
-          args: [p.id, debt.id, p.amount, p.date, p.note, p.accountId || null],
-        });
-      }
-    }
   }
 }

@@ -20,25 +20,66 @@ export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
 
-  // Application State
+  // Application State: Cleared of dummy data and ready for real accounts
   const [accounts, setAccounts] = useState(() => {
     const saved = localStorage.getItem('wf_accounts');
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+    if (!saved) return INITIAL_ACCOUNTS;
+    try {
+      const parsed = JSON.parse(saved);
+      // Clean up legacy mock data automatically
+      if (Array.isArray(parsed) && parsed.some((a) => a.id === 'acc-bank-bbva')) {
+        localStorage.removeItem('wf_accounts');
+        localStorage.removeItem('wf_transactions');
+        localStorage.removeItem('wf_subscriptions');
+        localStorage.removeItem('wf_debts');
+        return [];
+      }
+      return parsed;
+    } catch (_) {
+      return INITIAL_ACCOUNTS;
+    }
   });
 
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem('wf_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    if (!saved) return INITIAL_TRANSACTIONS;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some((t) => t.id === 'tx-101')) {
+        return [];
+      }
+      return parsed;
+    } catch (_) {
+      return INITIAL_TRANSACTIONS;
+    }
   });
 
   const [subscriptions, setSubscriptions] = useState(() => {
     const saved = localStorage.getItem('wf_subscriptions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBSCRIPTIONS;
+    if (!saved) return INITIAL_SUBSCRIPTIONS;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some((s) => s.id === 'sub-1')) {
+        return [];
+      }
+      return parsed;
+    } catch (_) {
+      return INITIAL_SUBSCRIPTIONS;
+    }
   });
 
   const [debts, setDebts] = useState(() => {
     const saved = localStorage.getItem('wf_debts');
-    return saved ? JSON.parse(saved) : INITIAL_DEBTS;
+    if (!saved) return INITIAL_DEBTS;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some((d) => d.id === 'debt-1')) {
+        return [];
+      }
+      return parsed;
+    } catch (_) {
+      return INITIAL_DEBTS;
+    }
   });
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -89,15 +130,21 @@ export function App() {
     }, 3200);
   };
 
-  // Reset demo data
+  // Reset clean data
   const handleResetDemoData = async () => {
-    setAccounts(INITIAL_ACCOUNTS);
-    setTransactions(INITIAL_TRANSACTIONS);
-    setSubscriptions(INITIAL_SUBSCRIPTIONS);
-    setDebts(INITIAL_DEBTS);
+    setAccounts([]);
+    setTransactions([]);
+    setSubscriptions([]);
+    setDebts([]);
     setSelectedAccountId(null);
-    await api.resetDemo();
-    showToast('Base de datos restaurada al estado inicial');
+    localStorage.removeItem('wf_accounts');
+    localStorage.removeItem('wf_transactions');
+    localStorage.removeItem('wf_subscriptions');
+    localStorage.removeItem('wf_debts');
+    try {
+      await fetch('/api/clear', { method: 'POST' });
+    } catch (_) {}
+    showToast('Base de datos y almacenamiento limpiados a cero');
   };
 
   // Handle adding a new transaction and update linked account balance
@@ -176,6 +223,7 @@ export function App() {
               transactions={transactions}
               timeframe={timeframe}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenNewAccount={() => setIsAccountModalOpen(true)}
               onSelectAccount={(accId) => {
                 setSelectedAccountId(accId);
                 setActiveTab('accounts');

@@ -125,130 +125,149 @@ export const AccountsView = ({
       </div>
 
       {/* Accounts Grid (Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredAccounts.map((acc) => {
-          const Icon = getAccountIcon(acc.type);
-          const badge = getAccountBadge(acc.type);
-          const isSelected = selectedAccountId === acc.id;
-          const isNegative = acc.balance < 0;
+      {filteredAccounts.length === 0 ? (
+        <div className="liquid-glass p-8 text-center space-y-4 max-w-lg mx-auto">
+          <Wallet className="w-10 h-10 text-purple-400 mx-auto" />
+          <div>
+            <h3 className="text-base font-bold text-white">No hay cuentas registradas</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Crea tu primera cuenta para comenzar a registrar movimientos, asociar pagos y consultar balances.
+            </p>
+          </div>
+          <button
+            onClick={onOpenNewAccount}
+            className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Crear Mi Primera Cuenta</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAccounts.map((acc) => {
+            const Icon = getAccountIcon(acc.type);
+            const badge = getAccountBadge(acc.type);
+            const isSelected = selectedAccountId === acc.id;
+            const isNegative = acc.balance < 0;
 
-          return (
-            <div
-              key={acc.id}
-              onClick={() => setSelectedAccountId(isSelected ? null : acc.id)}
-              className={`relative p-5 rounded-2xl backdrop-blur-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
-                isSelected
-                  ? 'bg-purple-900/30 border-purple-400/60 shadow-liquid-purple ring-1 ring-purple-400/40'
-                  : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/10 hover:border-purple-500/40 shadow-liquid'
-              }`}
-            >
-              {/* Top ambient glow */}
+            return (
               <div
-                className={`pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl ${
-                  acc.type === 'credit'
-                    ? 'bg-rose-600/15'
-                    : acc.type === 'cash'
-                    ? 'bg-emerald-600/15'
-                    : 'bg-purple-600/20'
+                key={acc.id}
+                onClick={() => setSelectedAccountId(isSelected ? null : acc.id)}
+                className={`relative p-5 rounded-2xl backdrop-blur-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
+                  isSelected
+                    ? 'bg-purple-900/30 border-purple-400/60 shadow-liquid-purple ring-1 ring-purple-400/40'
+                    : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/10 hover:border-purple-500/40 shadow-liquid'
                 }`}
-              />
+              >
+                {/* Top ambient glow */}
+                <div
+                  className={`pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl ${
+                    acc.type === 'credit'
+                      ? 'bg-rose-600/15'
+                      : acc.type === 'cash'
+                      ? 'bg-emerald-600/15'
+                      : 'bg-purple-600/20'
+                  }`}
+                />
 
-              <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
-                      acc.type === 'credit'
-                        ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
-                        : acc.type === 'cash'
-                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                        : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
+                <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        acc.type === 'credit'
+                          ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                          : acc.type === 'cash'
+                          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                          : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white text-sm tracking-tight truncate">
+                        {acc.name}
+                      </h3>
+                      <p className="text-xs text-zinc-400 truncate">{acc.institution}</p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badge.color}`}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
+
+                {/* Main Balance Display */}
+                <div className="space-y-1 mb-4 relative z-10">
+                  <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
+                    {acc.type === 'credit' ? 'Saldo Deudor Actual' : 'Saldo Disponible'}
+                  </span>
+                  <p
+                    className={`text-2xl font-black tracking-tight ${
+                      isNegative ? 'text-rose-400' : 'text-white'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-white text-sm tracking-tight truncate">
-                      {acc.name}
-                    </h3>
-                    <p className="text-xs text-zinc-400 truncate">{acc.institution}</p>
-                  </div>
+                    {formatCurrency(acc.balance)}
+                  </p>
                 </div>
 
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badge.color}`}
-                >
-                  {badge.label}
-                </span>
-              </div>
+                {/* Account Meta & Badges */}
+                <div className="pt-3 border-t border-white/10 space-y-2 relative z-10 text-xs">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span>Identificador</span>
+                    <span className="font-mono text-zinc-200">{acc.accountNumber}</span>
+                  </div>
 
-              {/* Main Balance Display */}
-              <div className="space-y-1 mb-4 relative z-10">
-                <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                  {acc.type === 'credit' ? 'Saldo Deudor Actual' : 'Saldo Disponible'}
-                </span>
-                <p
-                  className={`text-2xl font-black tracking-tight ${
-                    isNegative ? 'text-rose-400' : 'text-white'
-                  }`}
-                >
-                  {formatCurrency(acc.balance)}
-                </p>
-              </div>
+                  {acc.type === 'credit' && acc.creditLimit && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-zinc-400">
+                          Límite {formatCurrency(acc.creditLimit)}
+                        </span>
+                        <span className="text-rose-300 font-semibold">
+                          {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}%
+                          utilizado
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                      {acc.paymentDueDay && (
+                        <p className="text-[10px] text-zinc-400 pt-0.5">
+                          Corte día {acc.cutOffDay} • Pagar antes del día {acc.paymentDueDay}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-              {/* Account Meta & Badges */}
-              <div className="pt-3 border-t border-white/10 space-y-2 relative z-10 text-xs">
-                <div className="flex items-center justify-between text-zinc-400">
-                  <span>Identificador</span>
-                  <span className="font-mono text-zinc-200">{acc.accountNumber}</span>
+                  {acc.type === 'bank' && acc.yieldRate && (
+                    <div className="flex items-center justify-between text-[11px] text-emerald-300 pt-1">
+                      <span>Tasa de Rendimiento</span>
+                      <span className="font-semibold">+{acc.yieldRate}% Anual</span>
+                    </div>
+                  )}
                 </div>
 
-                {acc.type === 'credit' && acc.creditLimit && (
-                  <div className="space-y-1 pt-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-zinc-400">
-                        Límite {formatCurrency(acc.creditLimit)}
-                      </span>
-                      <span className="text-rose-300 font-semibold">
-                        {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}%
-                        utilizado
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                    {acc.paymentDueDay && (
-                      <p className="text-[10px] text-zinc-400 pt-0.5">
-                        Corte día {acc.cutOffDay} • Pagar antes del día {acc.paymentDueDay}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {acc.type === 'bank' && acc.yieldRate && (
-                  <div className="flex items-center justify-between text-[11px] text-emerald-300 pt-1">
-                    <span>Tasa de Rendimiento</span>
-                    <span className="font-semibold">+{acc.yieldRate}% Anual</span>
+                {isSelected && (
+                  <div className="mt-3 pt-2 text-center text-[11px] font-semibold text-purple-300 bg-purple-500/10 rounded-lg py-1 border border-purple-400/20">
+                    Filtrando historial de esta cuenta (clic para limpiar)
                   </div>
                 )}
               </div>
-
-              {isSelected && (
-                <div className="mt-3 pt-2 text-center text-[11px] font-semibold text-purple-300 bg-purple-500/10 rounded-lg py-1 border border-purple-400/20">
-                  Filtrando historial de esta cuenta (clic para limpiar)
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Transactions Ledger Panel */}
       <div className="liquid-glass p-6 space-y-5">

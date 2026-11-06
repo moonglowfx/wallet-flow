@@ -158,97 +158,115 @@ export const AIAdvisorView = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Finding 1: Gastos Hormiga */}
-            <div className="liquid-glass p-6 space-y-4 border-rose-500/30 hover:border-rose-400/50 transition-all relative overflow-hidden group">
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 shrink-0">
-                  <Flame className="w-5 h-5" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  Fuga Crítica
-                </span>
-              </div>
-
+          {transactions.length === 0 ? (
+            <div className="liquid-glass p-8 text-center space-y-4 max-w-lg mx-auto">
+              <Sparkles className="w-10 h-10 text-fuchsia-400 mx-auto animate-pulse" />
               <div>
-                <h4 className="text-base font-bold text-white tracking-tight">
-                  Gastos Hormiga al {antRatio}% de tus egresos
-                </h4>
-                <p className="text-2xl font-black text-rose-400 mt-1">
-                  {formatCurrency(antExpenses)} al mes
+                <h3 className="text-base font-bold text-white">Aura AI en Espera de Movimientos</h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Para auditar tus patrones de gasto, detectar microfugas hormiga y alertar sobre el uso de crédito, registra tus primeros movimientos.
                 </p>
               </div>
+              <button
+                onClick={onOpenNewTransaction}
+                className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
+              >
+                <span>+ Registrar Movimiento para Analizar</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Finding 1: Gastos Hormiga */}
+              <div className="liquid-glass p-6 space-y-4 border-rose-500/30 hover:border-rose-400/50 transition-all relative overflow-hidden group">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 shrink-0">
+                    <Flame className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    Fuga Crítica
+                  </span>
+                </div>
 
-              <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                <p>
-                  <strong className="text-white">Problema detectado:</strong> Microconsumos diarios en cafeterías de especialidad ({formatCurrency(1110)}), Uber frecuentes ({formatCurrency(1680)}) y apps de delivery nocturno ({formatCurrency(1390)}).
-                </p>
-                <p className="text-rose-300/90 font-medium">
-                  Impacto: Esta cifra drena {formatCurrency(antExpenses * 12)} anuales sin generar ningún activo duradero.
-                </p>
+                <div>
+                  <h4 className="text-base font-bold text-white tracking-tight">
+                    Gastos Hormiga al {antRatio}% de tus egresos
+                  </h4>
+                  <p className="text-2xl font-black text-rose-400 mt-1">
+                    {formatCurrency(antExpenses)} al mes
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
+                  <p>
+                    <strong className="text-white">Problema detectado:</strong> Microconsumos diarios en cafeterías de especialidad, traslados y apps de delivery nocturno.
+                  </p>
+                  <p className="text-rose-300/90 font-medium">
+                    Impacto: Esta cifra drena {formatCurrency(antExpenses * 12)} anuales sin generar ningún activo duradero.
+                  </p>
+                </div>
+              </div>
+
+              {/* Finding 2: Sobreutilización de Tarjetas de Crédito */}
+              <div className="liquid-glass p-6 space-y-4 border-amber-500/30 hover:border-amber-400/50 transition-all relative overflow-hidden group">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Riesgo Alto
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-base font-bold text-white tracking-tight">
+                    Sobreutilización de Crédito Revolvente ({creditUtilization}%)
+                  </h4>
+                  <p className="text-2xl font-black text-amber-300 mt-1">
+                    {formatCurrency(totalCreditDebt)} en deuda
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
+                  <p>
+                    <strong className="text-white">Problema detectado:</strong> Tienes líneas de crédito superando el 30% recomendado.
+                  </p>
+                  <p className="text-amber-300/90 font-medium">
+                    Impacto: Superar el 30% castiga tu score crediticio y devenga intereses compuestos regresivos.
+                  </p>
+                </div>
+              </div>
+
+              {/* Finding 3: Carga de Pasivos Fijos */}
+              <div className="liquid-glass p-6 space-y-4 border-purple-500/30 hover:border-purple-400/50 transition-all relative overflow-hidden group">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                    Optimizable
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-base font-bold text-white tracking-tight">
+                    {subscriptions.length} Suscripciones activas
+                  </h4>
+                  <p className="text-2xl font-black text-purple-300 mt-1">
+                    {formatCurrency(totalFixedExpenses)} comprometidos
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
+                  <p>
+                    <strong className="text-white">Problema detectado:</strong> Pasivos recurrentes mensuales domiciliados.
+                  </p>
+                  <p className="text-purple-300/90 font-medium">
+                    Impacto: Representa el {fixedRatio}% de tu flujo antes de iniciar el mes.
+                  </p>
+                </div>
               </div>
             </div>
-
-            {/* Finding 2: Sobreutilización de Tarjetas de Crédito */}
-            <div className="liquid-glass p-6 space-y-4 border-amber-500/30 hover:border-amber-400/50 transition-all relative overflow-hidden group">
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  Riesgo Alto
-                </span>
-              </div>
-
-              <div>
-                <h4 className="text-base font-bold text-white tracking-tight">
-                  Sobreutilización de Crédito Revolvente ({creditUtilization}%)
-                </h4>
-                <p className="text-2xl font-black text-amber-300 mt-1">
-                  {formatCurrency(totalCreditDebt)} en deuda
-                </p>
-              </div>
-
-              <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                <p>
-                  <strong className="text-white">Problema detectado:</strong> Tu tarjeta Nu Morada está al 66% de su límite con un CAT promedio del 48.5% anual.
-                </p>
-                <p className="text-amber-300/90 font-medium">
-                  Impacto: Superar el 30% de uso de línea castiga tu score crediticio ante buró y genera intereses compuestos regresivos.
-                </p>
-              </div>
-            </div>
-
-            {/* Finding 3: Carga de Pasivos Fijos */}
-            <div className="liquid-glass p-6 space-y-4 border-purple-500/30 hover:border-purple-400/50 transition-all relative overflow-hidden group">
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
-                  Optimizable
-                </span>
-              </div>
-
-              <div>
-                <h4 className="text-base font-bold text-white tracking-tight">
-                  {subscriptions.length} Suscripciones activas
-                </h4>
-                <p className="text-2xl font-black text-purple-300 mt-1">
-                  {formatCurrency(totalFixedExpenses)} comprometidos
-                </p>
-              </div>
-
-              <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                <p>
-                  <strong className="text-white">Problema detectado:</strong> Cuentas con 3 servicios de streaming simultáneos (Netflix, Max, Spotify) sumando {formatCurrency(1576)} mensuales.
-                </p>
-                <p className="text-purple-300/90 font-medium">
-                  Impacto: Representa el {fixedRatio}% de tu flujo libre antes de que inicie el mes calendario.
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Quick jump to Action Plan CTA */}
           <div className="p-4 rounded-2xl liquid-glass-purple border-purple-400/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
