@@ -249,11 +249,28 @@ export const AIAdvisorView = ({
               </div>
             </div>
           </div>
+
+          {/* Quick jump to Action Plan CTA */}
+          <div className="p-4 rounded-2xl liquid-glass-purple border-purple-400/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-purple-200">
+              <Lightbulb className="w-4 h-4 text-fuchsia-400 shrink-0" />
+              <span>
+                <strong>Aura AI ha formulado una solución:</strong> Descubre cuánto capital liberas recortando gastos con el simulador matemático.
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveTab('plan')}
+              className="liquid-button-primary px-4 py-2 font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+            >
+              <span>Ver Plan de Acción y Simulador</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* TAB 2: PLAN DE ACCIÓN PREDICTIVO & SIMULADOR MATEMÁTICO */}
-      {(activeTab === 'plan' || activeTab === 'diagnostico') && (
+      {activeTab === 'plan' && (
         <div className="space-y-6">
           {/* Interactive Predictive Simulator: Reducción de Gastos Hormiga */}
           <div className="liquid-glass p-6 sm:p-8 space-y-6 relative overflow-hidden border-purple-500/40">

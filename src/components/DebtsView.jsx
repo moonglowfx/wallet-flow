@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HandCoins,
   Plus,
@@ -22,10 +22,12 @@ export const DebtsView = ({
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState(null);
   const [showNewDebtModal, setShowNewDebtModal] = useState(false);
 
+  const defaultLiquidAcc = accounts.find((a) => a.type !== 'credit')?.id || accounts[0]?.id || '';
+
   // Payment modal state
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
-  const [paymentAccount, setPaymentAccount] = useState(accounts[0]?.id || '');
+  const [paymentAccount, setPaymentAccount] = useState(defaultLiquidAcc);
 
   // New debt modal state
   const [newTitle, setNewTitle] = useState('');
@@ -36,6 +38,23 @@ export const DebtsView = ({
   const [newRate, setNewRate] = useState('12.5');
   const [newMinMonthly, setNewMinMonthly] = useState('');
   const [newDueDate, setNewDueDate] = useState('2027-12-31');
+
+  useEffect(() => {
+    if (selectedDebtForPayment && (!paymentAccount || !accounts.some((a) => a.id === paymentAccount))) {
+      setPaymentAccount(defaultLiquidAcc);
+    }
+  }, [selectedDebtForPayment, accounts, defaultLiquidAcc]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedDebtForPayment(null);
+        setShowNewDebtModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Compute overall debt statistics
   const totalPrincipal = debts.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
@@ -317,8 +336,16 @@ export const DebtsView = ({
 
       {/* Modal: Ingresar Abono a Deuda */}
       {selectedDebtForPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedDebtForPayment(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
@@ -415,8 +442,16 @@ export const DebtsView = ({
 
       {/* Modal: Registrar Nueva Deuda */}
       {showNewDebtModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="w-full max-w-md liquid-glass p-6 space-y-4 border-purple-500/40 shadow-2xl relative">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewDebtModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md liquid-glass p-6 space-y-4 border-purple-500/40 shadow-2xl relative"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
                 Registrar Deuda o Préstamo

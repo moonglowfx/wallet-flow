@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CalendarClock,
   Plus,
@@ -27,6 +27,16 @@ export const SubscriptionsView = ({
   const [billingDay, setBillingDay] = useState('5');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [essential, setEssential] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowAddModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Toggle active/inactive
   const toggleActive = (id) => {
@@ -270,8 +280,16 @@ export const SubscriptionsView = ({
 
       {/* Add Subscription Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
                 Registrar Gasto Fijo o Suscripción
