@@ -336,6 +336,120 @@ export async function parseExcelFile(file, exchangeRate = DEFAULT_USD_COP_RATE) 
           });
         }
 
+        // 5. Fallback for Single-Sheet exports (e.g. Money Lover, Spendee, Notion or single-sheet ledgers)
+        if (result.transactions.length === 0 && workbook.SheetNames.length > 0) {
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rawRows = XLSX.utils.sheet_to_json(firstSheet);
+
+          if (rawRows.length > 0) {
+            // Check if it has transaction-like columns
+            const firstRow = rawRows[0];
+            const hasPeriod = 'Period' in firstRow || 'Fecha' in firstRow || 'Date' in firstRow;
+            const hasAccounts = 'Accounts' in firstRow || 'Cuenta' in firstRow || 'Account' in firstRow;
+            const hasAmount = 'USD' in firstRow || 'Amount' in firstRow || 'Monto' in firstRow;
+
+            if (hasPeriod && (hasAccounts || hasAmount)) {
+              const accountMap = {};
+              const balanceTracker = {};
+              const antKeywords = ['nestea', 'monster', 'gatorade', 'café', 'cafe', 'juguito', 'chucherias', 'churros', 'arepa', 'snack', 'perros', 'burguir', 'churro', 'jugo', 'chocolate'];
+
+              const formatSingleSheetDate = (val) => {
+                if (!val) return new Date().toISOString().split('T')[0];
+                if (typeof val === 'number') {
+                  const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+                  return d.toISOString().split('T')[0];
+                }
+                const str = String(val).trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+                if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+                  const parts = str.split('/');
+                  return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+                const parsed = new Date(str);
+                return !isNaN(parsed.getTime()) ? parsed.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+              };
+
+              const parsedTxs = rawRows.map((r, idx) => {
+                const accName = (r['Accounts'] || r['Cuenta'] || r['Account'] || 'Principal').toString().trim();
+                const accId = `acc-${accName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+                if (!accountMap[accName]) {
+                  accountMap[accName] = {
+                    id: accId,
+                    name: accName,
+                    institution: accName.includes('America') ? 'Bank of America' : accName.includes('Colombia') ? 'Bancolombia' : accName,
+                    type: accName.toLowerCase().includes('travel') || accName.toLowerCase().includes('credit') || accName.toLowerCase().includes('tdc')
+                      ? 'credit'
+                      : accName.toLowerCase().includes('cash') || accName.toLowerCase().includes('efectivo')
+                      ? 'cash'
+                      : 'bank',
+                    accountNumber: accName.toLowerCase().includes('cash') ? 'CASH' : `•••• ${1000 + Object.keys(accountMap).length * 111}`,
+                    accentGradient: accName.toLowerCase().includes('travel') || accName.toLowerCase().includes('credit')
+                      ? 'from-rose-600/40 via-purple-900/40 to-black/75'
+                      : accName.toLowerCase().includes('cash')
+                      ? 'from-emerald-600/35 via-purple-900/25 to-zinc-950/70'
+                      : 'from-blue-600/40 via-indigo-900/40 to-slate-900/70',
+                    yieldRate: accName.toLowerCase().includes('savings') ? 4.5 : accName.toLowerCase().includes('bancolombia') ? 10.5 : undefined,
+                    creditLimit: accName.toLowerCase().includes('travel') || accName.toLowerCase().includes('credit') ? 1000 : undefined,
+                  };
+                  balanceTracker[accId] = 0;
+                }
+
+                // Value in USD
+                const rawVal = parseFloat(r['USD'] || r['Amount'] || r['Monto'] || 0);
+                const currency = (r['Currency'] || r['Moneda'] || 'USD').toString().toUpperCase();
+                const usd = currency === 'COP' ? Math.round((rawVal / exchangeRate) * 100) / 100 : Math.round(rawVal * 100) / 100;
+
+                const rawType = (r['Income/Expense'] || r['Tipo'] || 'Exp.').toString().trim();
+                let type = 'expense';
+                if (rawType === 'Income' || rawType === 'Income Balance' || rawType.includes('Transfer-In')) {
+                  type = 'income';
+                  balanceTracker[accId] += usd;
+                } else if (rawType === 'Exp.' || rawType === 'Expense Balance' || rawType.includes('Transfer-Out')) {
+                  type = 'expense';
+                  balanceTracker[accId] -= usd;
+                }
+
+                let category = (r['Category'] || r['Categoría'] || 'Otros').toString().trim();
+                if (rawType.includes('Transfer')) category = 'Transferencias';
+
+                let title = (r['Note'] || r['Nota'] || r['Description'] || r['Category'] || `Movimiento ${idx + 1}`).toString().trim();
+                if (rawType === 'Transfer-In') title = `Transferencia Recibida (${category})`;
+                if (rawType === 'Transfer-Out') title = `Transferencia a ${category}`;
+
+                const isAnt = type === 'expense' && (
+                  (category.includes('Food') && usd <= 15) ||
+                  (category.includes('Transport') && usd <= 10) ||
+                  antKeywords.some((kw) => title.toLowerCase().includes(kw))
+                );
+
+                return {
+                  id: `tx-${String(rawRows.length - idx).padStart(3, '0')}`,
+                  title,
+                  amount: Math.abs(usd),
+                  type,
+                  category,
+                  accountId: accId,
+                  date: formatSingleSheetDate(r['Period'] || r['Fecha'] || r['Date']),
+                  notes: (r['Description'] || r['Note'] || '').toString(),
+                  isAntExpense: isAnt,
+                };
+              });
+
+              result.transactions = parsedTxs;
+
+              // Build accounts from tracker
+              result.accounts = Object.values(accountMap).map((acc) => {
+                const bal = balanceTracker[acc.id] || 0;
+                return {
+                  ...acc,
+                  balance: acc.type === 'credit' ? (bal > 0 ? -bal : bal) : Math.round(bal * 100) / 100,
+                };
+              });
+            }
+          }
+        }
+
         // Summary counts
         result.summary = {
           accountsCount: result.accounts.length,

@@ -28,19 +28,25 @@ export function App() {
   });
   const [exchangeRate, setExchangeRate] = useState(DEFAULT_USD_COP_RATE);
 
-  // Application State: Cleared of dummy data and ready for real accounts
+  const DATA_VERSION = '2026-11-real-data-v1';
+
+  // Application State: Preloaded with user's real transactions from 2024 to 2026
   const [accounts, setAccounts] = useState(() => {
+    const version = localStorage.getItem('wf_data_version');
+    if (version !== DATA_VERSION) {
+      localStorage.setItem('wf_data_version', DATA_VERSION);
+      localStorage.setItem('wf_accounts', JSON.stringify(INITIAL_ACCOUNTS));
+      localStorage.setItem('wf_transactions', JSON.stringify(INITIAL_TRANSACTIONS));
+      localStorage.setItem('wf_subscriptions', JSON.stringify(INITIAL_SUBSCRIPTIONS));
+      localStorage.setItem('wf_debts', JSON.stringify(INITIAL_DEBTS));
+      return INITIAL_ACCOUNTS;
+    }
     const saved = localStorage.getItem('wf_accounts');
     if (!saved) return INITIAL_ACCOUNTS;
     try {
       const parsed = JSON.parse(saved);
-      // Clean up legacy mock data automatically
-      if (Array.isArray(parsed) && parsed.some((a) => a.id === 'acc-bank-bbva')) {
-        localStorage.removeItem('wf_accounts');
-        localStorage.removeItem('wf_transactions');
-        localStorage.removeItem('wf_subscriptions');
-        localStorage.removeItem('wf_debts');
-        return [];
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((a) => a.id === 'acc-bank-bbva')) {
+        return INITIAL_ACCOUNTS;
       }
       return parsed;
     } catch (_) {
@@ -49,12 +55,14 @@ export function App() {
   });
 
   const [transactions, setTransactions] = useState(() => {
+    const version = localStorage.getItem('wf_data_version');
+    if (version !== DATA_VERSION) return INITIAL_TRANSACTIONS;
     const saved = localStorage.getItem('wf_transactions');
     if (!saved) return INITIAL_TRANSACTIONS;
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.some((t) => t.id === 'tx-101')) {
-        return [];
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((t) => t.id === 'tx-101')) {
+        return INITIAL_TRANSACTIONS;
       }
       return parsed;
     } catch (_) {
@@ -63,12 +71,14 @@ export function App() {
   });
 
   const [subscriptions, setSubscriptions] = useState(() => {
+    const version = localStorage.getItem('wf_data_version');
+    if (version !== DATA_VERSION) return INITIAL_SUBSCRIPTIONS;
     const saved = localStorage.getItem('wf_subscriptions');
     if (!saved) return INITIAL_SUBSCRIPTIONS;
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.some((s) => s.id === 'sub-1')) {
-        return [];
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((s) => s.id === 'sub-1')) {
+        return INITIAL_SUBSCRIPTIONS;
       }
       return parsed;
     } catch (_) {
@@ -77,12 +87,14 @@ export function App() {
   });
 
   const [debts, setDebts] = useState(() => {
+    const version = localStorage.getItem('wf_data_version');
+    if (version !== DATA_VERSION) return INITIAL_DEBTS;
     const saved = localStorage.getItem('wf_debts');
     if (!saved) return INITIAL_DEBTS;
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.some((d) => d.id === 'debt-1')) {
-        return [];
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((d) => d.id === 'debt-1')) {
+        return INITIAL_DEBTS;
       }
       return parsed;
     } catch (_) {
