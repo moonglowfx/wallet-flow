@@ -14,6 +14,7 @@ import {
   INITIAL_SUBSCRIPTIONS,
   INITIAL_DEBTS,
 } from './data/mockData.js';
+import { api } from './services/api.js';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -45,6 +46,25 @@ export function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Initial load from SQLite Database if server is running
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [accs, txs, subs, dts] = await Promise.all([
+          api.getAccounts(),
+          api.getTransactions(),
+          api.getSubscriptions(),
+          api.getDebts(),
+        ]);
+        if (accs) setAccounts(accs);
+        if (txs) setTransactions(txs);
+        if (subs) setSubscriptions(subs);
+        if (dts) setDebts(dts);
+      } catch (_) {}
+    }
+    loadData();
+  }, []);
+
   // Sync to local storage
   useEffect(() => {
     localStorage.setItem('wf_accounts', JSON.stringify(accounts));
@@ -70,17 +90,18 @@ export function App() {
   };
 
   // Reset demo data
-  const handleResetDemoData = () => {
+  const handleResetDemoData = async () => {
     setAccounts(INITIAL_ACCOUNTS);
     setTransactions(INITIAL_TRANSACTIONS);
     setSubscriptions(INITIAL_SUBSCRIPTIONS);
     setDebts(INITIAL_DEBTS);
     setSelectedAccountId(null);
-    showToast('Datos demo restaurados exitosamente');
+    await api.resetDemo();
+    showToast('Base de datos restaurada al estado inicial');
   };
 
   // Handle adding a new transaction and update linked account balance
-  const handleSaveTransaction = (newTxData) => {
+  const handleSaveTransaction = async (newTxData) => {
     const newTx = {
       id: `tx-${Date.now()}`,
       ...newTxData,
@@ -102,12 +123,14 @@ export function App() {
       })
     );
 
+    await api.createTransaction(newTx);
     showToast(`Movimiento registrado: ${newTx.title}`);
   };
 
   // Handle adding a new account
-  const handleSaveAccount = (newAcc) => {
+  const handleSaveAccount = async (newAcc) => {
     setAccounts([newAcc, ...accounts]);
+    await api.createAccount(newAcc);
     showToast(`Cuenta creada: ${newAcc.name}`);
   };
 

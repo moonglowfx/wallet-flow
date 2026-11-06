@@ -31,5 +31,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Databases (Local SQLite)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Vercel
 .vercel
