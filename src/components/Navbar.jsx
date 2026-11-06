@@ -8,6 +8,8 @@ import {
   Plus,
   ShieldCheck,
   TrendingUp,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
@@ -53,6 +55,8 @@ export const Navbar = ({
   antExpenseAlertCount,
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
+  currentUser,
+  onOpenSwitchUser,
 }) => {
   return (
     <>
@@ -145,6 +149,39 @@ export const Navbar = ({
 
           {/* Bottom Net Worth Quick Card inside Sidebar */}
           <div className="space-y-3 relative z-10">
+            {/* Active User Card & Switch button */}
+            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${
+                    currentUser?.avatarGradient || 'from-purple-600 to-indigo-600'
+                  } flex items-center justify-center text-white font-black text-sm shadow-md shrink-0 border border-white/20`}
+                >
+                  {currentUser?.username?.[0] || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-white truncate">
+                      {currentUser?.username || 'Usuario'}
+                    </p>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <span className="text-[10px] text-zinc-400 block truncate font-mono">
+                    PIN: {currentUser?.pin || '••••'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onOpenSwitchUser}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-zinc-400 hover:text-white transition-all cursor-pointer border border-white/5 hover:border-purple-400/40"
+                title="Cambiar de usuario o bloquear sesión"
+              >
+                <LogOut className="w-4 h-4 text-purple-300" />
+              </button>
+            </div>
+
             <div className="liquid-glass-purple p-4 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-purple-200/80 font-medium">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   PieChart as PieIcon,
@@ -9,15 +9,138 @@ import {
   formatCurrency,
   TIMEFRAME_CONFIG,
   CATEGORY_COLORS,
+  DEFAULT_USD_COP_RATE,
 } from '../data/mockData.js';
 
-export const FluidLineChart = ({ timeframe = 'monthly' }) => {
+export const FluidLineChart = ({
+  timeframe = 'monthly',
+  transactions = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
+}) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const data = TIMEFRAME_CONFIG[timeframe]?.series || TIMEFRAME_CONFIG.monthly.series;
+
+  // Dynamic series computed from actual transactions or guaranteed fallback
+  const data = useMemo(() => {
+    const fallbackSeries = {
+      weekly: [
+        { label: 'Lun', income: 0, expense: 45 },
+        { label: 'Mar', income: 150, expense: 80 },
+        { label: 'Mié', income: 0, expense: 60 },
+        { label: 'Jue', income: 300, expense: 120 },
+        { label: 'Vie', income: 50, expense: 95 },
+        { label: 'Sáb', income: 0, expense: 140 },
+        { label: 'Dom', income: 0, expense: 30 },
+      ],
+      monthly: [
+        { label: 'Sem 1', income: 650, expense: 320 },
+        { label: 'Sem 2', income: 900, expense: 480 },
+        { label: 'Sem 3', income: 450, expense: 390 },
+        { label: 'Sem 4', income: 1200, expense: 560 },
+      ],
+      quarterly: [
+        { label: 'Mes 1', income: 2400, expense: 1800 },
+        { label: 'Mes 2', income: 2900, expense: 1650 },
+        { label: 'Mes 3', income: 3200, expense: 2100 },
+      ],
+      yearly: [
+        { label: 'Q1', income: 8400, expense: 6200 },
+        { label: 'Q2', income: 7800, expense: 5900 },
+        { label: 'Q3', income: 9100, expense: 7100 },
+        { label: 'Q4', income: 8900, expense: 6800 },
+      ],
+    };
+
+    if (!transactions || transactions.length === 0) {
+      return fallbackSeries[timeframe] || fallbackSeries.monthly;
+    }
+
+    try {
+      // Aggregate real transactions based on timeframe
+      if (timeframe === 'weekly') {
+        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const dayBuckets = days.map((label) => ({ label, income: 0, expense: 0 }));
+        
+        // Take last 7 days of txs
+        const recentTxs = [...transactions]
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 40);
+
+        recentTxs.forEach((t) => {
+          const d = new Date(t.date);
+          if (!isNaN(d.getTime())) {
+            const dayIdx = d.getDay();
+            if (t.type === 'income') dayBuckets[dayIdx].income += t.amount;
+            else dayBuckets[dayIdx].expense += t.amount;
+          }
+        });
+        return dayBuckets;
+      }
+
+      if (timeframe === 'monthly') {
+        const weeks = [
+          { label: 'Sem 1', income: 0, expense: 0 },
+          { label: 'Sem 2', income: 0, expense: 0 },
+          { label: 'Sem 3', income: 0, expense: 0 },
+          { label: 'Sem 4', income: 0, expense: 0 },
+        ];
+
+        transactions.slice(0, 100).forEach((t) => {
+          const d = new Date(t.date);
+          if (!isNaN(d.getTime())) {
+            const day = d.getDate();
+            const weekIdx = Math.min(3, Math.floor((day - 1) / 7));
+            if (t.type === 'income') weeks[weekIdx].income += t.amount;
+            else weeks[weekIdx].expense += t.amount;
+          }
+        });
+        return weeks;
+      }
+
+      if (timeframe === 'quarterly') {
+        const months = [
+          { label: 'Mes -2', income: 0, expense: 0 },
+          { label: 'Mes -1', income: 0, expense: 0 },
+          { label: 'Mes Actual', income: 0, expense: 0 },
+        ];
+
+        transactions.slice(0, 200).forEach((t) => {
+          const d = new Date(t.date);
+          if (!isNaN(d.getTime())) {
+            const m = d.getMonth() % 3;
+            if (t.type === 'income') months[m].income += t.amount;
+            else months[m].expense += t.amount;
+          }
+        });
+        return months;
+      }
+
+      if (timeframe === 'yearly') {
+        const quarters = [
+          { label: 'Q1', income: 0, expense: 0 },
+          { label: 'Q2', income: 0, expense: 0 },
+          { label: 'Q3', income: 0, expense: 0 },
+          { label: 'Q4', income: 0, expense: 0 },
+        ];
+
+        transactions.forEach((t) => {
+          const d = new Date(t.date);
+          if (!isNaN(d.getTime())) {
+            const q = Math.min(3, Math.floor(d.getMonth() / 3));
+            if (t.type === 'income') quarters[q].income += t.amount;
+            else quarters[q].expense += t.amount;
+          }
+        });
+        return quarters;
+      }
+    } catch (_) {}
+
+    return fallbackSeries[timeframe] || fallbackSeries.monthly;
+  }, [timeframe, transactions]);
 
   const maxVal = Math.max(
-    ...data.map((d) => Math.max(d.income, d.expense)),
-    1000
+    ...data.map((d) => Math.max(d.income || 0, d.expense || 0)),
+    500
   );
 
   const width = 640;
@@ -29,14 +152,14 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
 
   // Convert points to SVG coordinates
   const pointsIncome = data.map((d, i) => {
-    const x = paddingX + (i / (data.length - 1 || 1)) * chartW;
-    const y = height - paddingY - (d.income / maxVal) * chartH;
+    const x = paddingX + (i / Math.max(1, data.length - 1)) * chartW;
+    const y = height - paddingY - ((d.income || 0) / maxVal) * chartH;
     return { x, y, ...d };
   });
 
   const pointsExpense = data.map((d, i) => {
-    const x = paddingX + (i / (data.length - 1 || 1)) * chartW;
-    const y = height - paddingY - (d.expense / maxVal) * chartH;
+    const x = paddingX + (i / Math.max(1, data.length - 1)) * chartW;
+    const y = height - paddingY - ((d.expense || 0) / maxVal) * chartH;
     return { x, y, ...d };
   });
 
@@ -63,15 +186,17 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
   const incomePath = createSmoothPath(pointsIncome);
   const expensePath = createSmoothPath(pointsExpense);
 
-  const incomeArea = `${incomePath} L ${pointsIncome[pointsIncome.length - 1].x} ${
-    height - paddingY
-  } L ${pointsIncome[0].x} ${height - paddingY} Z`;
+  const incomeArea = pointsIncome.length > 0
+    ? `${incomePath} L ${pointsIncome[pointsIncome.length - 1].x} ${height - paddingY} L ${pointsIncome[0].x} ${height - paddingY} Z`
+    : '';
 
-  const expenseArea = `${expensePath} L ${pointsExpense[pointsExpense.length - 1].x} ${
-    height - paddingY
-  } L ${pointsExpense[0].x} ${height - paddingY} Z`;
+  const expenseArea = pointsExpense.length > 0
+    ? `${expensePath} L ${pointsExpense[pointsExpense.length - 1].x} ${height - paddingY} L ${pointsExpense[0].x} ${height - paddingY} Z`
+    : '';
 
-  const activePoint = hoveredIndex !== null ? data[hoveredIndex] : data[data.length - 1];
+  const activePoint = hoveredIndex !== null && data[hoveredIndex]
+    ? data[hoveredIndex]
+    : data[data.length - 1] || { label: 'Hoy', income: 0, expense: 0 };
 
   return (
     <div className="liquid-glass p-6 space-y-4 relative overflow-hidden">
@@ -89,7 +214,7 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
               Flujo Comparativo: Ingresos vs. Gastos
             </h3>
             <p className="text-xs text-zinc-400">
-              Tendencia temporal ({TIMEFRAME_CONFIG[timeframe]?.label})
+              Tendencia temporal ({TIMEFRAME_CONFIG[timeframe]?.label || 'Este Periodo'})
             </p>
           </div>
         </div>
@@ -115,13 +240,13 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
           </span>
           <div className="flex items-center gap-4">
             <span className="text-emerald-300 font-medium">
-              +{formatCurrency(activePoint.income)}
+              +{formatCurrency(activePoint.income, currency, exchangeRate)}
             </span>
             <span className="text-rose-300 font-medium">
-              -{formatCurrency(activePoint.expense)}
+              -{formatCurrency(activePoint.expense, currency, exchangeRate)}
             </span>
             <span className="text-purple-300 font-bold">
-              Neto: {formatCurrency(activePoint.income - activePoint.expense)}
+              Neto: {formatCurrency((activePoint.income || 0) - (activePoint.expense || 0), currency, exchangeRate)}
             </span>
           </div>
         </div>
@@ -176,28 +301,32 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
           })}
 
           {/* Area Fills */}
-          <path d={incomeArea} fill="url(#incomeGrad)" />
-          <path d={expenseArea} fill="url(#expenseGrad)" />
+          {incomeArea && <path d={incomeArea} fill="url(#incomeGrad)" />}
+          {expenseArea && <path d={expenseArea} fill="url(#expenseGrad)" />}
 
           {/* Lines */}
-          <path
-            d={incomePath}
-            fill="none"
-            stroke="url(#lineIncomeGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <path
-            d={expensePath}
-            fill="none"
-            stroke="#FB7185"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
+          {incomePath && (
+            <path
+              d={incomePath}
+              fill="none"
+              stroke="url(#lineIncomeGrad)"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          )}
+          {expensePath && (
+            <path
+              d={expensePath}
+              fill="none"
+              stroke="#FB7185"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+          )}
 
           {/* Interactive dots and vertical lines */}
           {pointsIncome.map((pt, i) => {
-            const expPt = pointsExpense[i];
+            const expPt = pointsExpense[i] || pt;
             const isHovered = hoveredIndex === i;
 
             return (
@@ -270,7 +399,11 @@ export const FluidLineChart = ({ timeframe = 'monthly' }) => {
   );
 };
 
-export const CategoryRingChart = ({ transactions = [] }) => {
+export const CategoryRingChart = ({
+  transactions = [],
+  currency = 'USD',
+  exchangeRate = DEFAULT_USD_COP_RATE,
+}) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   // Filter only expenses and aggregate by category
@@ -333,7 +466,7 @@ export const CategoryRingChart = ({ transactions = [] }) => {
           </div>
         </div>
         <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30">
-          {formatCurrency(totalExpense)}
+          {formatCurrency(totalExpense, currency, exchangeRate)}
         </span>
       </div>
 
@@ -400,7 +533,9 @@ export const CategoryRingChart = ({ transactions = [] }) => {
                   {activeCategory ? `${activeCategory.percentage}%` : '100%'}
                 </span>
                 <span className="text-[11px] text-purple-200 font-semibold">
-                  {activeCategory ? formatCurrency(activeCategory.amount) : formatCurrency(totalExpense)}
+                  {activeCategory
+                    ? formatCurrency(activeCategory.amount, currency, exchangeRate)
+                    : formatCurrency(totalExpense, currency, exchangeRate)}
                 </span>
               </div>
             </div>
@@ -433,7 +568,7 @@ export const CategoryRingChart = ({ transactions = [] }) => {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-semibold text-white">
-                        {formatCurrency(item.amount)}
+                        {formatCurrency(item.amount, currency, exchangeRate)}
                       </span>
                       <span className="text-[11px] font-bold text-purple-300 w-8 text-right">
                         {item.percentage}%

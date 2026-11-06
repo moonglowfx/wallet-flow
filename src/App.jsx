@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar.jsx';
 import { Header } from './components/Header.jsx';
 import { DashboardView } from './components/DashboardView.jsx';
@@ -9,97 +9,71 @@ import { AIAdvisorView } from './components/AIAdvisorView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
 import { ExcelImportModal } from './components/ExcelImportModal.jsx';
-import {
-  INITIAL_ACCOUNTS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_SUBSCRIPTIONS,
-  INITIAL_DEBTS,
-  DEFAULT_USD_COP_RATE,
-} from './data/mockData.js';
+import { LoginModal } from './components/LoginModal.jsx';
+import { USERS, getUserInitialData } from './data/users.js';
+import { DEFAULT_USD_COP_RATE } from './data/mockData.js';
 import { api } from './services/api.js';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
 
+  // Multi-user authentication state: Munboi (PIN: 1234) | Tiago (PIN: 5678)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUserId = localStorage.getItem('wf_active_user_id');
+    return USERS.find((u) => u.id === savedUserId) || USERS[0];
+  });
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   // Currency State: USD as primary, COP as secondary
   const [currency, setCurrency] = useState(() => {
-    return localStorage.getItem('wf_currency') || 'USD';
+    return localStorage.getItem(`wf_user_${currentUser.id}_currency`) || 'USD';
   });
   const [exchangeRate, setExchangeRate] = useState(DEFAULT_USD_COP_RATE);
 
-  const DATA_VERSION = '2026-11-real-data-v1';
-
-  // Application State: Preloaded with user's real transactions from 2024 to 2026
+  // Isolated Application Data State per User
   const [accounts, setAccounts] = useState(() => {
-    const version = localStorage.getItem('wf_data_version');
-    if (version !== DATA_VERSION) {
-      localStorage.setItem('wf_data_version', DATA_VERSION);
-      localStorage.setItem('wf_accounts', JSON.stringify(INITIAL_ACCOUNTS));
-      localStorage.setItem('wf_transactions', JSON.stringify(INITIAL_TRANSACTIONS));
-      localStorage.setItem('wf_subscriptions', JSON.stringify(INITIAL_SUBSCRIPTIONS));
-      localStorage.setItem('wf_debts', JSON.stringify(INITIAL_DEBTS));
-      return INITIAL_ACCOUNTS;
+    const saved = localStorage.getItem(`wf_user_${currentUser.id}_accounts`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
     }
-    const saved = localStorage.getItem('wf_accounts');
-    if (!saved) return INITIAL_ACCOUNTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((a) => a.id === 'acc-bank-bbva')) {
-        return INITIAL_ACCOUNTS;
-      }
-      return parsed;
-    } catch (_) {
-      return INITIAL_ACCOUNTS;
-    }
+    return getUserInitialData(currentUser.id).accounts;
   });
 
   const [transactions, setTransactions] = useState(() => {
-    const version = localStorage.getItem('wf_data_version');
-    if (version !== DATA_VERSION) return INITIAL_TRANSACTIONS;
-    const saved = localStorage.getItem('wf_transactions');
-    if (!saved) return INITIAL_TRANSACTIONS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((t) => t.id === 'tx-101')) {
-        return INITIAL_TRANSACTIONS;
-      }
-      return parsed;
-    } catch (_) {
-      return INITIAL_TRANSACTIONS;
+    const saved = localStorage.getItem(`wf_user_${currentUser.id}_transactions`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
     }
+    return getUserInitialData(currentUser.id).transactions;
   });
 
   const [subscriptions, setSubscriptions] = useState(() => {
-    const version = localStorage.getItem('wf_data_version');
-    if (version !== DATA_VERSION) return INITIAL_SUBSCRIPTIONS;
-    const saved = localStorage.getItem('wf_subscriptions');
-    if (!saved) return INITIAL_SUBSCRIPTIONS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((s) => s.id === 'sub-1')) {
-        return INITIAL_SUBSCRIPTIONS;
-      }
-      return parsed;
-    } catch (_) {
-      return INITIAL_SUBSCRIPTIONS;
+    const saved = localStorage.getItem(`wf_user_${currentUser.id}_subscriptions`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
     }
+    return getUserInitialData(currentUser.id).subscriptions;
   });
 
   const [debts, setDebts] = useState(() => {
-    const version = localStorage.getItem('wf_data_version');
-    if (version !== DATA_VERSION) return INITIAL_DEBTS;
-    const saved = localStorage.getItem('wf_debts');
-    if (!saved) return INITIAL_DEBTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((d) => d.id === 'debt-1')) {
-        return INITIAL_DEBTS;
-      }
-      return parsed;
-    } catch (_) {
-      return INITIAL_DEBTS;
+    const saved = localStorage.getItem(`wf_user_${currentUser.id}_debts`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
     }
+    return getUserInitialData(currentUser.id).debts;
   });
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -108,15 +82,79 @@ export function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Initial load from SQLite Database if server is running
+  const showToast = useCallback((msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3200);
+  }, []);
+
+  // When active user switches, reload their isolated personal data
+  const switchUserData = useCallback((user) => {
+    const userId = user.id;
+    const initial = getUserInitialData(userId);
+
+    // Load Currency
+    const savedCurr = localStorage.getItem(`wf_user_${userId}_currency`) || 'USD';
+    setCurrency(savedCurr);
+
+    // Load Accounts
+    const savedAccs = localStorage.getItem(`wf_user_${userId}_accounts`);
+    let loadedAccs = initial.accounts;
+    if (savedAccs) {
+      try {
+        const p = JSON.parse(savedAccs);
+        if (Array.isArray(p) && p.length > 0) loadedAccs = p;
+      } catch (_) {}
+    }
+    setAccounts(loadedAccs);
+
+    // Load Transactions
+    const savedTxs = localStorage.getItem(`wf_user_${userId}_transactions`);
+    let loadedTxs = initial.transactions;
+    if (savedTxs) {
+      try {
+        const p = JSON.parse(savedTxs);
+        if (Array.isArray(p) && p.length > 0) loadedTxs = p;
+      } catch (_) {}
+    }
+    setTransactions(loadedTxs);
+
+    // Load Subscriptions
+    const savedSubs = localStorage.getItem(`wf_user_${userId}_subscriptions`);
+    let loadedSubs = initial.subscriptions;
+    if (savedSubs) {
+      try {
+        const p = JSON.parse(savedSubs);
+        if (Array.isArray(p) && p.length > 0) loadedSubs = p;
+      } catch (_) {}
+    }
+    setSubscriptions(loadedSubs);
+
+    // Load Debts
+    const savedDebts = localStorage.getItem(`wf_user_${userId}_debts`);
+    let loadedDebts = initial.debts;
+    if (savedDebts) {
+      try {
+        const p = JSON.parse(savedDebts);
+        if (Array.isArray(p) && p.length > 0) loadedDebts = p;
+      } catch (_) {}
+    }
+    setDebts(loadedDebts);
+
+    setSelectedAccountId(null);
+    showToast(`Sesión activa: ${user.username} (${user.role})`);
+  }, [showToast]);
+
+  // Initial load from SQLite Database for active user
   useEffect(() => {
     async function loadData() {
       try {
         const [accs, txs, subs, dts] = await Promise.all([
-          api.getAccounts(),
-          api.getTransactions(),
-          api.getSubscriptions(),
-          api.getDebts(),
+          api.getAccounts(currentUser.id),
+          api.getTransactions(currentUser.id),
+          api.getSubscriptions(currentUser.id),
+          api.getDebts(currentUser.id),
         ]);
         if (accs && accs.length > 0) setAccounts(accs);
         if (txs && txs.length > 0) setTransactions(txs);
@@ -125,58 +163,64 @@ export function App() {
       } catch (_) {}
     }
     loadData();
-  }, []);
+  }, [currentUser.id]);
 
-  // Sync currency to local storage
+  // Sync isolated user state to localStorage
   useEffect(() => {
-    localStorage.setItem('wf_currency', currency);
-  }, [currency]);
-
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem('wf_accounts', JSON.stringify(accounts));
-  }, [accounts]);
+    localStorage.setItem(`wf_user_${currentUser.id}_currency`, currency);
+  }, [currentUser.id, currency]);
 
   useEffect(() => {
-    localStorage.setItem('wf_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(accounts));
+  }, [currentUser.id, accounts]);
 
   useEffect(() => {
-    localStorage.setItem('wf_subscriptions', JSON.stringify(subscriptions));
-  }, [subscriptions]);
+    localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(transactions));
+  }, [currentUser.id, transactions]);
 
   useEffect(() => {
-    localStorage.setItem('wf_debts', JSON.stringify(debts));
-  }, [debts]);
+    localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(subscriptions));
+  }, [currentUser.id, subscriptions]);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3200);
+  useEffect(() => {
+    localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(debts));
+  }, [currentUser.id, debts]);
+
+  // Handle successful login
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    localStorage.setItem('wf_active_user_id', user.id);
+    setIsLoginModalOpen(false);
+    switchUserData(user);
   };
 
-  // Reset clean data
+  // Reset clean data only for current user
   const handleResetDemoData = async () => {
-    setAccounts([]);
-    setTransactions([]);
-    setSubscriptions([]);
-    setDebts([]);
+    const initial = getUserInitialData(currentUser.id);
+    setAccounts(initial.accounts);
+    setTransactions(initial.transactions);
+    setSubscriptions(initial.subscriptions);
+    setDebts(initial.debts);
     setSelectedAccountId(null);
-    localStorage.removeItem('wf_accounts');
-    localStorage.removeItem('wf_transactions');
-    localStorage.removeItem('wf_subscriptions');
-    localStorage.removeItem('wf_debts');
+    localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(initial.accounts));
+    localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(initial.transactions));
+    localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(initial.subscriptions));
+    localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(initial.debts));
     try {
-      await fetch('/api/clear', { method: 'POST' });
+      await fetch('/api/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id }),
+      });
     } catch (_) {}
-    showToast('Base de datos y almacenamiento limpiados a cero');
+    showToast(`Datos de ${currentUser.username} restablecidos`);
   };
 
   // Handle adding a new transaction and update linked account balance
   const handleSaveTransaction = async (newTxData) => {
     const newTx = {
       id: `tx-${Date.now()}`,
+      userId: currentUser.id,
       ...newTxData,
     };
 
@@ -189,25 +233,29 @@ export function App() {
           const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
           return {
             ...acc,
-            balance: acc.balance + delta,
+            balance: Math.round((acc.balance + delta) * 100) / 100,
           };
         }
         return acc;
       })
     );
 
-    await api.createTransaction(newTx);
+    await api.createTransaction(newTx, currentUser.id);
     showToast(`Movimiento registrado: ${newTx.title}`);
   };
 
   // Handle adding a new account
   const handleSaveAccount = async (newAcc) => {
-    setAccounts([newAcc, ...accounts]);
-    await api.createAccount(newAcc);
-    showToast(`Cuenta creada: ${newAcc.name}`);
+    const userAccount = {
+      ...newAcc,
+      userId: currentUser.id,
+    };
+    setAccounts([userAccount, ...accounts]);
+    await api.createAccount(userAccount, currentUser.id);
+    showToast(`Cuenta creada: ${userAccount.name}`);
   };
 
-  // Handle importing Excel data
+  // Handle importing Excel data for the active user
   const handleImportData = async (parsedData, mode = 'replace') => {
     let nextAccounts = [];
     let nextTransactions = [];
@@ -243,11 +291,11 @@ export function App() {
     setSubscriptions(nextSubscriptions);
     setDebts(nextDebts);
 
-    // Save to localStorage
-    localStorage.setItem('wf_accounts', JSON.stringify(nextAccounts));
-    localStorage.setItem('wf_transactions', JSON.stringify(nextTransactions));
-    localStorage.setItem('wf_subscriptions', JSON.stringify(nextSubscriptions));
-    localStorage.setItem('wf_debts', JSON.stringify(nextDebts));
+    // Save to user scoped localStorage
+    localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(nextAccounts));
+    localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(nextTransactions));
+    localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(nextSubscriptions));
+    localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(nextDebts));
 
     // Save to SQLite
     await api.bulkImport({
@@ -255,10 +303,10 @@ export function App() {
       transactions: nextTransactions,
       subscriptions: nextSubscriptions,
       debts: nextDebts,
-    }, mode);
+    }, mode, currentUser.id);
 
     showToast(
-      `Excel importado con éxito: ${nextAccounts.length} cuentas, ${nextTransactions.length} movimientos`
+      `Excel importado para ${currentUser.username}: ${nextAccounts.length} cuentas, ${nextTransactions.length} movimientos`
     );
   };
 
@@ -286,6 +334,8 @@ export function App() {
         antExpenseAlertCount={antAlertCount}
         currency={currency}
         exchangeRate={exchangeRate}
+        currentUser={currentUser}
+        onOpenSwitchUser={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main Content Area (offset by desktop sidebar) */}
@@ -297,6 +347,8 @@ export function App() {
           currency={currency}
           setCurrency={setCurrency}
           exchangeRate={exchangeRate}
+          currentUser={currentUser}
+          onOpenSwitchUser={() => setIsLoginModalOpen(true)}
           onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
           onOpenImportModal={() => setIsImportModalOpen(true)}
           onResetDemoData={handleResetDemoData}
@@ -396,6 +448,13 @@ export function App() {
         onImportData={handleImportData}
         activeCurrency={currency}
         exchangeRate={exchangeRate}
+      />
+
+      {/* Multi-User Security PIN Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onLoginSuccess={handleLoginSuccess}
+        currentUserId={currentUser?.id}
       />
 
       {/* Floating Toast Notification */}

@@ -1,33 +1,28 @@
 // API Client with SQLite Server Integration & Resilient LocalStorage Fallback
-import {
-  INITIAL_ACCOUNTS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_SUBSCRIPTIONS,
-  INITIAL_DEBTS,
-} from '../data/mockData.js';
+import { getUserInitialData } from '../data/users.js';
 
 const API_BASE = '/api';
 
 export const api = {
   // Accounts
-  async getAccounts() {
+  async getAccounts(userId = 'munboi') {
     try {
-      const res = await fetch(`${API_BASE}/accounts`);
+      const res = await fetch(`${API_BASE}/accounts?userId=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
-    const saved = localStorage.getItem('wf_accounts');
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+    const saved = localStorage.getItem(`wf_user_${userId}_accounts`);
+    return saved ? JSON.parse(saved) : getUserInitialData(userId).accounts;
   },
 
-  async createAccount(account) {
+  async createAccount(account, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(account),
+        body: JSON.stringify({ ...account, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
@@ -35,24 +30,24 @@ export const api = {
   },
 
   // Transactions
-  async getTransactions() {
+  async getTransactions(userId = 'munboi') {
     try {
-      const res = await fetch(`${API_BASE}/transactions`);
+      const res = await fetch(`${API_BASE}/transactions?userId=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
-    const saved = localStorage.getItem('wf_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    const saved = localStorage.getItem(`wf_user_${userId}_transactions`);
+    return saved ? JSON.parse(saved) : getUserInitialData(userId).transactions;
   },
 
-  async createTransaction(transaction) {
+  async createTransaction(transaction, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify({ ...transaction, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
@@ -60,31 +55,31 @@ export const api = {
   },
 
   // Subscriptions
-  async getSubscriptions() {
+  async getSubscriptions(userId = 'munboi') {
     try {
-      const res = await fetch(`${API_BASE}/subscriptions`);
+      const res = await fetch(`${API_BASE}/subscriptions?userId=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
-    const saved = localStorage.getItem('wf_subscriptions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBSCRIPTIONS;
+    const saved = localStorage.getItem(`wf_user_${userId}_subscriptions`);
+    return saved ? JSON.parse(saved) : getUserInitialData(userId).subscriptions;
   },
 
-  async createSubscription(subscription) {
+  async createSubscription(subscription, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/subscriptions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription),
+        body: JSON.stringify({ ...subscription, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
     return subscription;
   },
 
-  async toggleSubscription(id) {
+  async toggleSubscription(id, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/subscriptions/${id}/toggle`, {
         method: 'PATCH',
@@ -95,36 +90,36 @@ export const api = {
   },
 
   // Debts
-  async getDebts() {
+  async getDebts(userId = 'munboi') {
     try {
-      const res = await fetch(`${API_BASE}/debts`);
+      const res = await fetch(`${API_BASE}/debts?userId=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
-    const saved = localStorage.getItem('wf_debts');
-    return saved ? JSON.parse(saved) : INITIAL_DEBTS;
+    const saved = localStorage.getItem(`wf_user_${userId}_debts`);
+    return saved ? JSON.parse(saved) : getUserInitialData(userId).debts;
   },
 
-  async createDebt(debt) {
+  async createDebt(debt, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/debts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(debt),
+        body: JSON.stringify({ ...debt, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
     return debt;
   },
 
-  async addDebtPayment(debtId, payment) {
+  async addDebtPayment(debtId, payment, userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/debts/${debtId}/payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payment }),
+        body: JSON.stringify({ payment, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
@@ -132,22 +127,15 @@ export const api = {
   },
 
   // Bulk Import / Sync
-  async bulkImport(data, mode = 'replace') {
+  async bulkImport(data, mode = 'replace', userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, mode }),
+        body: JSON.stringify({ ...data, mode, userId }),
       });
       if (res.ok) return await res.json();
     } catch (_) {}
     return null;
-  },
-
-  // Reset Demo
-  async resetDemo() {
-    try {
-      await fetch(`${API_BASE}/reset-demo`, { method: 'POST' });
-    } catch (_) {}
   },
 };

@@ -7,6 +7,8 @@ import {
   Wallet,
   FileSpreadsheet,
   Coins,
+  LogOut,
+  UserCheck,
 } from 'lucide-react';
 import { TIMEFRAME_CONFIG, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
@@ -42,6 +44,8 @@ export const Header = ({
   currency = 'USD',
   setCurrency,
   exchangeRate = DEFAULT_USD_COP_RATE,
+  currentUser,
+  onOpenSwitchUser,
   onOpenNewTransaction,
   onOpenImportModal,
   onResetDemoData,
@@ -52,17 +56,29 @@ export const Header = ({
   return (
     <header className="sticky top-0 z-20 pt-3 pb-4 px-4 sm:px-6 lg:px-8 bg-[#0F0F13]/75 backdrop-blur-2xl border-b border-white/[0.07]">
       <div className="max-w-7xl mx-auto flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between">
-        {/* Left: Mobile Brand + Current View Title */}
+        {/* Left: Mobile Brand + Current View Title + User Badge */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="lg:hidden w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center shadow-neon-purple border border-white/20 shrink-0">
               <Wallet className="w-4 h-4 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
                   {info.title}
                 </h1>
+
+                {/* Active user badge button */}
+                <button
+                  onClick={onOpenSwitchUser}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-900/35 border border-purple-400/40 hover:border-purple-300 text-purple-200 text-xs font-bold transition-all cursor-pointer shadow-sm hover:scale-105"
+                  title="Cambiar de usuario o bloquear sesión"
+                >
+                  <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${currentUser?.avatarGradient || 'from-purple-400 to-fuchsia-400'} animate-pulse`} />
+                  <span>{currentUser?.username || 'Usuario'}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">(PIN: {currentUser?.pin})</span>
+                </button>
+
                 <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-300">
                   <Calendar className="w-3 h-3" />
                   {TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Mensual'}
@@ -78,8 +94,15 @@ export const Header = ({
             </div>
           </div>
 
-          {/* Mobile Quick AI & Reset buttons */}
-          <div className="flex lg:hidden items-center gap-2">
+          {/* Mobile Quick AI, User Switch & Reset buttons */}
+          <div className="flex lg:hidden items-center gap-1.5">
+            <button
+              onClick={onOpenSwitchUser}
+              className="liquid-pill p-1.5 text-purple-300 hover:text-white cursor-pointer"
+              title="Cambiar Usuario"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
             <button
               onClick={onOpenImportModal}
               className="liquid-pill p-1.5 text-emerald-300 hover:text-white cursor-pointer"
@@ -94,13 +117,6 @@ export const Header = ({
             >
               <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />
               <span>IA</span>
-            </button>
-            <button
-              onClick={onResetDemoData}
-              className="liquid-pill p-1.5 text-zinc-400 hover:text-white cursor-pointer"
-              title="Restaurar a cero"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -153,7 +169,7 @@ export const Header = ({
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  {TIMEFRAME_CONFIG[tf].label}
+                  {TIMEFRAME_CONFIG[tf]?.label || tf}
                 </button>
               );
             })}
@@ -179,11 +195,11 @@ export const Header = ({
             </button>
 
             <button
-              onClick={onResetDemoData}
-              title="Limpiar y restaurar datos"
+              onClick={onOpenSwitchUser}
+              title="Cambiar Usuario / Bloquear Sesión"
               className="liquid-pill p-2 text-zinc-400 hover:text-purple-200 hover:border-purple-500/40 transition-colors cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

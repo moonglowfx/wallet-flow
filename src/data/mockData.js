@@ -8285,24 +8285,50 @@ export const TIMEFRAME_CONFIG = {
     shortLabel: 'Semanal',
     days: 7,
     multiplier: 0.25,
+    series: [
+      { label: 'Lun', income: 0, expense: 45 },
+      { label: 'Mar', income: 150, expense: 80 },
+      { label: 'Mié', income: 0, expense: 60 },
+      { label: 'Jue', income: 300, expense: 120 },
+      { label: 'Vie', income: 50, expense: 95 },
+      { label: 'Sáb', income: 0, expense: 140 },
+      { label: 'Dom', income: 0, expense: 30 },
+    ],
   },
   monthly: {
     label: 'Este Mes',
     shortLabel: 'Mensual',
     days: 30,
     multiplier: 1.0,
+    series: [
+      { label: 'Sem 1', income: 650, expense: 320 },
+      { label: 'Sem 2', income: 900, expense: 480 },
+      { label: 'Sem 3', income: 450, expense: 390 },
+      { label: 'Sem 4', income: 1200, expense: 560 },
+    ],
   },
   quarterly: {
     label: 'Último Trimestre',
     shortLabel: 'Trimestral',
     days: 90,
     multiplier: 3.0,
+    series: [
+      { label: 'Mes 1', income: 2400, expense: 1800 },
+      { label: 'Mes 2', income: 2900, expense: 1650 },
+      { label: 'Mes 3', income: 3200, expense: 2100 },
+    ],
   },
   yearly: {
     label: 'Año en Curso',
     shortLabel: 'Anual',
     days: 365,
     multiplier: 12.0,
+    series: [
+      { label: 'Q1', income: 8400, expense: 6200 },
+      { label: 'Q2', income: 7800, expense: 5900 },
+      { label: 'Q3', income: 9100, expense: 7100 },
+      { label: 'Q4', income: 8900, expense: 6800 },
+    ],
   },
 };
 
