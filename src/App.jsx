@@ -15,6 +15,23 @@ import { USERS, getUserInitialData } from './data/users.js';
 import { DEFAULT_USD_COP_RATE } from './data/mockData.js';
 import { api } from './services/api.js';
 
+// Ensure Tiago is 100% wiped clean of any past mock data in browser localStorage
+if (typeof window !== 'undefined' && window.localStorage) {
+  const hasOldTiagoData = () => {
+    const accs = localStorage.getItem('wf_user_tiago_accounts') || '';
+    const txs = localStorage.getItem('wf_user_tiago_transactions') || '';
+    return accs.includes('acc-tiago-') || accs.includes('Chase') || accs.includes('Wells Fargo') || txs.includes('tx-tg-');
+  };
+
+  if (hasOldTiagoData() || localStorage.getItem('wf_tiago_clean_v4') !== 'true') {
+    localStorage.setItem('wf_user_tiago_accounts', JSON.stringify([]));
+    localStorage.setItem('wf_user_tiago_transactions', JSON.stringify([]));
+    localStorage.setItem('wf_user_tiago_subscriptions', JSON.stringify([]));
+    localStorage.setItem('wf_user_tiago_debts', JSON.stringify([]));
+    localStorage.setItem('wf_tiago_clean_v4', 'true');
+  }
+}
+
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
@@ -34,6 +51,18 @@ export function App() {
 
   // Isolated Application Data State per User
   const [accounts, setAccounts] = useState(() => {
+    if (currentUser.id === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_accounts');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((a) => a.id?.startsWith('acc-tiago-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
     const saved = localStorage.getItem(`wf_user_${currentUser.id}_accounts`);
     if (saved) {
       try {
@@ -45,6 +74,18 @@ export function App() {
   });
 
   const [transactions, setTransactions] = useState(() => {
+    if (currentUser.id === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_transactions');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((t) => t.id?.startsWith('tx-tg-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
     const saved = localStorage.getItem(`wf_user_${currentUser.id}_transactions`);
     if (saved) {
       try {
@@ -56,6 +97,18 @@ export function App() {
   });
 
   const [subscriptions, setSubscriptions] = useState(() => {
+    if (currentUser.id === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_subscriptions');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((s) => s.id?.startsWith('sub-tg-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
     const saved = localStorage.getItem(`wf_user_${currentUser.id}_subscriptions`);
     if (saved) {
       try {
@@ -67,6 +120,18 @@ export function App() {
   });
 
   const [debts, setDebts] = useState(() => {
+    if (currentUser.id === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_debts');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((d) => d.id?.startsWith('debt-tg-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
     const saved = localStorage.getItem(`wf_user_${currentUser.id}_debts`);
     if (saved) {
       try {
@@ -141,6 +206,31 @@ export function App() {
         if (Array.isArray(p)) loadedDebts = p;
       } catch (_) {}
     }
+
+    // Strict guarantee for Tiago: purge any legacy mock data
+    if (userId === 'tiago') {
+      const isOld = (items) =>
+        Array.isArray(items) &&
+        items.some(
+          (x) =>
+            x.id?.startsWith('acc-tiago-') ||
+            x.id?.startsWith('tx-tg-') ||
+            x.id?.startsWith('sub-tg-') ||
+            x.id?.startsWith('debt-tg-')
+        );
+      if (isOld(loadedAccs)) loadedAccs = [];
+      if (isOld(loadedTxs)) loadedTxs = [];
+      if (isOld(loadedSubs)) loadedSubs = [];
+      if (isOld(loadedDebts)) loadedDebts = [];
+      localStorage.setItem('wf_user_tiago_accounts', JSON.stringify(loadedAccs));
+      localStorage.setItem('wf_user_tiago_transactions', JSON.stringify(loadedTxs));
+      localStorage.setItem('wf_user_tiago_subscriptions', JSON.stringify(loadedSubs));
+      localStorage.setItem('wf_user_tiago_debts', JSON.stringify(loadedDebts));
+    }
+
+    setAccounts(loadedAccs);
+    setTransactions(loadedTxs);
+    setSubscriptions(loadedSubs);
     setDebts(loadedDebts);
 
     setSelectedAccountId(null);
@@ -157,10 +247,18 @@ export function App() {
           api.getSubscriptions(currentUser.id),
           api.getDebts(currentUser.id),
         ]);
-        if (accs && accs.length > 0) setAccounts(accs);
-        if (txs && txs.length > 0) setTransactions(txs);
-        if (subs && subs.length > 0) setSubscriptions(subs);
-        if (dts && dts.length > 0) setDebts(dts);
+        if (currentUser.id === 'tiago') {
+          // Tiago only loads whatever is explicitly in SQLite (starts at 0)
+          setAccounts(accs || []);
+          setTransactions(txs || []);
+          setSubscriptions(subs || []);
+          setDebts(dts || []);
+        } else {
+          if (accs && accs.length > 0) setAccounts(accs);
+          if (txs && txs.length > 0) setTransactions(txs);
+          if (subs && subs.length > 0) setSubscriptions(subs);
+          if (dts && dts.length > 0) setDebts(dts);
+        }
       } catch (_) {}
     }
     loadData();
