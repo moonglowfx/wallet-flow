@@ -33,6 +33,10 @@ const TAB_TITLES = {
     title: 'Aura AI — Smart Financial Advisor',
     subtitle: 'Diagnóstico algorítmico de fugas de capital y plan predictivo',
   },
+  settings: {
+    title: 'Ajustes del Sistema & Personalización',
+    subtitle: 'Edición total de PIN, perfil, divisas, cuentas, deudas y copias de seguridad',
+  },
 };
 
 const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
@@ -76,7 +80,7 @@ export const Header = ({
                 >
                   <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${currentUser?.avatarGradient || 'from-purple-400 to-fuchsia-400'} animate-pulse`} />
                   <span>{currentUser?.username || 'Usuario'}</span>
-                  <span className="text-[10px] text-zinc-400 font-mono">(PIN: {currentUser?.pin})</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">({currentUser?.role || 'Personal'})</span>
                 </button>
 
                 <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-300">

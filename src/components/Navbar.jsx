@@ -10,6 +10,7 @@ import {
   TrendingUp,
   LogOut,
   User,
+  Settings,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
@@ -44,6 +45,12 @@ const NAV_ITEMS = [
     shortLabel: 'IA Advisor',
     icon: Sparkles,
     badge: 'IA',
+  },
+  {
+    id: 'settings',
+    label: 'Ajustes',
+    shortLabel: 'Ajustes',
+    icon: Settings,
   },
 ];
 
@@ -166,8 +173,8 @@ export const Navbar = ({
                     </p>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   </div>
-                  <span className="text-[10px] text-zinc-400 block truncate font-mono">
-                    PIN: {currentUser?.pin || '••••'}
+                  <span className="text-[10px] text-zinc-400 block truncate">
+                    {currentUser?.role || 'Personal'}
                   </span>
                 </div>
               </div>

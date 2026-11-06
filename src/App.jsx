@@ -6,6 +6,7 @@ import { AccountsView } from './components/AccountsView.jsx';
 import { SubscriptionsView } from './components/SubscriptionsView.jsx';
 import { DebtsView } from './components/DebtsView.jsx';
 import { AIAdvisorView } from './components/AIAdvisorView.jsx';
+import { SettingsView } from './components/SettingsView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
 import { ExcelImportModal } from './components/ExcelImportModal.jsx';
@@ -37,7 +38,7 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).accounts;
@@ -48,7 +49,7 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).transactions;
@@ -59,7 +60,7 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).subscriptions;
@@ -70,7 +71,7 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).debts;
@@ -104,7 +105,7 @@ export function App() {
     if (savedAccs) {
       try {
         const p = JSON.parse(savedAccs);
-        if (Array.isArray(p) && p.length > 0) loadedAccs = p;
+        if (Array.isArray(p)) loadedAccs = p;
       } catch (_) {}
     }
     setAccounts(loadedAccs);
@@ -115,7 +116,7 @@ export function App() {
     if (savedTxs) {
       try {
         const p = JSON.parse(savedTxs);
-        if (Array.isArray(p) && p.length > 0) loadedTxs = p;
+        if (Array.isArray(p)) loadedTxs = p;
       } catch (_) {}
     }
     setTransactions(loadedTxs);
@@ -126,7 +127,7 @@ export function App() {
     if (savedSubs) {
       try {
         const p = JSON.parse(savedSubs);
-        if (Array.isArray(p) && p.length > 0) loadedSubs = p;
+        if (Array.isArray(p)) loadedSubs = p;
       } catch (_) {}
     }
     setSubscriptions(loadedSubs);
@@ -137,7 +138,7 @@ export function App() {
     if (savedDebts) {
       try {
         const p = JSON.parse(savedDebts);
-        if (Array.isArray(p) && p.length > 0) loadedDebts = p;
+        if (Array.isArray(p)) loadedDebts = p;
       } catch (_) {}
     }
     setDebts(loadedDebts);
@@ -417,6 +418,27 @@ export function App() {
               currency={currency}
               exchangeRate={exchangeRate}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsView
+              currentUser={currentUser}
+              currency={currency}
+              setCurrency={setCurrency}
+              exchangeRate={exchangeRate}
+              setExchangeRate={setExchangeRate}
+              accounts={accounts}
+              setAccounts={setAccounts}
+              transactions={transactions}
+              setTransactions={setTransactions}
+              subscriptions={subscriptions}
+              setSubscriptions={setSubscriptions}
+              debts={debts}
+              setDebts={setDebts}
+              onOpenNewAccount={() => setIsAccountModalOpen(true)}
+              onResetUserData={handleResetDemoData}
+              showToast={showToast}
             />
           )}
         </main>

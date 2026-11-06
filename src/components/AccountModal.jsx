@@ -24,7 +24,6 @@ export const AccountModal = ({
   const [accountCurrency, setAccountCurrency] = useState(currency || 'USD');
   const [creditLimit, setCreditLimit] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  const [yieldRate, setYieldRate] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -72,7 +71,6 @@ export const AccountModal = ({
       type,
       balance: Math.round(finalBalance * 100) / 100,
       creditLimit: type === 'credit' ? Math.round(rawCreditLimit * 100) / 100 : undefined,
-      yieldRate: type === 'bank' && yieldRate ? parseFloat(yieldRate) : undefined,
       accountNumber: accountNumber.trim() || (type === 'cash' ? 'CASH' : `•••• ${Math.floor(1000 + Math.random() * 9000)}`),
       accentGradient:
         type === 'credit'
@@ -88,7 +86,6 @@ export const AccountModal = ({
     setBalance('');
     setCreditLimit('');
     setAccountNumber('');
-    setYieldRate('');
     onClose();
   };
 
@@ -114,7 +111,7 @@ export const AccountModal = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight">
-                Crear Nueva Cuenta Financiera
+                Crear cuenta nueva
               </h3>
               <p className="text-xs text-zinc-400">
                 Efectivo, Cuentas Bancarias o Tarjetas de Crédito
@@ -283,21 +280,7 @@ export const AccountModal = ({
                   className="liquid-input text-xs font-bold"
                 />
               </div>
-            ) : type === 'bank' ? (
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Tasa de Rendimiento Anual (%)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="ej. 14.25 (Cajita Nu / Cetes)"
-                  value={yieldRate}
-                  onChange={(e) => setYieldRate(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-            ) : (
+            ) : type === 'cash' ? (
               <div>
                 <label className="block text-zinc-300 font-medium mb-1">
                   Identificador / Etiqueta
@@ -310,24 +293,22 @@ export const AccountModal = ({
                   className="liquid-input text-xs"
                 />
               </div>
+            ) : (
+              <div>
+                <label className="block text-zinc-300 font-medium mb-1">
+                  Últimos 4 dígitos o referencia
+                </label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  placeholder="ej. •••• 4821"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  className="liquid-input text-xs font-mono"
+                />
+              </div>
             )}
           </div>
-
-          {type !== 'cash' && (
-            <div>
-              <label className="block text-zinc-300 font-medium mb-1">
-                Últimos 4 dígitos de la tarjeta o cuenta
-              </label>
-              <input
-                type="text"
-                maxLength={4}
-                placeholder="ej. 8921"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                className="liquid-input text-xs font-mono"
-              />
-            </div>
-          )}
 
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
