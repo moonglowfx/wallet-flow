@@ -766,13 +766,13 @@ export const AccountsView = ({
           onClick={(e) => {
             if (e.target === e.currentTarget) setEditingAccount(null);
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+          className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-5 sm:p-6 space-y-4 text-xs shadow-2xl"
+            className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden text-xs shadow-2xl"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
               <h3 className="text-base font-bold text-white">Editar Cuenta</h3>
               <button
                 type="button"
@@ -783,91 +783,93 @@ export const AccountsView = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedAccount} className="space-y-3">
-              <div>
-                <label className="block text-zinc-300 mb-1">Nombre de la Cuenta</label>
-                <input
-                  type="text"
-                  required
-                  value={accName}
-                  onChange={(e) => setAccName(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-zinc-300 mb-1">Institución</label>
-                <input
-                  type="text"
-                  value={accInstitution}
-                  onChange={(e) => setAccInstitution(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-zinc-300">Saldo ({accCurrency})</label>
-                  <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => setAccCurrency('USD')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'USD' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
-                    >
-                      USD
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAccCurrency('COP')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'COP' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
-                    >
-                      COP
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="tel"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={accBalance}
-                  onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
-                  className="liquid-input text-xs font-bold font-mono"
-                />
-              </div>
-
-              {editingAccount.type === 'credit' && (
+            <form onSubmit={handleSaveEditedAccount} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Límite de Crédito ({accCurrency})</label>
+                  <label className="block text-zinc-300 mb-1">Nombre de la Cuenta</label>
+                  <input
+                    type="text"
+                    required
+                    value={accName}
+                    onChange={(e) => setAccName(e.target.value)}
+                    className="liquid-input text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 mb-1">Institución</label>
+                  <input
+                    type="text"
+                    value={accInstitution}
+                    onChange={(e) => setAccInstitution(e.target.value)}
+                    className="liquid-input text-xs"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-300">Saldo ({accCurrency})</label>
+                    <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setAccCurrency('USD')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'USD' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                      >
+                        USD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAccCurrency('COP')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'COP' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                      >
+                        COP
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="tel"
                     inputMode="decimal"
-                    value={accLimit}
-                    onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="0"
+                    value={accBalance}
+                    onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
                     className="liquid-input text-xs font-bold font-mono"
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="block text-zinc-300 mb-1">Número de Cuenta / Referencia</label>
-                <input
-                  type="text"
-                  value={accNumber}
-                  onChange={(e) => setAccNumber(e.target.value)}
-                  className="liquid-input text-xs"
-                />
+                {editingAccount.type === 'credit' && (
+                  <div>
+                    <label className="block text-zinc-300 mb-1">Límite de Crédito ({accCurrency})</label>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      value={accLimit}
+                      onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-xs font-bold font-mono"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-zinc-300 mb-1">Número de Cuenta / Referencia</label>
+                  <input
+                    type="text"
+                    value={accNumber}
+                    onChange={(e) => setAccNumber(e.target.value)}
+                    className="liquid-input text-xs"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   onClick={() => setEditingAccount(null)}
-                  className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
+                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="liquid-button-primary px-5 py-2 font-bold cursor-pointer">
-                  Guardar Cambios
+                <button type="submit" className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[44px] flex items-center justify-center">
+                  Guardar
                 </button>
               </div>
             </form>

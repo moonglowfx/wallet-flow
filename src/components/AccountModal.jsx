@@ -98,26 +98,26 @@ export const AccountModal = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-5 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative"
+        className="w-full max-w-lg h-[100dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
       >
         {/* Glow */}
         <div className="pointer-events-none absolute -top-20 -left-20 w-52 h-52 rounded-full bg-violet-600/25 blur-3xl" />
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 relative z-10">
+        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white tracking-tight">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
                 Crear cuenta nueva
               </h3>
-              <p className="text-xs text-zinc-400">
+              <p className="text-[11px] sm:text-xs text-zinc-400">
                 Efectivo, Cuentas Bancarias o Tarjetas de Crédito
               </p>
             </div>
@@ -125,20 +125,20 @@ export const AccountModal = ({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {error && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center gap-2 text-xs text-rose-300">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs relative z-10">
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden relative z-10 text-xs">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+            {error && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center gap-2 text-xs text-rose-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
           {/* Account Type Selector (3 options) */}
           <div>
             <label className="block text-zinc-300 font-semibold mb-2">
@@ -316,19 +316,20 @@ export const AccountModal = ({
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+        {/* Sticky Action Buttons - Full-width touch targets on mobile */}
+          <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))] grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5 w-full">
             <button
               type="button"
               onClick={onClose}
-              className="liquid-pill px-4 py-2.5 text-zinc-400 hover:text-white cursor-pointer font-semibold"
+              className="liquid-pill py-2.5 px-4 text-xs text-zinc-400 hover:text-white cursor-pointer font-semibold text-center flex items-center justify-center min-h-[44px]"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="liquid-button-primary px-6 py-2.5 font-bold cursor-pointer"
+              className="liquid-button-primary py-2.5 px-6 text-xs font-bold cursor-pointer text-center flex items-center justify-center min-h-[44px] shadow-neon-purple active:scale-95"
             >
               Guardar Cuenta
             </button>
