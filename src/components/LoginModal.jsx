@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Lock,
   Unlock,
@@ -23,6 +23,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const inputRef = useRef(null);
 
   // In-modal PIN change mode state
   const [isChangePinMode, setIsChangePinMode] = useState(false);
@@ -43,31 +44,26 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
       setNewPinInput('');
       setConfirmPinInput('');
       setChangeSuccessMessage('');
+      setTimeout(() => inputRef.current?.focus(), 60);
     }
   }, [isOpen, selectedUser]);
 
-  // Support direct physical keyboard input
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e) => {
-      if (isChangePinMode) return; // Keyboard handling for change mode is managed via standard inputs or keypad
-      if (e.key >= '0' && e.key <= '9') {
-        if (pin.length < 4) {
-          handleDigitPress(e.key);
-        }
-      } else if (e.key === 'Backspace') {
-        handleBackspace();
-      } else if (e.key === 'Enter' && pin.length === 4) {
-        verifyPin(pin);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, pin, selectedUser, isChangePinMode]);
-
-  if (!isOpen) return null;
+  const verifyPin = (pinToTest) => {
+    const activePin = getUserPin(selectedUser.id);
+    if (pinToTest === activePin) {
+      setIsSuccess(true);
+      setError('');
+      setTimeout(() => {
+        onLoginSuccess(selectedUser);
+      }, 220);
+    } else {
+      setError('PIN incorrecto. Intenta de nuevo.');
+      setTimeout(() => {
+        setPin('');
+        inputRef.current?.focus();
+      }, 420);
+    }
+  };
 
   const handleDigitPress = (digit) => {
     if (pin.length >= 4) return;
@@ -88,23 +84,46 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
   const handleClear = () => {
     setPin('');
     setError('');
+    inputRef.current?.focus();
   };
 
-  const verifyPin = (pinToTest) => {
-    const activePin = getUserPin(selectedUser.id);
-    if (pinToTest === activePin) {
-      setIsSuccess(true);
-      setError('');
-      setTimeout(() => {
-        onLoginSuccess(selectedUser);
-      }, 500);
-    } else {
-      setError('PIN incorrecto. Intenta de nuevo.');
-      setTimeout(() => {
-        setPin('');
-      }, 700);
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (!pasted) return;
+    setPin(pasted);
+    setError('');
+    if (pasted.length === 4) {
+      verifyPin(pasted);
     }
   };
+
+  // Support direct physical keyboard input & fast arrow navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (isChangePinMode) return;
+      if (e.key >= '0' && e.key <= '9') {
+        if (pin.length < 4) {
+          handleDigitPress(e.key);
+        }
+      } else if (e.key === 'Backspace') {
+        handleBackspace();
+      } else if (e.key === 'Enter' && pin.length === 4) {
+        verifyPin(pin);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        setSelectedUser((prev) => (prev.id === 'munboi' ? USERS[1] : USERS[0]));
+        setPin('');
+        setError('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, pin, selectedUser, isChangePinMode]);
+
+  if (!isOpen) return null;
 
   // PIN Change handlers
   const handleProcessPinChange = (e) => {
@@ -305,28 +324,66 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
           </form>
         ) : (
           <>
-            {/* PIN Indicators: 4 Liquid Glass Dots */}
-            <div className="space-y-3 relative z-10">
-              <div className="flex items-center justify-center gap-4 py-2">
+            {/* Hidden Input for Instant Keyboard & Paste Capture */}
+            <input
+              ref={inputRef}
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setPin(val);
+                setError('');
+                if (val.length === 4) verifyPin(val);
+              }}
+              onPaste={handlePaste}
+              autoFocus
+              className="absolute opacity-0 pointer-events-none w-0 h-0"
+              aria-label="Ingresa tu PIN de 4 dígitos"
+            />
+
+            {/* Fast Interactive 4-Digit Glass Boxes */}
+            <div className="space-y-2 relative z-10">
+              <div
+                onClick={() => inputRef.current?.focus()}
+                className="flex items-center justify-center gap-2.5 sm:gap-3.5 py-2 cursor-pointer"
+                title="Toca para escribir tu PIN"
+              >
                 {[0, 1, 2, 3].map((idx) => {
                   const isFilled = pin.length > idx;
+                  const isActive = pin.length === idx;
                   return (
                     <div
                       key={idx}
-                      className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                        isFilled
-                          ? 'bg-gradient-to-r from-fuchsia-400 to-purple-500 scale-125 shadow-[0_0_12px_#c084fc] border border-white'
-                          : 'bg-white/10 border border-white/20'
+                      className={`w-12 h-14 sm:w-14 sm:h-16 rounded-2xl flex items-center justify-center transition-all duration-200 border font-mono text-xl sm:text-2xl font-black ${
+                        isSuccess
+                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.5)] scale-105'
+                          : error
+                          ? 'bg-rose-500/20 border-rose-500 text-rose-300 animate-shake'
+                          : isFilled
+                          ? 'bg-gradient-to-tr from-purple-600/40 via-violet-600/30 to-fuchsia-600/30 border-purple-400/80 text-white shadow-liquid-purple scale-105 ring-1 ring-purple-400/50'
+                          : isActive
+                          ? 'bg-white/[0.08] border-purple-400 text-purple-300 ring-2 ring-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+                          : 'bg-white/[0.03] border-white/15 text-zinc-600'
                       }`}
-                    />
+                    >
+                      {isFilled ? '●' : isActive ? <span className="w-1.5 h-5 bg-purple-400 animate-pulse rounded-full" /> : '·'}
+                    </div>
                   );
                 })}
               </div>
 
-              {error && (
+              {error ? (
                 <p className="text-xs text-rose-400 font-medium flex items-center justify-center gap-1.5 animate-shake">
                   <AlertCircle className="w-3.5 h-3.5" />
                   <span>{error}</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-zinc-400 flex items-center justify-center gap-1">
+                  <span>Escribe con teclado físico o en pantalla</span>
+                  <span className="text-purple-300 font-mono font-bold">({selectedUser.username})</span>
                 </p>
               )}
             </div>

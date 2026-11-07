@@ -29,9 +29,10 @@ export function App() {
 
   // Multi-user authentication state backed by SQLite: Munboi (PIN: 0800) | Tiago (PIN: 5678)
   const [currentUser, setCurrentUser] = useState(() => USERS[0]);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(
-    () => typeof document !== 'undefined' && !document.cookie.includes('wf_account_id=')
-  );
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.sessionStorage?.getItem('wf_session_unlocked') !== 'true';
+  });
 
   // Currency State persisted in SQLite per user: USD as primary, COP as secondary
   const [currency, setCurrency] = useState('USD');
@@ -75,8 +76,10 @@ export function App() {
     const state = await api.getState(targetUserId);
     if (state) {
       if (!targetUserId) {
-        const isAuthed = state.authenticatedAccount || Boolean(state.user);
-        setIsLoginModalOpen(!isAuthed);
+        const isSessionUnlocked =
+          typeof window !== 'undefined' &&
+          window.sessionStorage?.getItem('wf_session_unlocked') === 'true';
+        setIsLoginModalOpen(!isSessionUnlocked);
       }
       if (state.user) {
         setCurrentUser((prev) => ({
@@ -128,6 +131,9 @@ export function App() {
   // When active user switches, persist session in SQLite and load their isolated data
   const handleLoginSuccess = async (user) => {
     setCurrentUser(user);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.setItem('wf_session_unlocked', 'true');
+    }
     setIsLoginModalOpen(false);
     setSelectedAccountId(null);
 
@@ -344,6 +350,13 @@ export function App() {
     }
   }, [subscriptions, accounts, transactions, handleExecuteDueSubscriptions]);
 
+  const handleOpenSwitchUser = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.removeItem('wf_session_unlocked');
+    }
+    setIsLoginModalOpen(true);
+  }, []);
+
   const handleOpenEditTransaction = useCallback((tx) => {
     setEditingTransaction(tx);
     setIsTransactionModalOpen(true);
@@ -393,7 +406,7 @@ export function App() {
         currency={currency}
         exchangeRate={exchangeRate}
         currentUser={currentUser}
-        onOpenSwitchUser={() => setIsLoginModalOpen(true)}
+        onOpenSwitchUser={handleOpenSwitchUser}
       />
 
       {/* Main Content Area (offset by desktop sidebar and mobile bottom tab bar) */}
@@ -409,7 +422,7 @@ export function App() {
           setCurrency={handleSetCurrency}
           exchangeRate={exchangeRate}
           currentUser={currentUser}
-          onOpenSwitchUser={() => setIsLoginModalOpen(true)}
+          onOpenSwitchUser={handleOpenSwitchUser}
           onOpenNewTransaction={handleOpenNewTransaction}
           onResetDemoData={handleResetDemoData}
           onNavigateAI={() => setActiveTab('ai-advisor')}
