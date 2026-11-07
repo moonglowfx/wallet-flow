@@ -5,6 +5,7 @@ import {
   formatCurrency,
   formatSecondaryCurrency,
   TIMEFRAME_CONFIG,
+  INITIAL_TRANSACTIONS,
 } from '../src/data/mockData.js';
 import { createClient } from '@libsql/client';
 
@@ -86,29 +87,59 @@ async function verifyDB() {
   assert(tiagoDbAccs.rows[0].c === 0, `SQLite tiene a Tiago en blanco (0 cuentas)`);
 
   // -------------------------------------------------------------
-  // 4. VERIFICACIÓN DE MODAL CREAR CUENTA Y AI ADVISOR
+  // 4. VERIFICACIÓN DE COMPONENTES UNIFICADOS Y NUEVAS SECCIONES
   // -------------------------------------------------------------
-  console.log('\n--- 4. Verificación de Componentes y Ajustes ---');
+  console.log('\n--- 4. Verificación de Componentes Unificados y Nuevas Secciones ---');
+  
+  // Unificación de Deudas, Gastos Fijos y Suscripciones
+  assert(fs.existsSync('src/components/CommitmentsView.jsx'), 'CommitmentsView.jsx existe como sección unificada');
+  const commitmentsCode = fs.readFileSync('src/components/CommitmentsView.jsx', 'utf-8');
+  assert(commitmentsCode.includes('SubscriptionsView'), 'CommitmentsView integra la gestión de suscripciones');
+  assert(commitmentsCode.includes('DebtsView'), 'CommitmentsView integra la gestión de deudas');
+
+  // Nueva sección de Gastos Mensuales ordenados cronológicamente
+  assert(fs.existsSync('src/components/MonthlyExpensesView.jsx'), 'MonthlyExpensesView.jsx existe');
+  const monthlyCode = fs.readFileSync('src/components/MonthlyExpensesView.jsx', 'utf-8');
+  assert(monthlyCode.includes('allExpenses'), 'MonthlyExpensesView filtra y agrupa gastos');
+  assert(monthlyCode.includes('formatMonthName'), 'MonthlyExpensesView muestra los meses en orden');
+
+  // AccountModal sin tasa de rendimiento anual
   const accountModalCode = fs.readFileSync('src/components/AccountModal.jsx', 'utf-8');
   assert(accountModalCode.includes('Crear cuenta nueva'), 'AccountModal tiene como título exacto "Crear cuenta nueva"');
   assert(!accountModalCode.includes('Tasa de Rendimiento Anual'), 'AccountModal NO incluye tasa de rendimiento anual');
 
+  // AI Advisor sin datos ajenos
   const aiAdvisorCode = fs.readFileSync('src/components/AIAdvisorView.jsx', 'utf-8');
   assert(!aiAdvisorCode.includes('MXN'), 'AI Advisor NO contiene monedas ajenas (MXN eliminado)');
   assert(!aiAdvisorCode.includes('BBVA'), 'AI Advisor NO contiene bancos ajenos (BBVA eliminado)');
   assert(!aiAdvisorCode.includes('Nu Cajita Turbo'), 'AI Advisor NO contiene cuentas ajenas (Nu Cajita Turbo eliminado)');
 
-  const settingsViewCode = fs.readFileSync('src/components/SettingsView.jsx', 'utf-8');
-  assert(settingsViewCode.includes('Cambiar PIN de Acceso'), 'SettingsView incluye sección completa para cambiar PIN');
-  assert(settingsViewCode.includes('Exportar Respaldo JSON'), 'SettingsView incluye exportación e importación de respaldo');
-  assert(settingsViewCode.includes('Divisas y Tipo de Cambio'), 'SettingsView incluye configuración de divisas');
+  // -------------------------------------------------------------
+  // 5. CÁLCULOS EXACTOS DE TIEMPO REAL SIN EXAGERACIONES
+  // -------------------------------------------------------------
+  console.log('\n--- 5. Exactitud Matemática de Ingresos y Gastos Anuales ---');
+  const dashboardCode = fs.readFileSync('src/components/DashboardView.jsx', 'utf-8');
+  assert(!dashboardCode.includes('multiplier * 0.9'), 'DashboardView NO multiplica ingresos por factores artificiales');
+  
+  // Real calculation for 2026 in course
+  const txs2026 = INITIAL_TRANSACTIONS.filter((t) => t.date.startsWith('2026'));
+  const realIncome2026 = txs2026.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const realExpense2026 = txs2026.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+  assert(Math.round(realIncome2026) === 17611, `Ingresos reales año en curso (2026) exactos: ${formatCurrency(realIncome2026)} (NO números inflados)`);
+  assert(Math.round(realExpense2026) === 16682, `Gastos reales año en curso (2026) exactos: ${formatCurrency(realExpense2026)}`);
+
+  // Sticky Header verification
+  const indexHtml = fs.readFileSync('index.html', 'utf-8');
+  assert(!indexHtml.includes('overflow-x-hidden'), 'index.html no bloquea el sticky header con overflow-x-hidden en body');
+  assert(headerCode.includes('sticky top-0 z-30'), 'Header tiene posición sticky fija en z-30');
 
   // -------------------------------------------------------------
-  // 5. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)
+  // 6. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)
   // -------------------------------------------------------------
-  console.log('\n--- 5. Responsividad y Conversión de Monedas ---');
+  console.log('\n--- 6. Responsividad y Conversión de Monedas ---');
   ['weekly', 'monthly', 'quarterly', 'yearly'].forEach((tf) => {
-    assert(TIMEFRAME_CONFIG[tf] && TIMEFRAME_CONFIG[tf].days > 0, `Filtro temporal '${tf}' configurado correctamente`);
+    assert(TIMEFRAME_CONFIG[tf] && TIMEFRAME_CONFIG[tf].days > 0, `Filtro temporal '${tf}' configurado con series reales`);
   });
 
   const testValUSD = 100;

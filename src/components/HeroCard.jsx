@@ -82,7 +82,7 @@ export const HeroCard = ({
             Capital Neto Consolidado
           </span>
           <span className="text-xs text-zinc-400 hidden sm:inline">
-            {TIMEFRAME_CONFIG[timeframe]?.subtitle}
+            {TIMEFRAME_CONFIG[timeframe]?.label || 'Periodo Activo'}
           </span>
         </div>
 

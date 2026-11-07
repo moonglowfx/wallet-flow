@@ -57,78 +57,97 @@ export const FluidLineChart = ({
 
     try {
       // Aggregate real transactions based on timeframe
-      if (timeframe === 'weekly') {
-        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-        const dayBuckets = days.map((label) => ({ label, income: 0, expense: 0 }));
-        
-        // Take last 7 days of txs
-        const recentTxs = [...transactions]
-          .sort((a, b) => new Date(b.date) - new Date(a.date))
-          .slice(0, 40);
+      const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const refDate = new Date(sorted[0].date);
+      const currentYear = refDate.getFullYear();
 
-        recentTxs.forEach((t) => {
+      if (timeframe === 'weekly') {
+        const wStart = new Date(refDate);
+        wStart.setDate(wStart.getDate() - 7);
+        const wTxs = transactions.filter((t) => {
+          const d = new Date(t.date);
+          return d >= wStart && d <= refDate;
+        });
+
+        const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const dayBuckets = dayNames.map((label) => ({ label, income: 0, expense: 0 }));
+
+        wTxs.forEach((t) => {
           const d = new Date(t.date);
           if (!isNaN(d.getTime())) {
             const dayIdx = d.getDay();
-            if (t.type === 'income') dayBuckets[dayIdx].income += t.amount;
-            else dayBuckets[dayIdx].expense += t.amount;
+            if (t.type === 'income') dayBuckets[dayIdx].income += Number(t.amount) || 0;
+            else dayBuckets[dayIdx].expense += Number(t.amount) || 0;
           }
         });
         return dayBuckets;
       }
 
       if (timeframe === 'monthly') {
+        const latestMonth = sorted[0].date.slice(0, 7); // e.g. 2026-11
+        const monthTxs = transactions.filter((t) => t.date && t.date.startsWith(latestMonth));
+
         const weeks = [
-          { label: 'Sem 1', income: 0, expense: 0 },
-          { label: 'Sem 2', income: 0, expense: 0 },
-          { label: 'Sem 3', income: 0, expense: 0 },
-          { label: 'Sem 4', income: 0, expense: 0 },
+          { label: 'Día 1-7', income: 0, expense: 0 },
+          { label: 'Día 8-14', income: 0, expense: 0 },
+          { label: 'Día 15-21', income: 0, expense: 0 },
+          { label: 'Día 22+', income: 0, expense: 0 },
         ];
 
-        transactions.slice(0, 100).forEach((t) => {
-          const d = new Date(t.date);
-          if (!isNaN(d.getTime())) {
-            const day = d.getDate();
-            const weekIdx = Math.min(3, Math.floor((day - 1) / 7));
-            if (t.type === 'income') weeks[weekIdx].income += t.amount;
-            else weeks[weekIdx].expense += t.amount;
-          }
+        monthTxs.forEach((t) => {
+          const day = parseInt(t.date.slice(8, 10), 10);
+          const wIdx = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3;
+          if (t.type === 'income') weeks[wIdx].income += Number(t.amount) || 0;
+          else weeks[wIdx].expense += Number(t.amount) || 0;
         });
         return weeks;
       }
 
       if (timeframe === 'quarterly') {
+        const qStart = new Date(refDate);
+        qStart.setDate(qStart.getDate() - 90);
+
+        const qTxs = transactions.filter((t) => {
+          const d = new Date(t.date);
+          return d >= qStart && d <= refDate;
+        });
+
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const m3 = refDate.getMonth();
+        const m2 = (m3 - 1 + 12) % 12;
+        const m1 = (m3 - 2 + 12) % 12;
+
         const months = [
-          { label: 'Mes -2', income: 0, expense: 0 },
-          { label: 'Mes -1', income: 0, expense: 0 },
-          { label: 'Mes Actual', income: 0, expense: 0 },
+          { label: monthNames[m1], income: 0, expense: 0, monthNum: m1 + 1 },
+          { label: monthNames[m2], income: 0, expense: 0, monthNum: m2 + 1 },
+          { label: monthNames[m3], income: 0, expense: 0, monthNum: m3 + 1 },
         ];
 
-        transactions.slice(0, 200).forEach((t) => {
-          const d = new Date(t.date);
-          if (!isNaN(d.getTime())) {
-            const m = d.getMonth() % 3;
-            if (t.type === 'income') months[m].income += t.amount;
-            else months[m].expense += t.amount;
+        qTxs.forEach((t) => {
+          const m = parseInt(t.date.slice(5, 7), 10);
+          const bucket = months.find((b) => b.monthNum === m);
+          if (bucket) {
+            if (t.type === 'income') bucket.income += Number(t.amount) || 0;
+            else bucket.expense += Number(t.amount) || 0;
           }
         });
-        return months;
+        return months.map(({ label, income, expense }) => ({ label, income, expense }));
       }
 
       if (timeframe === 'yearly') {
         const quarters = [
-          { label: 'Q1', income: 0, expense: 0 },
-          { label: 'Q2', income: 0, expense: 0 },
-          { label: 'Q3', income: 0, expense: 0 },
-          { label: 'Q4', income: 0, expense: 0 },
+          { label: 'Q1 (Ene-Mar)', income: 0, expense: 0 },
+          { label: 'Q2 (Abr-Jun)', income: 0, expense: 0 },
+          { label: 'Q3 (Jul-Sep)', income: 0, expense: 0 },
+          { label: 'Q4 (Oct-Nov)', income: 0, expense: 0 },
         ];
 
         transactions.forEach((t) => {
-          const d = new Date(t.date);
-          if (!isNaN(d.getTime())) {
-            const q = Math.min(3, Math.floor(d.getMonth() / 3));
-            if (t.type === 'income') quarters[q].income += t.amount;
-            else quarters[q].expense += t.amount;
+          if (t.date && t.date.startsWith(String(currentYear))) {
+            const m = parseInt(t.date.slice(5, 7), 10);
+            const q = Math.min(3, Math.floor((m - 1) / 3));
+            if (t.type === 'income') quarters[q].income += Number(t.amount) || 0;
+            else quarters[q].expense += Number(t.amount) || 0;
           }
         });
         return quarters;

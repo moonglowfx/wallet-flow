@@ -21,12 +21,20 @@ const TAB_TITLES = {
     title: 'Bóveda de Cuentas & Movimientos',
     subtitle: 'Efectivo, Cuentas Bancarias (Débito/Ahorro) y Tarjetas de Crédito',
   },
+  'monthly-expenses': {
+    title: 'Historial de Gastos por Mes',
+    subtitle: 'Desglose mensual en orden cronológico con concepto, cantidad, categoría y cuenta',
+  },
+  commitments: {
+    title: 'Gastos Fijos, Suscripciones & Deudas',
+    subtitle: 'Gestión unificada de compromisos recurrentes, suscripciones y créditos',
+  },
   subscriptions: {
-    title: 'Gastos Fijos & Suscripciones',
-    subtitle: 'Control de cargos recurrentes mensuales y pasivos automáticos',
+    title: 'Gastos Fijos, Suscripciones & Deudas',
+    subtitle: 'Gestión unificada de compromisos recurrentes, suscripciones y créditos',
   },
   debts: {
-    title: 'Gestor de Deudas & Abonos',
+    title: 'Gastos Fijos, Suscripciones & Deudas',
     subtitle: 'Seguimiento de amortización, liquidación progresiva e historial',
   },
   'ai-advisor': {
@@ -58,7 +66,7 @@ export const Header = ({
   const info = TAB_TITLES[activeTab] || TAB_TITLES.dashboard;
 
   return (
-    <header className="sticky top-0 z-20 pt-3 pb-4 px-4 sm:px-6 lg:px-8 bg-[#0F0F13]/75 backdrop-blur-2xl border-b border-white/[0.07]">
+    <header className="sticky top-0 z-30 pt-3 pb-3 px-4 sm:px-6 lg:px-8 bg-[#0F0F13]/95 backdrop-blur-2xl border-b border-white/[0.1] shadow-lg transition-all">
       <div className="max-w-7xl mx-auto flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between">
         {/* Left: Mobile Brand + Current View Title + User Badge */}
         <div className="flex items-center justify-between">

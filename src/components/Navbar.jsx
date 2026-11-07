@@ -11,6 +11,8 @@ import {
   LogOut,
   User,
   Settings,
+  CalendarDays,
+  Layers,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
@@ -28,16 +30,16 @@ const NAV_ITEMS = [
     icon: Wallet,
   },
   {
-    id: 'subscriptions',
-    label: 'Fijos & Suscripciones',
-    shortLabel: 'Fijos',
-    icon: CalendarClock,
+    id: 'monthly-expenses',
+    label: 'Gastos Mensuales',
+    shortLabel: 'Por Mes',
+    icon: CalendarDays,
   },
   {
-    id: 'debts',
-    label: 'Deudas & Abonos',
-    shortLabel: 'Deudas',
-    icon: HandCoins,
+    id: 'commitments',
+    label: 'Fijos, Suscripciones & Deudas',
+    shortLabel: 'Compromisos',
+    icon: Layers,
   },
   {
     id: 'ai-advisor',

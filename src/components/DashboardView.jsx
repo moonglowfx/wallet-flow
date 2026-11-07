@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -28,30 +28,73 @@ export const DashboardView = ({
   const [filterType, setFilterType] = useState('all');
 
   const tfData = TIMEFRAME_CONFIG[timeframe] || TIMEFRAME_CONFIG.monthly;
-  const multiplier = tfData.multiplier || 1;
 
-  // Compute incomes and expenses scaled or summed
-  const totalIncomes = transactions
+  // Reference date: the latest transaction date (e.g. 2026-11-05), or fallback to today
+  const latestDate = useMemo(() => {
+    if (!transactions || transactions.length === 0) return new Date();
+    const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const d = new Date(sorted[0].date);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }, [transactions]);
+
+  // Real filtered transactions strictly according to the active timeframe
+  const activePeriodTxs = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    const ref = new Date(latestDate);
+    const refYear = ref.getFullYear();
+    const refMonthStr = `${refYear}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+
+    if (timeframe === 'weekly') {
+      const weekStart = new Date(ref);
+      weekStart.setDate(weekStart.getDate() - 7);
+      return transactions.filter((t) => {
+        const d = new Date(t.date);
+        return d >= weekStart && d <= ref;
+      });
+    }
+
+    if (timeframe === 'monthly') {
+      return transactions.filter((t) => t.date && t.date.startsWith(refMonthStr));
+    }
+
+    if (timeframe === 'quarterly') {
+      const qStart = new Date(ref);
+      qStart.setDate(qStart.getDate() - 90);
+      return transactions.filter((t) => {
+        const d = new Date(t.date);
+        return d >= qStart && d <= ref;
+      });
+    }
+
+    if (timeframe === 'yearly') {
+      return transactions.filter((t) => t.date && t.date.startsWith(String(refYear)));
+    }
+
+    return transactions;
+  }, [transactions, timeframe, latestDate]);
+
+  // Exact real income and expense sums without artificial multipliers
+  const periodIncomes = activePeriodTxs
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  const totalExpenses = transactions
+  const periodExpenses = activePeriodTxs
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  const antExpenses = transactions
-    .filter((t) => t.isAntExpense)
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const periodAntExpenses = activePeriodTxs
+    .filter((t) => t.isAntExpense || (t.type === 'expense' && Number(t.amount) <= 15))
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  const netSavings = totalIncomes - totalExpenses;
-  const savingsRate = totalIncomes > 0 ? Math.round((netSavings / totalIncomes) * 100) : 0;
-  const antPercentageOfExpenses = totalExpenses > 0 ? Math.round((antExpenses / totalExpenses) * 100) : 0;
+  const netSavings = periodIncomes - periodExpenses;
+  const savingsRate = periodIncomes > 0 ? Math.round((netSavings / periodIncomes) * 100) : 0;
+  const antPercentageOfExpenses = periodExpenses > 0 ? Math.round((periodAntExpenses / periodExpenses) * 100) : 0;
 
   // Filtered transactions for quick list
-  const filteredTransactions = transactions.filter((tx) => {
+  const filteredTransactions = activePeriodTxs.filter((tx) => {
     if (filterType === 'income') return tx.type === 'income';
     if (filterType === 'expense') return tx.type === 'expense';
-    if (filterType === 'ant') return tx.isAntExpense;
+    if (filterType === 'ant') return tx.isAntExpense || Number(tx.amount) <= 15;
     return true;
   });
 
@@ -79,11 +122,11 @@ export const DashboardView = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(totalIncomes * (multiplier === 0.25 ? 0.4 : multiplier === 1 ? 1 : multiplier * 0.9), currency, exchangeRate)}
+            {formatCurrency(periodIncomes, currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
-            <span className="text-emerald-400 font-medium">+15.4% vs prev.</span>
+            <span className="text-emerald-400 font-medium">Flujo Real</span>
           </div>
         </div>
 
@@ -96,11 +139,11 @@ export const DashboardView = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(totalExpenses * (multiplier === 0.25 ? 0.35 : multiplier === 1 ? 1 : multiplier * 0.88), currency, exchangeRate)}
+            {formatCurrency(periodExpenses, currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
-            <span className="text-rose-400 font-medium">+3.8% controlado</span>
+            <span className="text-rose-400 font-medium">{activePeriodTxs.filter((t) => t.type === 'expense').length} movimientos</span>
           </div>
         </div>
 
@@ -136,7 +179,7 @@ export const DashboardView = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white tracking-tight">
-            {formatCurrency(antExpenses, currency, exchangeRate)}
+            {formatCurrency(periodAntExpenses, currency, exchangeRate)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-fuchsia-200 pt-1 border-t border-purple-400/20">
             <span>{antPercentageOfExpenses}% de egresos</span>

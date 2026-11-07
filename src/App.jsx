@@ -3,6 +3,8 @@ import { Navbar } from './components/Navbar.jsx';
 import { Header } from './components/Header.jsx';
 import { DashboardView } from './components/DashboardView.jsx';
 import { AccountsView } from './components/AccountsView.jsx';
+import { CommitmentsView } from './components/CommitmentsView.jsx';
+import { MonthlyExpensesView } from './components/MonthlyExpensesView.jsx';
 import { SubscriptionsView } from './components/SubscriptionsView.jsx';
 import { DebtsView } from './components/DebtsView.jsx';
 import { AIAdvisorView } from './components/AIAdvisorView.jsx';
@@ -486,24 +488,27 @@ export function App() {
             />
           )}
 
-          {activeTab === 'subscriptions' && (
-            <SubscriptionsView
-              subscriptions={subscriptions}
-              setSubscriptions={setSubscriptions}
+          {activeTab === 'monthly-expenses' && (
+            <MonthlyExpensesView
+              transactions={transactions}
               accounts={accounts}
               currency={currency}
               exchangeRate={exchangeRate}
+              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
             />
           )}
 
-          {activeTab === 'debts' && (
-            <DebtsView
+          {(activeTab === 'commitments' || activeTab === 'subscriptions' || activeTab === 'debts') && (
+            <CommitmentsView
+              subscriptions={subscriptions}
+              setSubscriptions={setSubscriptions}
               debts={debts}
               setDebts={setDebts}
               accounts={accounts}
               currency={currency}
               exchangeRate={exchangeRate}
               onLogPaymentTransaction={handleSaveTransaction}
+              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
             />
           )}
 
