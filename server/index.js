@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { db, initDatabase, seedUserData, clearDatabase } from './db.js';
 
@@ -841,13 +843,22 @@ app.post('/api/reset-demo', async (req, res) => {
 });
 
 // Start standalone HTTP server only when executed directly
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(__dirname, '../dist');
 const isDirectRun =
   process.argv[1] && fileURLToPath(import.meta.url).toLowerCase() === process.argv[1].toLowerCase();
 
 if (isDirectRun) {
+  if (fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.get(/^(?!\/api).*/, (_req, res) => {
+      res.sendFile(path.join(distDir, 'index.html'));
+    });
+  }
+
   initDatabase().then(() => {
     app.listen(PORT, () => {
-      console.log(`⚡ SQLite REST API Server activo en http://localhost:${PORT}`);
+      console.log(`⚡ SQLite Full-Stack Server activo en http://localhost:${PORT}`);
     });
   });
 }

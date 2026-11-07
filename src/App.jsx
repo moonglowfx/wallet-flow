@@ -393,10 +393,14 @@ export function App() {
                 subscriptions={subscriptions}
                 debts={debts}
                 timeframe={timeframe}
+                setTimeframe={setTimeframe}
                 selectedYear={selectedYear}
+                setSelectedYear={setSelectedYear}
+                availableYears={availableYears}
                 currency={currency}
                 exchangeRate={exchangeRate}
-                onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+                onOpenNewTransaction={handleOpenNewTransaction}
+                onEditTransaction={handleOpenEditTransaction}
               />
             </React.Suspense>
           )}

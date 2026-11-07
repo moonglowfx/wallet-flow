@@ -26,6 +26,7 @@ import {
   AlertOctagon,
   Percent,
   Calendar,
+  Pencil,
 } from 'lucide-react';
 import {
   formatCurrency,
@@ -34,16 +35,22 @@ import {
   filterTransactionsByPeriod,
 } from '../data/mockData.js';
 
+const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
+
 export const AIAdvisorView = ({
   accounts = [],
   transactions = [],
   subscriptions = [],
   debts = [],
   timeframe = 'monthly',
+  setTimeframe,
   selectedYear = '2026',
+  setSelectedYear,
+  availableYears = ['2026', '2025', '2024', 'all'],
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
+  onEditTransaction,
 }) => {
   const [antReductionPercent, setAntReductionPercent] = useState(40);
   const [isScanning, setIsScanning] = useState(false);
@@ -61,18 +68,39 @@ export const AIAdvisorView = ({
     return filterTransactionsByPeriod(transactions, timeframe, selectedYear);
   }, [transactions, timeframe, selectedYear]);
 
-  const targetTxs = activePeriodTxs.length > 0 ? activePeriodTxs : transactions;
+  const targetTxs = activePeriodTxs;
+  const periodDays =
+    timeframe === 'weekly' ? 7 : timeframe === 'monthly' ? 30 : timeframe === 'quarterly' ? 90 : 365;
+  const periodFactor =
+    timeframe === 'weekly' ? 7 / 30 : timeframe === 'monthly' ? 1 : timeframe === 'quarterly' ? 3 : 12;
+  const periodLabel = TIMEFRAME_CONFIG[timeframe]?.label || 'Este Mes';
+  const periodShortLabel = TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Mensual';
+  const yearLabel = selectedYear === 'all' ? 'Histórico Completo' : `Año ${selectedYear}`;
+
+  const dateRangeLabel = React.useMemo(() => {
+    if (targetTxs.length === 0) return 'Sin movimientos en este período';
+    let minD = targetTxs[0].date;
+    let maxD = targetTxs[0].date;
+    targetTxs.forEach((t) => {
+      if (t.date && t.date < minD) minD = t.date;
+      if (t.date && t.date > maxD) maxD = t.date;
+    });
+    return `${minD} al ${maxD}`;
+  }, [targetTxs]);
 
   const totalIncomes = targetTxs
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  const totalExpenses = transactions
+  const totalExpenses = targetTxs
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  // Micro-expenses / Ant expenses (flagged or amount <= $15)
-  const antTransactions = transactions.filter(
+  const netPeriodFlow = totalIncomes - totalExpenses;
+  const savingsRate = totalIncomes > 0 ? Math.round((netPeriodFlow / totalIncomes) * 100) : 0;
+
+  // Micro-expenses / Ant expenses in the selected period
+  const antTransactions = targetTxs.filter(
     (t) => t.type === 'expense' && (t.isAntExpense || (t.amount > 0 && t.amount <= 15))
   );
   const antExpenses = antTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -91,46 +119,52 @@ export const AIAdvisorView = ({
   const creditUtilization =
     totalCreditLimit > 0 ? Math.round((totalCreditDebt / totalCreditLimit) * 100) : 0;
 
-  // Subscriptions impact
+  // Subscriptions impact scaled to selected period
   const activeSubs = subscriptions.filter((s) => s.active);
   const totalMonthlySubs = activeSubs.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const periodSubsImpact = Math.round(totalMonthlySubs * periodFactor * 100) / 100;
   const essentialSubs = activeSubs
     .filter((s) => s.essential)
     .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
   const optionalSubs = totalMonthlySubs - essentialSubs;
-  const fixedRatio = totalIncomes > 0 ? Math.round((totalMonthlySubs / totalIncomes) * 100) : 0;
+  const fixedRatio = totalIncomes > 0 ? Math.round((periodSubsImpact / totalIncomes) * 100) : 0;
 
-  // Burn rate calculations
-  // Estimate monthly expense baseline: average of last transactions or totalExpenses / period
-  const estimatedMonthlyExpense = Math.max(1, totalExpenses > 0 ? (totalExpenses / Math.max(1, transactions.length > 50 ? 12 : 1)) : 1);
-  const dailyBurnRate = estimatedMonthlyExpense / 30;
+  // Burn rate calculations strictly for the selected period
+  const dailyBurnRate = totalExpenses > 0 ? totalExpenses / periodDays : 0;
+  const estimatedMonthlyExpense = dailyBurnRate > 0 ? dailyBurnRate * 30 : Math.max(1, totalMonthlySubs);
   const runwayDays = dailyBurnRate > 0 ? Math.round(liquidCash / dailyBurnRate) : 999;
   const runwayMonths = Math.round((runwayDays / 30) * 10) / 10;
 
-  // Aura Financial Health Score (0 - 100)
+  // Largest single expense & top income source in the selected period
+  const periodExpenseList = targetTxs.filter((t) => t.type === 'expense');
+  const largestExpense = periodExpenseList.reduce(
+    (max, t) => ((Number(t.amount) || 0) > (Number(max?.amount) || 0) ? t : max),
+    null
+  );
+  const avgTicketExpense =
+    periodExpenseList.length > 0 ? totalExpenses / periodExpenseList.length : 0;
+
+  // Aura Financial Health Score (0 - 100) dynamically computed for the active period
   let healthScore = 70;
-  if (transactions.length > 0) {
-    let score = 50;
-    // Cash flow ratio: (+25 if income exceeds expense)
-    if (totalIncomes > totalExpenses) score += 20;
-    else score -= 15;
+  if (targetTxs.length > 0) {
+    let score = 52;
+    if (totalIncomes > totalExpenses) score += 22;
+    else if (totalIncomes > 0 && totalExpenses <= totalIncomes * 1.1) score += 5;
+    else score -= 14;
 
-    // Runway bonus (+15 if > 2 months runway)
-    if (runwayMonths >= 3) score += 15;
-    else if (runwayMonths >= 1) score += 8;
-    else score -= 10;
+    if (runwayMonths >= 3) score += 14;
+    else if (runwayMonths >= 1) score += 7;
+    else score -= 8;
 
-    // Ant expense penalty
-    if (antRatio <= 12) score += 15;
-    else if (antRatio <= 25) score += 5;
-    else score -= 15;
+    if (antRatio <= 12) score += 12;
+    else if (antRatio <= 25) score += 4;
+    else score -= 12;
 
-    // Credit utilization penalty
     if (creditUtilization === 0) score += 10;
     else if (creditUtilization <= 30) score += 5;
-    else score -= 15;
+    else score -= 12;
 
-    healthScore = Math.max(10, Math.min(98, score));
+    healthScore = Math.max(12, Math.min(99, score));
   }
 
   const getHealthBadge = (score) => {
@@ -142,21 +176,31 @@ export const AIAdvisorView = ({
 
   const healthBadge = getHealthBadge(healthScore);
 
-  // 50 / 30 / 20 Dynamic Rule Breakdown
-  // Needs: Food, Transports, Health, Subscriptions essential
-  // Wants: Other, Travel, Gaming, Apparel, Dining out
-  // Savings: Inversión, Trading, Debt Payments
+  // 50 / 30 / 20 Dynamic Rule Breakdown strictly for the selected period
   let calculatedNeeds = 0;
   let calculatedWants = 0;
   let calculatedSavings = 0;
 
-  transactions.forEach((tx) => {
+  targetTxs.forEach((tx) => {
     const amt = Number(tx.amount) || 0;
     if (tx.type === 'expense') {
       const cat = (tx.category || '').toLowerCase();
-      if (cat.includes('food') || cat.includes('alimentación') || cat.includes('health') || cat.includes('transport') || cat.includes('household')) {
+      if (
+        cat.includes('food') ||
+        cat.includes('alimentación') ||
+        cat.includes('health') ||
+        cat.includes('salud') ||
+        cat.includes('transport') ||
+        cat.includes('hogar') ||
+        cat.includes('household')
+      ) {
         calculatedNeeds += amt;
-      } else if (cat.includes('inversión') || cat.includes('trading') || cat.includes('transfer')) {
+      } else if (
+        cat.includes('inversión') ||
+        cat.includes('trading') ||
+        cat.includes('transfer') ||
+        cat.includes('herramientas')
+      ) {
         calculatedSavings += amt;
       } else {
         calculatedWants += amt;
@@ -169,26 +213,30 @@ export const AIAdvisorView = ({
   const wantsPercent = Math.round((calculatedWants / totalCategorized) * 100);
   const savingsPercent = Math.round((calculatedSavings / totalCategorized) * 100);
 
-  // Top Expense Categories
+  // Top Expense Categories in the selected period
   const categoryMap = {};
-  transactions
+  const categoryCountMap = {};
+  targetTxs
     .filter((t) => t.type === 'expense')
     .forEach((t) => {
       const cat = t.category || 'Otros';
       categoryMap[cat] = (categoryMap[cat] || 0) + (Number(t.amount) || 0);
+      categoryCountMap[cat] = (categoryCountMap[cat] || 0) + 1;
     });
   const topCategories = Object.entries(categoryMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 6)
     .map(([category, amount]) => ({
       category,
       amount,
+      count: categoryCountMap[category] || 1,
       percent: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
     }));
 
-  // Interactive Simulator math:
-  const monthlyAntSavings = Math.round(antExpenses * (antReductionPercent / 100));
-  const annualAntSavings = monthlyAntSavings * 12;
+  // Interactive Simulator math normalized to monthly & annual from the selected period
+  const periodAntSavings = Math.round(antExpenses * (antReductionPercent / 100) * 100) / 100;
+  const monthlyAntSavings = Math.round((periodAntSavings / Math.max(0.23, periodFactor)) * 100) / 100;
+  const annualAntSavings = Math.round(monthlyAntSavings * 12);
   // Compound interest at 10% annual over 3 and 5 years
   const threeYearCompound = Math.round(
     monthlyAntSavings * ((Math.pow(1 + 0.10 / 12, 36) - 1) / (0.10 / 12))
@@ -254,6 +302,44 @@ export const AIAdvisorView = ({
           </div>
         </div>
 
+        {/* Synchronized Temporal & Year Selector Strip inside Aura AI */}
+        <div className="pt-3 border-t border-white/10 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold text-purple-200 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-fuchsia-400" />
+              <span>Analizando Período:</span>
+            </span>
+            <span className="text-xs font-extrabold text-white px-2.5 py-1 rounded-lg bg-white/10 border border-white/15">
+              {periodLabel} • {yearLabel}
+            </span>
+            <span className="text-[11px] text-zinc-300 font-mono">
+              ({targetTxs.length} movs • {dateRangeLabel})
+            </span>
+          </div>
+
+          {setTimeframe && (
+            <div className="grid grid-cols-4 sm:flex items-center gap-1 bg-black/45 p-1 rounded-xl border border-white/10">
+              {TIMEFRAMES.map((tf) => {
+                const isTfActive = timeframe === tf;
+                return (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-2 sm:px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center truncate ${
+                      isTfActive
+                        ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {TIMEFRAME_CONFIG[tf]?.shortLabel || tf}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Tab Navigation Switcher */}
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
           <button
@@ -311,6 +397,64 @@ export const AIAdvisorView = ({
           {/* TAB 1: DIAGNÓSTICO & FUGAS DE CAPITAL */}
           {activeTab === 'diagnostico' && (
             <div className="space-y-6">
+              {/* Executive Period Cashflow Summary Banner */}
+              <div className="liquid-glass p-4 sm:p-6 space-y-4 border-purple-500/30">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-purple-400" />
+                      Radiografía Financiera de {periodLabel} ({yearLabel})
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Cálculo sincronizado en tiempo real sobre {targetTxs.length} movimientos del período ({dateRangeLabel})
+                    </p>
+                  </div>
+                  <span
+                    className={`self-start sm:self-auto text-[11px] font-bold px-3 py-1 rounded-full border ${
+                      netPeriodFlow >= 0
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    {netPeriodFlow >= 0 ? `Superávit (+${savingsRate}% ahorro)` : 'Déficit en el período'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/25 space-y-1">
+                    <span className="text-[11px] text-emerald-300/90 font-semibold block">
+                      Ingresos ({periodShortLabel})
+                    </span>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-400 font-tabular">
+                      {formatCurrency(totalIncomes, currency, exchangeRate)}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/25 space-y-1">
+                    <span className="text-[11px] text-rose-300/90 font-semibold block">
+                      Gastos ({periodShortLabel})
+                    </span>
+                    <p className="text-xl sm:text-2xl font-black text-rose-400 font-tabular">
+                      {formatCurrency(totalExpenses, currency, exchangeRate)}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-purple-950/25 border border-purple-500/30 space-y-1">
+                    <span className="text-[11px] text-purple-200 font-semibold block">
+                      Balance Neto ({periodShortLabel})
+                    </span>
+                    <p
+                      className={`text-xl sm:text-2xl font-black font-tabular ${
+                        netPeriodFlow >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {netPeriodFlow >= 0 ? '+' : ''}
+                      {formatCurrency(netPeriodFlow, currency, exchangeRate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Top 4 KPI Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1: Gastos Hormiga */}
@@ -345,14 +489,14 @@ export const AIAdvisorView = ({
                 {/* 3: Compromiso de Pasivos Fijos */}
                 <div className="liquid-glass p-5 space-y-2 border-purple-500/30 hover:border-purple-400/50 transition-all">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-400 font-medium">Carga en Fijos Mensuales</span>
+                    <span className="text-xs text-zinc-400 font-medium">Carga Fija ({periodShortLabel})</span>
                     <Zap className="w-4 h-4 text-purple-400" />
                   </div>
                   <p className="text-2xl font-black text-purple-300">
-                    {formatCurrency(totalMonthlySubs, currency, exchangeRate)}
+                    {formatCurrency(periodSubsImpact, currency, exchangeRate)}
                   </p>
                   <p className="text-[11px] text-zinc-400">
-                    {activeSubs.length} suscripciones ({fixedRatio}% de ingresos)
+                    {activeSubs.length} suscripciones ({fixedRatio}% de ingresos del período)
                   </p>
                 </div>
 
@@ -386,7 +530,7 @@ export const AIAdvisorView = ({
 
                   <div>
                     <h4 className="text-base font-bold text-white tracking-tight">
-                      Microconsumos ({antTransactions.length} transacciones)
+                      Microconsumos ({antTransactions.length} en {periodShortLabel})
                     </h4>
                     <p className="text-2xl font-black text-rose-400 mt-1">
                       {formatCurrency(antExpenses, currency, exchangeRate)}
@@ -398,7 +542,7 @@ export const AIAdvisorView = ({
                       <strong className="text-white">Patrón detectado:</strong> Pagos menores o iguales a $15 USD (cafés, snacks, delivery, viajes cortos).
                     </p>
                     <p className="text-rose-300/90 font-medium">
-                      Impacto anualizado: {formatCurrency(antExpenses * 12, currency, exchangeRate)} que se escapan sin capitalizar.
+                      Proyección anualizada a este ritmo: {formatCurrency((antExpenses / Math.max(0.23, periodFactor)) * 12, currency, exchangeRate)}.
                     </p>
                   </div>
                 </div>
@@ -455,12 +599,106 @@ export const AIAdvisorView = ({
 
                   <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
                     <p>
-                      <strong className="text-white">Fondo de Emergencia:</strong> Tu saldo líquido actual cubre aproximadamente {runwayMonths} meses de tu ritmo de egresos.
+                      <strong className="text-white">Fondo de Emergencia:</strong> Tu saldo líquido actual cubre aproximadamente {runwayMonths} meses de tu ritmo de egresos en {periodLabel.toLowerCase()}.
                     </p>
                     <p className="text-purple-300/90 font-medium">
                       Recomendación: Ampliar a 3-6 meses para blindaje financiero absoluto.
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Period Anomalies & Top Ant Expenses Audit */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Mayor Egreso & Ticket Promedio del Período */}
+                <div className="liquid-glass p-5 sm:p-6 space-y-4 border-purple-500/30">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <AlertOctagon className="w-4 h-4 text-fuchsia-400" />
+                      Pico de Gasto & Ticket Promedio ({periodShortLabel})
+                    </h4>
+                    <span className="text-[10px] font-mono text-purple-300 px-2 py-0.5 rounded-md bg-purple-900/30 border border-purple-500/30">
+                      {periodExpenseList.length} egresos
+                    </span>
+                  </div>
+
+                  {largestExpense ? (
+                    <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-bold block">
+                          Mayor Salida de Capital en {periodShortLabel}
+                        </span>
+                        <p className="text-sm font-bold text-white truncate">{largestExpense.title}</p>
+                        <span className="text-[11px] text-zinc-400">
+                          {largestExpense.category} • {largestExpense.date}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0 flex items-center gap-2">
+                        <div>
+                          <p className="text-base sm:text-lg font-black text-rose-400 font-tabular">
+                            -{formatCurrency(largestExpense.amount, currency, exchangeRate)}
+                          </p>
+                          <span className="text-[10px] text-zinc-400">
+                            Ticket prom: {formatCurrency(avgTicketExpense, currency, exchangeRate)}
+                          </span>
+                        </div>
+                        {onEditTransaction && (
+                          <button
+                            type="button"
+                            onClick={() => onEditTransaction(largestExpense)}
+                            className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/35 text-purple-200 border border-purple-400/30 cursor-pointer"
+                            title="Editar este movimiento"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400">No hay egresos registrados en este período.</p>
+                  )}
+                </div>
+
+                {/* Lista de Gastos Hormiga Detectados en el Período */}
+                <div className="liquid-glass p-5 sm:p-6 space-y-3 border-rose-500/30">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-rose-400" />
+                      Gastos Hormiga Detectados ({antTransactions.length})
+                    </h4>
+                    <span className="text-xs font-bold text-rose-300">
+                      {formatCurrency(antExpenses, currency, exchangeRate)}
+                    </span>
+                  </div>
+
+                  {antTransactions.length === 0 ? (
+                    <p className="text-xs text-emerald-300 py-2">
+                      ¡Excelente! Cero gastos hormiga detectados en {periodLabel.toLowerCase()}.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {antTransactions.slice(0, 8).map((tx) => (
+                        <div
+                          key={tx.id}
+                          onClick={() => onEditTransaction && onEditTransaction(tx)}
+                          className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] hover:bg-purple-500/15 border border-white/5 text-xs cursor-pointer transition-colors"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="font-semibold text-white truncate">{tx.title}</p>
+                            <span className="text-[10px] text-zinc-400">
+                              {tx.category} • {tx.date}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-bold text-rose-300 font-tabular">
+                              -{formatCurrency(tx.amount, currency, exchangeRate)}
+                            </span>
+                            {onEditTransaction && <Pencil className="w-3 h-3 text-purple-300" />}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -475,10 +713,10 @@ export const AIAdvisorView = ({
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <Target className="w-4 h-4 text-purple-400" />
-                      Auditoría Matemática Regla 50 / 30 / 20 Dinámica
+                      Auditoría Matemática Regla 50 / 30 / 20 ({periodLabel} • {yearLabel})
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      Distribución real calculada sobre tus egresos totales ({formatCurrency(totalExpenses, currency, exchangeRate)})
+                      Distribución real calculada sobre los egresos del período ({formatCurrency(totalExpenses, currency, exchangeRate)})
                     </p>
                   </div>
                 </div>
@@ -543,16 +781,16 @@ export const AIAdvisorView = ({
                 </div>
               </div>
 
-              {/* Top 5 Categories of Expenditure */}
+              {/* Top Categories of Expenditure */}
               <div className="liquid-glass p-6 sm:p-7 space-y-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <BarChart3 className="w-4 h-4 text-purple-400" />
-                      Top 5 Categorías con Mayor Concentración de Egreso
+                      Categorías con Mayor Concentración de Egreso ({periodShortLabel})
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      Identifica en qué se concentra tu capital saliente
+                      Identifica en qué rubros se concentró tu salida de capital durante {periodLabel.toLowerCase()}
                     </p>
                   </div>
                 </div>
@@ -560,15 +798,16 @@ export const AIAdvisorView = ({
                 <div className="space-y-3">
                   {topCategories.map((item, idx) => (
                     <div key={idx} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-white flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center text-[10px] text-purple-300 font-mono">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="font-semibold text-white flex items-center gap-2 min-w-0 truncate">
+                          <span className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center text-[10px] text-purple-300 font-mono shrink-0">
                             {idx + 1}
                           </span>
-                          {item.category}
+                          <span className="truncate">{item.category}</span>
+                          <span className="text-[10px] text-zinc-500 shrink-0">({item.count} movs)</span>
                         </span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-zinc-300 font-bold">
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                          <span className="text-zinc-300 font-bold font-tabular">
                             {formatCurrency(item.amount, currency, exchangeRate)}
                           </span>
                           <span className="text-[11px] font-mono text-purple-300 px-2 py-0.5 rounded-md bg-purple-900/30 border border-purple-500/30">

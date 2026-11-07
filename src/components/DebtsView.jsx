@@ -155,7 +155,9 @@ export const DebtsView = ({
 
   const handleDeleteDebt = (id) => {
     setDebts((prev) => prev.filter((d) => d.id !== id));
-    api.deleteDebt(id).catch((err) => console.error('Error SQLite deleteDebt:', err));
+    api
+      .deleteDebt(id, currentUser?.id || 'munboi')
+      .catch((err) => console.error('Error SQLite deleteDebt:', err));
     setEditingDebtId(null);
     setShowNewDebtModal(false);
   };

@@ -167,6 +167,10 @@ async function verifyDB() {
 
     const advisorCode = fs.readFileSync('src/components/AIAdvisorView.jsx', 'utf-8');
     assert(advisorCode.includes('filterTransactionsByPeriod'), 'AIAdvisorView diagnostica en tiempo real según el período y año seleccionado');
+    assert(advisorCode.includes('periodDays') && advisorCode.includes('periodFactor'), 'AIAdvisorView recalcula Burn Rate, Hormiga, 50/30/20 y Simulador según Esta Semana / Este Mes / Trimestre / Año');
+
+    const q2026 = filterFn(txs, 'quarterly', '2026');
+    assert(q2026.length > m2026.length && q2026.length <= y2026.length, `Filtro Trimestre 2026 filtra exactamente los últimos 90 días (${q2026.length} movs)`);
 
     // -------------------------------------------------------------
     // 7. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)

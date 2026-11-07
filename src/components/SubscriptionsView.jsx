@@ -129,7 +129,9 @@ export const SubscriptionsView = ({
 
   const handleDeleteSub = (id) => {
     setSubscriptions((prev) => prev.filter((s) => s.id !== id));
-    api.deleteSubscription(id).catch((err) => console.error('Error SQLite deleteSubscription:', err));
+    api
+      .deleteSubscription(id, currentUser?.id || 'munboi')
+      .catch((err) => console.error('Error SQLite deleteSubscription:', err));
     setEditingSubId(null);
     setShowAddModal(false);
   };

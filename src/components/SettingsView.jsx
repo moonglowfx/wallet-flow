@@ -175,7 +175,9 @@ export const SettingsView = ({
 
     setAccounts(updated);
     if (editedObj) {
-      api.updateAccount(editedObj.id, editedObj).catch((err) => console.error('Error SQLite updateAccount:', err));
+      api
+        .updateAccount(editedObj.id, editedObj, currentUser?.id)
+        .catch((err) => console.error('Error SQLite updateAccount:', err));
     }
     setEditingAccount(null);
     if (showToast) showToast('Cuenta modificada correctamente');
@@ -185,7 +187,9 @@ export const SettingsView = ({
     if (window.confirm('¿Estás seguro de eliminar esta cuenta?')) {
       const updated = accounts.filter((a) => a.id !== accId);
       setAccounts(updated);
-      api.deleteAccount(accId).catch((err) => console.error('Error SQLite deleteAccount:', err));
+      api
+        .deleteAccount(accId, currentUser?.id)
+        .catch((err) => console.error('Error SQLite deleteAccount:', err));
       if (showToast) showToast('Cuenta eliminada de SQLite');
     }
   };
@@ -220,7 +224,9 @@ export const SettingsView = ({
 
     setSubscriptions(updated);
     if (editedSub) {
-      api.updateSubscription(editedSub.id, editedSub).catch((err) => console.error('Error SQLite updateSub:', err));
+      api
+        .updateSubscription(editedSub.id, editedSub, currentUser?.id)
+        .catch((err) => console.error('Error SQLite updateSub:', err));
     }
     setEditingSub(null);
     if (showToast) showToast('Suscripción actualizada en SQLite');
@@ -230,7 +236,9 @@ export const SettingsView = ({
     if (window.confirm('¿Eliminar esta suscripción?')) {
       const updated = subscriptions.filter((s) => s.id !== subId);
       setSubscriptions(updated);
-      api.deleteSubscription(subId).catch((err) => console.error('Error SQLite deleteSub:', err));
+      api
+        .deleteSubscription(subId, currentUser?.id)
+        .catch((err) => console.error('Error SQLite deleteSub:', err));
       if (showToast) showToast('Suscripción eliminada');
     }
   };
@@ -269,7 +277,9 @@ export const SettingsView = ({
 
     setDebts(updated);
     if (editedDebt) {
-      api.updateDebt(editedDebt.id, editedDebt).catch((err) => console.error('Error SQLite updateDebt:', err));
+      api
+        .updateDebt(editedDebt.id, editedDebt, currentUser?.id)
+        .catch((err) => console.error('Error SQLite updateDebt:', err));
     }
     setEditingDebt(null);
     if (showToast) showToast('Deuda actualizada en SQLite');
@@ -279,7 +289,9 @@ export const SettingsView = ({
     if (window.confirm('¿Eliminar este registro de deuda?')) {
       const updated = debts.filter((d) => d.id !== debtId);
       setDebts(updated);
-      api.deleteDebt(debtId).catch((err) => console.error('Error SQLite deleteDebt:', err));
+      api
+        .deleteDebt(debtId, currentUser?.id)
+        .catch((err) => console.error('Error SQLite deleteDebt:', err));
       if (showToast) showToast('Deuda eliminada');
     }
   };

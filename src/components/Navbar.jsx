@@ -214,13 +214,13 @@ export const Navbar = ({
       <button
         onClick={onOpenNewTransaction}
         aria-label="Registrar Entrada o Salida"
-        className="lg:hidden fixed right-3.5 bottom-20 z-40 liquid-button-primary w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-neon-purple border border-purple-300/40 cursor-pointer"
+        className="lg:hidden fixed right-3.5 bottom-[5.25rem] z-40 liquid-button-primary w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-neon-purple border border-purple-300/40 cursor-pointer"
       >
         <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
       </button>
 
       {/* MOBILE iOS FLOATING LIQUID GLASS BOTTOM TAB BAR (6 Equal Columns — Zero Overflow) */}
-      <nav className="lg:hidden fixed bottom-2 inset-x-2 z-40">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-2 pb-safe">
         <div className="bg-[#110E1B]/85 backdrop-blur-3xl border border-white/20 rounded-3xl px-1.5 py-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_1px_0_0_rgba(255,255,255,0.28)] grid grid-cols-6 gap-0.5 items-center">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;

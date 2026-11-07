@@ -29,6 +29,19 @@
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Prevent iOS Safari auto-zoom on inputs & respect safe-area insets */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
 }
 
 @layer components {
