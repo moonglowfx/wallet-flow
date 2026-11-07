@@ -106,6 +106,8 @@ async function verifyDB() {
   assert(monthlyCode.includes('totalIncome') && monthlyCode.includes('totalExpense'), 'MonthlyExpensesView incluye tanto ingresos como gastos');
   assert(monthlyCode.includes('monthGroups'), 'MonthlyExpensesView agrupa y ordena movimientos por mes');
   assert(monthlyCode.includes('formatMonthName'), 'MonthlyExpensesView muestra los meses en orden');
+  assert(monthlyCode.includes('onEditTransaction') && monthlyCode.includes('onDeleteTransaction'), 'MonthlyExpensesView integra botones rápidos de editar y eliminar de 1 toque');
+  assert(monthlyCode.includes('acc.name') || monthlyCode.includes('Cuenta Principal'), 'MonthlyExpensesView exhibe claramente la cuenta de cada movimiento en móvil y PC');
 
   // AccountModal sin tasa de rendimiento anual, saldo 0 por defecto y type="tel"
   const accountModalCode = fs.readFileSync('src/components/AccountModal.jsx', 'utf-8');

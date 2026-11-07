@@ -18,6 +18,8 @@ import {
   Edit2,
   Trash2,
   BarChart3,
+  CreditCard,
+  Banknote,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
@@ -556,37 +558,59 @@ export const MonthlyExpensesView = ({
                         </div>
                       </div>
 
-                      {/* Right: Category + Account + Edit + Amount */}
-                      <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                      {/* Right: Category + Account Pill + 1-touch Edit/Delete + Amount */}
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                        {/* Account Name Pill (Always Visible on Mobile & Desktop) */}
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-[11px] font-semibold shrink-0">
+                          {acc?.type === 'credit' ? (
+                            <CreditCard className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                          ) : acc?.type === 'cash' ? (
+                            <Banknote className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          ) : (
+                            <Building2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          )}
+                          <span className="truncate max-w-[120px] sm:max-w-[170px] text-white">
+                            {acc ? acc.name : 'Cuenta Principal'}
+                          </span>
+                        </div>
+
                         {/* Category badge */}
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 truncate max-w-[130px] sm:max-w-none">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-zinc-300 truncate max-w-[110px] sm:max-w-none">
                           {tx.category}
                         </span>
 
-                        {/* Account Name */}
-                        <span className="text-[11px] text-zinc-400 hidden md:inline-flex items-center gap-1">
-                          <Building2 className="w-3 h-3 text-purple-400" />
-                          <span>{acc ? acc.name : 'Cuenta Principal'}</span>
-                        </span>
-
-                        {/* Edit Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditTransaction && onEditTransaction(tx);
-                          }}
-                          className="liquid-pill px-2.5 py-1 text-[11px] font-semibold text-purple-200 hover:text-white flex items-center gap-1 border-purple-500/30 hover:border-purple-400 cursor-pointer"
-                          title="Editar movimiento"
-                        >
-                          <Edit2 className="w-3 h-3 text-purple-400" />
-                          <span>Editar</span>
-                        </button>
+                        {/* 1-Touch Edit & Delete Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditTransaction && onEditTransaction(tx);
+                            }}
+                            className="p-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-400 transition-all cursor-pointer active:scale-95 shadow-sm"
+                            title="Editar movimiento (1 toque)"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm ? window.confirm(`¿Eliminar movimiento "${tx.title}"?`) : true) {
+                                onDeleteTransaction && onDeleteTransaction(tx.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400 transition-all cursor-pointer active:scale-95 shadow-sm"
+                            title="Eliminar movimiento (1 toque)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
 
                         {/* Amount */}
-                        <div className="text-right min-w-[90px]">
+                        <div className="text-right min-w-[85px] shrink-0">
                           <span
-                            className={`text-sm font-black font-mono ${
+                            className={`text-sm sm:text-base font-black font-mono tracking-tight ${
                               isIncome ? 'text-emerald-400' : 'text-rose-400'
                             }`}
                           >

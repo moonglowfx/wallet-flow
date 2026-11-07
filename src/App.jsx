@@ -62,7 +62,8 @@ export function App() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
-  const hasAutoExecutedRef = React.useRef(false);
+  const activeUserRef = React.useRef(currentUser.id);
+  const isSwitchingUserRef = React.useRef(false);
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -157,6 +158,7 @@ export function App() {
 
   // When active user switches, persist session in SQLite and load their isolated data
   const handleLoginSuccess = async (user) => {
+    isSwitchingUserRef.current = true;
     setCurrentUser(user);
     if (typeof window !== 'undefined') {
       window.sessionStorage?.setItem('wf_session_unlocked', 'true');
@@ -173,6 +175,8 @@ export function App() {
 
     await api.setActiveSession(user.id);
     await loadUserFromSQLite(user.id);
+    activeUserRef.current = user.id;
+    isSwitchingUserRef.current = false;
     showToast(`Sesión activa en SQLite: ${user.username} (${user.role})`);
   };
 
@@ -382,6 +386,11 @@ export function App() {
   const isInitialSyncDoneRef = React.useRef(false);
 
   useEffect(() => {
+    // Prevent syncing while switching between users to guarantee total isolation
+    if (isSwitchingUserRef.current || activeUserRef.current !== currentUser.id) {
+      return;
+    }
+
     if (!isInitialSyncDoneRef.current) {
       if (accounts.length > 0 || transactions.length > 0) {
         isInitialSyncDoneRef.current = true;
