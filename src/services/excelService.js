@@ -1,11 +1,20 @@
-import * as XLSX from 'xlsx';
 import { DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+
+// Dynamic loader for XLSX: avoids bundling 500 KB into initial bundle load
+let xlsxModule = null;
+async function getXLSX() {
+  if (!xlsxModule) {
+    xlsxModule = await import('xlsx');
+  }
+  return xlsxModule;
+}
 
 /**
  * Downloads a complete pre-formatted .xlsx template workbook
  * for the user to populate accounts, transactions, subscriptions, and debts in USD and COP.
  */
-export function downloadExcelTemplate() {
+export async function downloadExcelTemplate() {
+  const XLSX = await getXLSX();
   const wb = XLSX.utils.book_new();
 
   // 1. Cuentas Sheet Sample
@@ -149,6 +158,7 @@ export function downloadExcelTemplate() {
  * Base internal amounts are converted to USD (primary currency).
  */
 export async function parseExcelFile(file, exchangeRate = DEFAULT_USD_COP_RATE) {
+  const XLSX = await getXLSX();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

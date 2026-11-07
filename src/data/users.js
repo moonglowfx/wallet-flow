@@ -11,7 +11,7 @@ export const USERS = [
     id: 'munboi',
     username: 'Munboi',
     displayName: 'Munboi Master',
-    defaultPin: '1234',
+    defaultPin: '0800',
     role: 'Portafolio Principal',
     avatarGradient: 'from-purple-600 via-indigo-600 to-fuchsia-600',
     description: 'Historial completo 2024-2026 (726 transacciones reales)',
@@ -34,6 +34,11 @@ const memoryPins = {};
 export function getUserPin(userId) {
   if (typeof window !== 'undefined' && window.localStorage) {
     const customPin = localStorage.getItem(`wf_user_pin_${userId}`);
+    // Auto-migrate Munboi from old 1234 to new 0800
+    if (userId === 'munboi' && (!customPin || customPin === '1234')) {
+      localStorage.setItem('wf_user_pin_munboi', '0800');
+      return '0800';
+    }
     if (customPin && customPin.length === 4) {
       return customPin;
     }
@@ -42,7 +47,7 @@ export function getUserPin(userId) {
     return memoryPins[userId];
   }
   const user = USERS.find((u) => u.id === userId);
-  return user?.defaultPin || (userId === 'munboi' ? '1234' : '5678');
+  return user?.defaultPin || (userId === 'munboi' ? '0800' : '5678');
 }
 
 // Helper to save customized PIN for a user

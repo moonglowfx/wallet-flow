@@ -7,17 +7,19 @@ import { CommitmentsView } from './components/CommitmentsView.jsx';
 import { MonthlyExpensesView } from './components/MonthlyExpensesView.jsx';
 import { SubscriptionsView } from './components/SubscriptionsView.jsx';
 import { DebtsView } from './components/DebtsView.jsx';
-import { AIAdvisorView } from './components/AIAdvisorView.jsx';
-import { SettingsView } from './components/SettingsView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
-import { ExcelImportModal } from './components/ExcelImportModal.jsx';
 import { LoginModal } from './components/LoginModal.jsx';
 import { USERS, getUserInitialData } from './data/users.js';
 import { DEFAULT_USD_COP_RATE } from './data/mockData.js';
 import { api } from './services/api.js';
 
-export const APP_BUILD_VERSION = 'v2026.11.06-r5';
+// Lazy-load heavier auxiliary views to make initial app load instantaneous
+const AIAdvisorView = React.lazy(() => import('./components/AIAdvisorView.jsx').then(m => ({ default: m.AIAdvisorView })));
+const SettingsView = React.lazy(() => import('./components/SettingsView.jsx').then(m => ({ default: m.SettingsView })));
+const ExcelImportModal = React.lazy(() => import('./components/ExcelImportModal.jsx').then(m => ({ default: m.ExcelImportModal })));
+
+export const APP_BUILD_VERSION = 'v2026.11.06-r6';
 
 // Self-healing migration for browser localStorage: guarantees immediate sync on Vercel deploys
 if (typeof window !== 'undefined' && window.localStorage) {
@@ -572,36 +574,40 @@ export function App() {
           )}
 
           {activeTab === 'ai-advisor' && (
-            <AIAdvisorView
-              accounts={accounts}
-              transactions={transactions}
-              subscriptions={subscriptions}
-              debts={debts}
-              currency={currency}
-              exchangeRate={exchangeRate}
-              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
-            />
+            <React.Suspense fallback={<div className="liquid-glass p-8 text-center text-purple-300 animate-pulse text-xs">Cargando Smart AI Advisor...</div>}>
+              <AIAdvisorView
+                accounts={accounts}
+                transactions={transactions}
+                subscriptions={subscriptions}
+                debts={debts}
+                currency={currency}
+                exchangeRate={exchangeRate}
+                onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              />
+            </React.Suspense>
           )}
 
           {activeTab === 'settings' && (
-            <SettingsView
-              currentUser={currentUser}
-              currency={currency}
-              setCurrency={setCurrency}
-              exchangeRate={exchangeRate}
-              setExchangeRate={setExchangeRate}
-              accounts={accounts}
-              setAccounts={setAccounts}
-              transactions={transactions}
-              setTransactions={setTransactions}
-              subscriptions={subscriptions}
-              setSubscriptions={setSubscriptions}
-              debts={debts}
-              setDebts={setDebts}
-              onOpenNewAccount={() => setIsAccountModalOpen(true)}
-              onResetUserData={handleResetDemoData}
-              showToast={showToast}
-            />
+            <React.Suspense fallback={<div className="liquid-glass p-8 text-center text-purple-300 animate-pulse text-xs">Cargando Panel de Ajustes...</div>}>
+              <SettingsView
+                currentUser={currentUser}
+                currency={currency}
+                setCurrency={setCurrency}
+                exchangeRate={exchangeRate}
+                setExchangeRate={setExchangeRate}
+                accounts={accounts}
+                setAccounts={setAccounts}
+                transactions={transactions}
+                setTransactions={setTransactions}
+                subscriptions={subscriptions}
+                setSubscriptions={setSubscriptions}
+                debts={debts}
+                setDebts={setDebts}
+                onOpenNewAccount={() => setIsAccountModalOpen(true)}
+                onResetUserData={handleResetDemoData}
+                showToast={showToast}
+              />
+            </React.Suspense>
           )}
         </main>
       </div>
@@ -626,13 +632,17 @@ export function App() {
       />
 
       {/* Excel (.xlsx) Import / Export Modal */}
-      <ExcelImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImportData={handleImportData}
-        activeCurrency={currency}
-        exchangeRate={exchangeRate}
-      />
+      {isImportModalOpen && (
+        <React.Suspense fallback={null}>
+          <ExcelImportModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImportData={handleImportData}
+            activeCurrency={currency}
+            exchangeRate={exchangeRate}
+          />
+        </React.Suspense>
+      )}
 
       {/* Multi-User Security PIN Modal */}
       <LoginModal

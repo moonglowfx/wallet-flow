@@ -33,14 +33,14 @@ assert(USERS.length === 2, `Existen exactamente 2 perfiles: ${USERS.map((u) => u
 const munboi = USERS.find((u) => u.username === 'Munboi');
 const tiago = USERS.find((u) => u.username === 'Tiago');
 
-assert(munboi && getUserPin('munboi') === '1234', `Usuario 1: Munboi tiene PIN '1234'`);
+assert(munboi && getUserPin('munboi') === '0800', `Usuario 1: Munboi tiene PIN '0800'`);
 assert(tiago && getUserPin('tiago') === '5678', `Usuario 2: Tiago tiene PIN '5678'`);
 
 // Test PIN change capability
 setUserPin('munboi', '9999');
 assert(getUserPin('munboi') === '9999', 'Capacidad de cambiar PIN funciona correctamente (9999)');
-setUserPin('munboi', '1234'); // restore to default
-assert(getUserPin('munboi') === '1234', 'PIN de Munboi restaurado a 1234');
+setUserPin('munboi', '0800'); // restore to default
+assert(getUserPin('munboi') === '0800', 'PIN de Munboi restaurado a 0800');
 
 // Verify that LoginModal does NOT leak the suggested PIN
 const loginModalCode = fs.readFileSync('src/components/LoginModal.jsx', 'utf-8');
