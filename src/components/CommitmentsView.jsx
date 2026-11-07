@@ -26,11 +26,13 @@ export const CommitmentsView = ({
   debts = [],
   setDebts,
   accounts = [],
+  transactions = [],
   timeframe = 'monthly',
   selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onLogPaymentTransaction,
+  onExecuteDueSubscriptions,
   onOpenNewTransaction,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState('suscripciones'); // 'suscripciones', 'deudas', 'calendario'
@@ -173,6 +175,26 @@ export const CommitmentsView = ({
             <span className="truncate">2. Deudas & Líneas de Crédito ({debts.length})</span>
           </button>
         </div>
+
+        {/* Auto-Execution System Strip */}
+        <div className="pt-3 border-t border-white/10 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="text-zinc-300">
+              <strong className="text-white">Auto-Ejecución Activa:</strong> Los gastos fijos se debitan automáticamente en su día de cobro.
+            </span>
+          </div>
+          {onExecuteDueSubscriptions && (
+            <button
+              type="button"
+              onClick={() => onExecuteDueSubscriptions()}
+              className="liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-neon-purple shrink-0 active:scale-95 transition-all"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span>Ejecutar Cobros de la Fecha</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* RENDER ACTIVE SUB-SECTION */}
@@ -181,6 +203,8 @@ export const CommitmentsView = ({
           subscriptions={subscriptions}
           setSubscriptions={setSubscriptions}
           accounts={accounts}
+          transactions={transactions}
+          onExecuteDueSubscriptions={onExecuteDueSubscriptions}
           currency={currency}
           exchangeRate={exchangeRate}
           currentUser={currentUser}

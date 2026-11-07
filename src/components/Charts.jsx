@@ -349,7 +349,7 @@ export const FluidLineChart = ({
           {incomeArea && <path d={incomeArea} fill="url(#incomeGrad)" />}
           {expenseArea && <path d={expenseArea} fill="url(#expenseGrad)" />}
 
-          {/* Lines */}
+          {/* Lines with smooth stroke drawing animation */}
           {incomePath && (
             <path
               d={incomePath}
@@ -357,6 +357,7 @@ export const FluidLineChart = ({
               stroke="url(#lineIncomeGrad)"
               strokeWidth="3"
               strokeLinecap="round"
+              className="animate-chart-draw"
             />
           )}
           {expensePath && (
@@ -366,6 +367,7 @@ export const FluidLineChart = ({
               stroke="#FB7185"
               strokeWidth="2.5"
               strokeLinecap="round"
+              className="animate-chart-draw"
             />
           )}
 

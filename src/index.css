@@ -259,3 +259,61 @@
 .hover-lift:hover {
   transform: translateY(-2px);
 }
+
+/* SECTION-SPECIFIC ANIMATIONS */
+@keyframes chartDraw {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes barGrowUp {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cardSheen {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes beaconPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(52, 211, 153, 0);
+  }
+}
+
+.animate-chart-draw {
+  stroke-dasharray: 1000;
+  animation: chartDraw 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bar-grow {
+  transform-origin: bottom;
+  animation: barGrowUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-card-sheen:hover {
+  background-size: 200% 100%;
+  animation: cardSheen 1.8s ease-in-out infinite;
+}
+
+.animate-beacon {
+  animation: beaconPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

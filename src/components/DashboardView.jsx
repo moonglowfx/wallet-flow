@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { HeroCard } from './HeroCard.jsx';
 import { FluidLineChart, CategoryRingChart } from './Charts.jsx';
+import { AnimatedCounter } from './AnimatedCounter.jsx';
 import {
   formatCurrency,
   TIMEFRAME_CONFIG,
@@ -83,15 +84,18 @@ export const DashboardView = ({
       {/* 2. SUMMARY METRIC CARDS (4 Glass Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Incomes Card */}
-        <div className="liquid-glass p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-emerald-500/40 transition-all min-w-0">
+        <div className="liquid-glass hover-lift p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-emerald-500/40 transition-all min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-zinc-400 truncate">Ingresos Totales</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 shrink-0">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
-            {formatCurrency(periodIncomes, currency, exchangeRate)}
+          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate font-mono">
+            <AnimatedCounter
+              value={periodIncomes}
+              formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+            />
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
@@ -100,15 +104,18 @@ export const DashboardView = ({
         </div>
 
         {/* Expenses Card */}
-        <div className="liquid-glass p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-rose-500/40 transition-all min-w-0">
+        <div className="liquid-glass hover-lift p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-rose-500/40 transition-all min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-zinc-400 truncate">Gastos Consolidados</span>
             <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 shrink-0">
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
-            {formatCurrency(periodExpenses, currency, exchangeRate)}
+          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate font-mono">
+            <AnimatedCounter
+              value={periodExpenses}
+              formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+            />
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/10">
             <span>Periodo {tfData.label}</span>
@@ -119,7 +126,7 @@ export const DashboardView = ({
         </div>
 
         {/* Savings Rate Card */}
-        <div className="liquid-glass p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-purple-500/40 transition-all min-w-0">
+        <div className="liquid-glass hover-lift p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-purple-500/40 transition-all min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-zinc-400 truncate">
               Tasa de Ahorro / Inversión
@@ -129,12 +136,14 @@ export const DashboardView = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <p className="text-xl sm:text-2xl font-bold text-white tracking-tight">{savingsRate}%</p>
+            <p className="text-xl sm:text-2xl font-bold text-white tracking-tight font-mono">
+              <AnimatedCounter value={savingsRate} formatter={(v) => `${Math.round(v)}%`} />
+            </p>
             <span className="text-xs text-purple-300 font-medium">del ingreso neto</span>
           </div>
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full"
+              className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full transition-all duration-700"
               style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
             />
           </div>
@@ -143,7 +152,7 @@ export const DashboardView = ({
         {/* Ant Expenses Alert Card (Diagnóstico Rápido) */}
         <div
           onClick={() => onNavigateTab('ai-advisor')}
-          className="liquid-glass-purple p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-fuchsia-400/60 transition-all cursor-pointer shadow-liquid-purple min-w-0"
+          className="liquid-glass-purple hover-lift p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden group hover:border-fuchsia-400/60 transition-all cursor-pointer shadow-liquid-purple min-w-0"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-purple-200 truncate">
@@ -153,8 +162,11 @@ export const DashboardView = ({
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
-            {formatCurrency(periodAntExpenses, currency, exchangeRate)}
+          <p className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate font-mono">
+            <AnimatedCounter
+              value={periodAntExpenses}
+              formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+            />
           </p>
           <div className="flex items-center justify-between text-[11px] text-fuchsia-200 pt-1 border-t border-purple-400/20">
             <span>{antPercentageOfExpenses}% de egresos</span>

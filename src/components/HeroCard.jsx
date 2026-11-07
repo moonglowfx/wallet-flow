@@ -17,6 +17,7 @@ import {
   TIMEFRAME_CONFIG,
   DEFAULT_USD_COP_RATE,
 } from '../data/mockData.js';
+import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 export const HeroCard = ({
   accounts = [],
@@ -122,7 +123,14 @@ export const HeroCard = ({
               Patrimonio Neto Líquido (Activos − Pasivos)
             </p>
             <div className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white flex items-baseline gap-2 break-words">
-              <span>{showValues ? formatCurrency(netCapital, currency, exchangeRate) : '••••••••'}</span>
+              {showValues ? (
+                <AnimatedCounter
+                  value={netCapital}
+                  formatter={(val) => formatCurrency(val, currency, exchangeRate)}
+                />
+              ) : (
+                <span>••••••••</span>
+              )}
             </div>
             {showValues && (
               <p className="text-xs sm:text-sm font-semibold text-emerald-300/90 mt-1 flex items-center gap-1.5 flex-wrap">
@@ -137,7 +145,7 @@ export const HeroCard = ({
           <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
             <button
               onClick={onOpenNewTransaction}
-              className="w-full sm:w-auto liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple active:scale-95 transition-all"
             >
               <span>+ Registrar Movimiento</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -146,28 +154,43 @@ export const HeroCard = ({
         </div>
 
         {/* Mini stats pill-row separated in native USD and COP */}
-        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Dólares</span>
             <span className="text-xs sm:text-sm font-semibold text-purple-200 block truncate font-mono">
-              {showValues ? formatNativeCurrency(totalUSD, 'USD') : '••••'}
+              {showValues ? (
+                <AnimatedCounter value={totalUSD} formatter={(v) => formatNativeCurrency(v, 'USD')} />
+              ) : (
+                '••••'
+              )}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Pesos (COP)</span>
             <span className="text-xs sm:text-sm font-semibold text-emerald-300 block truncate font-mono">
-              {showValues ? formatNativeCurrency(totalCOP, 'COP') : '••••'}
+              {showValues ? (
+                <AnimatedCounter value={totalCOP} formatter={(v) => formatNativeCurrency(v, 'COP')} />
+              ) : (
+                '••••'
+              )}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Deuda en TDC</span>
             <span className="text-xs sm:text-sm font-semibold text-rose-300 block truncate font-mono">
-              {showValues ? formatCurrency(creditDebtUSD, currency, exchangeRate) : '••••'}
+              {showValues ? (
+                <AnimatedCounter
+                  value={creditDebtUSD}
+                  formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+                />
+              ) : (
+                '••••'
+              )}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Apalancamiento</span>
-            <span className="text-xs sm:text-sm font-semibold text-amber-300 block truncate">
+            <span className="text-xs sm:text-sm font-semibold text-amber-300 block truncate font-mono">
               {leveragePercent}% del activo
             </span>
           </div>
@@ -203,7 +226,7 @@ export const HeroCard = ({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 auto-rows-fr">
             {accounts.map((acc) => {
               const Icon = getAccountIcon(acc.type);
               const isNegative = (acc.balance || 0) < 0;
@@ -212,68 +235,77 @@ export const HeroCard = ({
                 <div
                   key={acc.id}
                   onClick={() => onSelectAccount && onSelectAccount(acc.id)}
-                  className="liquid-glass-interactive group relative p-3.5 rounded-2xl cursor-pointer min-w-0"
+                  className="liquid-glass-interactive hover-lift animate-card-sheen group relative p-4 rounded-2xl cursor-pointer min-w-0 flex flex-col justify-between transition-all duration-300 border border-white/10 hover:border-purple-400/50 shadow-liquid"
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                            acc.type === 'credit'
+                              ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                              : acc.type === 'cash'
+                              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                              : 'bg-purple-500/20 border-purple-500/30 text-purple-200'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-purple-200 transition-colors">
+                            {acc.name}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {acc.institution} • {acc.accountNumber}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
                           acc.type === 'credit'
-                            ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                            ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
                             : acc.type === 'cash'
-                            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                            : 'bg-purple-500/20 border-purple-500/30 text-purple-200'
+                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
-                          {acc.name}
-                        </p>
-                        <p className="text-[10px] text-zinc-400 truncate">
-                          {acc.institution} • {acc.accountNumber}
-                        </p>
-                      </div>
+                        {getTypeLabel(acc.type)}
+                      </span>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
-                        acc.type === 'credit'
-                          ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
-                          : acc.type === 'cash'
-                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
-                      }`}
-                    >
-                      {getTypeLabel(acc.type)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-white/[0.06]">
-                    <span className="text-[11px] text-zinc-400 shrink-0">
-                      Balance ({acc.currency || 'USD'})
-                    </span>
-                    <span
-                      className={`text-sm font-bold tracking-tight truncate font-mono ${
-                        isNegative ? 'text-rose-400' : 'text-purple-100'
-                      }`}
-                    >
-                      {showValues ? formatNativeCurrency(acc.balance, acc.currency || 'USD') : '••••••••'}
-                    </span>
+                    <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-white/[0.06]">
+                      <span className="text-[11px] text-zinc-400 shrink-0">
+                        Balance ({acc.currency || 'USD'})
+                      </span>
+                      <span
+                        className={`text-sm font-bold tracking-tight truncate font-mono ${
+                          isNegative ? 'text-rose-400' : 'text-purple-100'
+                        }`}
+                      >
+                        {showValues ? (
+                          <AnimatedCounter
+                            value={acc.balance}
+                            formatter={(v) => formatNativeCurrency(v, acc.currency || 'USD')}
+                          />
+                        ) : (
+                          '••••••••'
+                        )}
+                      </span>
+                    </div>
                   </div>
 
                   {acc.type === 'credit' && acc.creditLimit && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400">
-                        <span className="truncate font-mono">
+                    <div className="mt-2.5 space-y-1.5 pt-1.5 border-t border-white/5">
+                      <div className="flex items-center justify-between gap-1.5 text-[10px]">
+                        <span className="text-zinc-400 font-mono truncate">
                           Límite {formatNativeCurrency(acc.creditLimit, acc.currency || 'USD')}
                         </span>
-                        <span className="text-rose-300 font-medium shrink-0 font-mono">
+                        <span className="text-rose-300 font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/25 shrink-0">
                           {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}% Usado
                         </span>
                       </div>
-                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
                         <div
                           className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
                           style={{

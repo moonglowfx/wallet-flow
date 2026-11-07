@@ -34,13 +34,13 @@ const NAV_ITEMS = [
   },
   {
     id: 'commitments',
-    label: 'Fijos, Suscripciones & Deudas',
+    label: 'Gastos Fijos & Deudas',
     shortLabel: 'Fijos',
     icon: Layers,
   },
   {
     id: 'ai-advisor',
-    label: 'Smart AI Advisor',
+    label: 'Aura AI Advisor',
     shortLabel: 'IA',
     icon: Sparkles,
     badge: 'IA',
@@ -67,7 +67,7 @@ export const Navbar = ({
   return (
     <>
       {/* DESKTOP SIDEBAR (Liquid Glass Left Navigation) */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 p-4">
+      <aside className="hidden lg:flex lg:flex-col lg:w-80 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 p-4">
         <div className="liquid-glass h-full flex flex-col justify-between p-5 relative overflow-hidden">
           {/* Subtle purple ambient glows */}
           <div className="pointer-events-none absolute -top-24 -left-24 w-56 h-56 rounded-full bg-purple-600/20 blur-3xl" />
@@ -142,9 +142,9 @@ export const Navbar = ({
                     </div>
 
                     {item.id === 'ai-advisor' && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500/30 to-fuchsia-500/30 text-purple-200 border border-purple-400/40 shrink-0">
+                      <span className="flex items-center gap-1 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500/30 to-fuchsia-500/30 text-purple-200 border border-purple-400/40 shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse" />
-                        {antExpenseAlertCount} alertas
+                        {antExpenseAlertCount}
                       </span>
                     )}
                   </button>

@@ -27,6 +27,7 @@ import {
   filterTransactionsByPeriod,
 } from '../data/mockData.js';
 import { api } from '../services/api.js';
+import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -252,7 +253,7 @@ export const AccountsView = ({
               <div
                 key={acc.id}
                 onClick={() => setSelectedAccountId(isSelected ? null : acc.id)}
-                className={`relative p-5 rounded-2xl backdrop-blur-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
+                className={`relative p-5 rounded-2xl backdrop-blur-xl border hover-lift animate-card-sheen transition-all duration-300 cursor-pointer overflow-hidden ${
                   isSelected
                     ? 'bg-purple-900/30 border-purple-400/60 shadow-liquid-purple ring-1 ring-purple-400/40'
                     : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/10 hover:border-purple-500/40 shadow-liquid'
@@ -317,7 +318,10 @@ export const AccountsView = ({
                       isNegative ? 'text-rose-400' : 'text-white'
                     }`}
                   >
-                    {formatNativeCurrency(acc.balance, acc.currency || 'USD')}
+                    <AnimatedCounter
+                      value={acc.balance}
+                      formatter={(v) => formatNativeCurrency(v, acc.currency || 'USD')}
+                    />
                   </p>
                 </div>
 

@@ -20,6 +20,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 export const MonthlyExpensesView = ({
   transactions = [],
@@ -337,40 +338,49 @@ export const MonthlyExpensesView = ({
           <div className="space-y-3 pt-2 border-t border-white/10 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Ingresos */}
-              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
+              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1 hover-lift transition-all">
                 <span className="text-zinc-400 text-[11px] flex items-center gap-1 truncate">
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Ingresos de {formatMonthName(activeGroup.monthKey)}</span>
                 </span>
-                <p className="text-lg sm:text-xl font-black text-emerald-400 truncate">
-                  +{formatCurrency(activeGroup.totalIncome, currency, exchangeRate)}
+                <p className="text-lg sm:text-xl font-black text-emerald-400 truncate font-mono">
+                  +<AnimatedCounter
+                    value={activeGroup.totalIncome}
+                    formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+                  />
                 </p>
               </div>
 
               {/* Gastos */}
-              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1">
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1 hover-lift transition-all">
                 <span className="text-zinc-400 text-[11px] flex items-center gap-1 truncate">
                   <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                   <span>Gastos de {formatMonthName(activeGroup.monthKey)}</span>
                 </span>
-                <p className="text-lg sm:text-xl font-black text-rose-400 truncate">
-                  -{formatCurrency(activeGroup.totalExpense, currency, exchangeRate)}
+                <p className="text-lg sm:text-xl font-black text-rose-400 truncate font-mono">
+                  -<AnimatedCounter
+                    value={activeGroup.totalExpense}
+                    formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+                  />
                 </p>
               </div>
 
               {/* Balance Neto */}
-              <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 space-y-1">
+              <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 space-y-1 hover-lift transition-all">
                 <span className="text-zinc-400 text-[11px] flex items-center gap-1 truncate">
                   <Coins className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                   <span>Balance Neto del Mes</span>
                 </span>
                 <p
-                  className={`text-lg sm:text-xl font-black truncate ${
+                  className={`text-lg sm:text-xl font-black truncate font-mono ${
                     activeGroup.netBalance >= 0 ? 'text-emerald-300' : 'text-rose-400'
                   }`}
                 >
                   {activeGroup.netBalance >= 0 ? '+' : ''}
-                  {formatCurrency(activeGroup.netBalance, currency, exchangeRate)}
+                  <AnimatedCounter
+                    value={activeGroup.netBalance}
+                    formatter={(v) => formatCurrency(v, currency, exchangeRate)}
+                  />
                 </p>
               </div>
 

@@ -61,6 +61,7 @@ export function App() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const hasAutoExecutedRef = React.useRef(false);
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -261,6 +262,88 @@ export function App() {
     showToast('Movimiento eliminado de SQLite');
   };
 
+  // Automatic execution of active subscriptions / fixed expenses on billing dates
+  const handleExecuteDueSubscriptions = useCallback(
+    async (subsToProcess, accsToProcess, txsToProcess) => {
+      const activeSubs = (subsToProcess || subscriptions || []).filter((s) => s.active);
+      if (activeSubs.length === 0) return { executed: 0 };
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const currentDay = now.getDate();
+      const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      const currentTxs = txsToProcess || transactions || [];
+
+      const dueSubs = activeSubs.filter((sub) => {
+        const billingDay = Number(sub.billingDay) || 1;
+        if (currentDay < billingDay) return false;
+        return !currentTxs.some((tx) => {
+          if (tx.subscriptionId && tx.subscriptionId === sub.id && tx.date?.startsWith(monthPrefix)) return true;
+          if (tx.id === `auto-sub-${sub.id}-${monthPrefix}`) return true;
+          if (tx.title?.toLowerCase().includes(sub.name?.toLowerCase()) && tx.date?.startsWith(monthPrefix)) return true;
+          return false;
+        });
+      });
+
+      if (dueSubs.length === 0) return { executed: 0 };
+
+      const newTxs = [];
+      let updatedAccs = [...(accsToProcess || accounts || [])];
+
+      for (const sub of dueSubs) {
+        const billingDay = Number(sub.billingDay) || 1;
+        const safeDay = String(Math.min(28, billingDay)).padStart(2, '0');
+        const targetAcc = updatedAccs.find((a) => a.id === sub.accountId) || updatedAccs[0];
+
+        const autoTx = {
+          id: `auto-sub-${sub.id}-${monthPrefix}`,
+          subscriptionId: sub.id,
+          title: `${sub.name} (Gasto Fijo)`,
+          amount: Number(sub.amount) || 0,
+          originalAmount: Number(sub.amount) || 0,
+          currency: 'USD',
+          type: 'expense',
+          category: sub.category || 'Suscripciones & Fijos',
+          accountId: targetAcc?.id || 'acc-bofa-checking',
+          date: `${monthPrefix}-${safeDay}`,
+          userId: currentUser.id,
+          isRecurringAuto: true,
+          notes: `Cobro automático recurrente ejecutado el día ${billingDay}`,
+        };
+
+        newTxs.push(autoTx);
+
+        if (targetAcc) {
+          const delta = calcDelta(targetAcc, autoTx);
+          const nextBal = targetAcc.balance + delta;
+          const formattedBal = targetAcc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100;
+          updatedAccs = updatedAccs.map((a) => (a.id === targetAcc.id ? { ...a, balance: formattedBal } : a));
+        }
+
+        await api.createTransaction(autoTx, currentUser.id);
+        if (targetAcc) {
+          const updatedTarget = updatedAccs.find((a) => a.id === targetAcc.id);
+          await api.updateAccount(targetAcc.id, { balance: updatedTarget.balance }, currentUser.id);
+        }
+      }
+
+      setTransactions((prev) => [...newTxs, ...prev]);
+      setAccounts(updatedAccs);
+      showToast(`⚡ ${newTxs.length} gasto(s) fijo(s) ejecutado(s) automáticamente según fecha de cobro`);
+      return { executed: newTxs.length };
+    },
+    [subscriptions, accounts, transactions, currentUser.id, exchangeRate, showToast]
+  );
+
+  // Auto-execute due fixed charges on initial load
+  useEffect(() => {
+    if (!hasAutoExecutedRef.current && subscriptions.length > 0 && accounts.length > 0) {
+      hasAutoExecutedRef.current = true;
+      handleExecuteDueSubscriptions(subscriptions, accounts, transactions);
+    }
+  }, [subscriptions, accounts, transactions, handleExecuteDueSubscriptions]);
+
   const handleOpenEditTransaction = useCallback((tx) => {
     setEditingTransaction(tx);
     setIsTransactionModalOpen(true);
@@ -314,7 +397,7 @@ export function App() {
       />
 
       {/* Main Content Area (offset by desktop sidebar and mobile bottom tab bar) */}
-      <div className="lg:pl-72 flex-1 flex flex-col relative z-10 min-w-0">
+      <div className="lg:pl-80 flex-1 flex flex-col relative z-10 min-w-0">
         <Header
           activeTab={activeTab}
           timeframe={timeframe}
@@ -403,7 +486,9 @@ export function App() {
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
+              transactions={transactions}
               onLogPaymentTransaction={handleSaveTransaction}
+              onExecuteDueSubscriptions={handleExecuteDueSubscriptions}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
             />
           )}

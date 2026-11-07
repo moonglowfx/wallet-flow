@@ -301,7 +301,7 @@ export const DebtsView = ({
             return (
               <div
                 key={debt.id}
-                className={`liquid-glass p-6 space-y-5 relative transition-all duration-300 ${
+                className={`liquid-glass hover-lift animate-card-sheen p-6 space-y-5 relative transition-all duration-300 ${
                   isLiquidated
                     ? 'border-emerald-500/40 bg-emerald-950/10'
                     : 'hover:border-purple-400/50'

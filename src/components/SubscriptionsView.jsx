@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Pencil,
   Trash2,
+  Clock,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { api } from '../services/api.js';
@@ -19,6 +20,8 @@ export const SubscriptionsView = ({
   subscriptions = [],
   setSubscriptions,
   accounts = [],
+  transactions = [],
+  onExecuteDueSubscriptions,
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   currentUser,
@@ -357,6 +360,34 @@ export const SubscriptionsView = ({
                     {sub.essential ? 'Vital / Fijo' : 'Suscripción Cancelable'}
                   </span>
                 </div>
+
+                {/* Auto-execution status pill */}
+                {(() => {
+                  const now = new Date();
+                  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                  const isExecuted = (transactions || []).some(
+                    (tx) =>
+                      (tx.subscriptionId === sub.id && tx.date?.startsWith(currentMonthPrefix)) ||
+                      tx.id === `auto-sub-${sub.id}-${currentMonthPrefix}` ||
+                      (tx.title?.toLowerCase().includes(sub.name?.toLowerCase()) && tx.date?.startsWith(currentMonthPrefix))
+                  );
+                  return (
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-400">Auto-Cobro</span>
+                      {isExecuted ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Cobrado este mes
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-200 border border-purple-400/30 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-purple-400" />
+                          Programado Día {sub.billingDay}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
