@@ -2,19 +2,19 @@ import React, { useState, useMemo } from 'react';
 import {
   Calendar,
   Search,
-  Filter,
   TrendingDown,
+  TrendingUp,
   ArrowDownLeft,
+  ArrowUpRight,
   Building2,
   Wallet,
   Clock,
-  ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Flame,
-  FileSpreadsheet,
   Plus,
   Coins,
-  Layers,
+  Filter,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 
@@ -26,56 +26,62 @@ export const MonthlyExpensesView = ({
   onOpenNewTransaction,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all', 'expense', 'income'
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAccountId, setSelectedAccountId] = useState('all');
 
-  // Filter only expenses
-  const allExpenses = useMemo(() => {
-    return transactions.filter((t) => t.type === 'expense');
-  }, [transactions]);
-
-  // Group all expenses by month (YYYY-MM) in reverse chronological order
+  // Group all movements (both expenses and incomes) by month (YYYY-MM) in reverse chronological order
   const monthGroups = useMemo(() => {
     const groups = {};
 
-    allExpenses.forEach((t) => {
+    transactions.forEach((t) => {
       if (!t.date) return;
       const monthKey = t.date.slice(0, 7); // e.g. "2026-11"
       if (!groups[monthKey]) {
         groups[monthKey] = {
           monthKey,
           transactions: [],
-          total: 0,
+          totalIncome: 0,
+          totalExpense: 0,
           antTotal: 0,
         };
       }
       groups[monthKey].transactions.push(t);
       const amt = Number(t.amount) || 0;
-      groups[monthKey].total += amt;
-      if (t.isAntExpense || amt <= 15) {
-        groups[monthKey].antTotal += amt;
+      if (t.type === 'income') {
+        groups[monthKey].totalIncome += amt;
+      } else if (t.type === 'expense') {
+        groups[monthKey].totalExpense += amt;
+        if (t.isAntExpense || amt <= 15) {
+          groups[monthKey].antTotal += amt;
+        }
       }
     });
 
-    // Sort transactions within each month by date descending (newest first)
+    // Sort transactions within each month strictly by date descending (newest first)
     Object.keys(groups).forEach((key) => {
       groups[key].transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+      groups[key].netBalance = groups[key].totalIncome - groups[key].totalExpense;
     });
 
     // Sort month keys descending (newest month first)
     const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
     return sortedKeys.map((k) => groups[k]);
-  }, [allExpenses]);
+  }, [transactions]);
 
-  // Active selected month tab (defaults to newest month available, e.g. 2026-11)
+  // Active selected month (defaults to newest month available, e.g. 2026-11)
   const [activeMonthKey, setActiveMonthKey] = useState(() => {
     if (monthGroups.length > 0) return monthGroups[0].monthKey;
     return '2026-11';
   });
 
-  const activeGroup = useMemo(() => {
-    return monthGroups.find((g) => g.monthKey === activeMonthKey) || monthGroups[0] || null;
+  const activeIndex = useMemo(() => {
+    return monthGroups.findIndex((g) => g.monthKey === activeMonthKey);
   }, [monthGroups, activeMonthKey]);
+
+  const activeGroup = useMemo(() => {
+    return monthGroups[activeIndex] || monthGroups[0] || null;
+  }, [monthGroups, activeIndex]);
 
   // Format month name in Spanish (e.g. "Noviembre 2026")
   const formatMonthName = (monthKey) => {
@@ -89,188 +95,215 @@ export const MonthlyExpensesView = ({
     return `${monthNames[mIdx] || month} ${year}`;
   };
 
-  // Filter transactions of active month by search, category, account
+  // Step to previous / next month
+  const handlePrevMonth = () => {
+    if (activeIndex < monthGroups.length - 1) {
+      setActiveMonthKey(monthGroups[activeIndex + 1].monthKey);
+      setSelectedCategory('all');
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (activeIndex > 0) {
+      setActiveMonthKey(monthGroups[activeIndex - 1].monthKey);
+      setSelectedCategory('all');
+    }
+  };
+
+  // Filter transactions of active month
   const displayedTransactions = useMemo(() => {
     if (!activeGroup) return [];
     return activeGroup.transactions.filter((tx) => {
-      const matchesSearch =
-        searchQuery === '' ||
-        tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (tx.notes && tx.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        tx.category.toLowerCase().includes(searchQuery.toLowerCase());
+      // Type filter
+      if (filterType === 'expense' && tx.type !== 'expense') return false;
+      if (filterType === 'income' && tx.type !== 'income') return false;
 
-      const matchesCat = selectedCategory === 'all' || tx.category === selectedCategory;
-      const matchesAcc = selectedAccountId === 'all' || tx.accountId === selectedAccountId;
+      // Category and Account filter
+      if (selectedCategory !== 'all' && tx.category !== selectedCategory) return false;
+      if (selectedAccountId !== 'all' && tx.accountId !== selectedAccountId) return false;
 
-      return matchesSearch && matchesCat && matchesAcc;
+      // Text Search
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        const matchesTitle = tx.title?.toLowerCase().includes(q);
+        const matchesNotes = tx.notes?.toLowerCase().includes(q);
+        const matchesCat = tx.category?.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesNotes && !matchesCat) return false;
+      }
+
+      return true;
     });
-  }, [activeGroup, searchQuery, selectedCategory, selectedAccountId]);
+  }, [activeGroup, filterType, selectedCategory, selectedAccountId, searchQuery]);
 
-  // Category breakdown for active month
-  const categorySummary = useMemo(() => {
-    if (!activeGroup) return [];
-    const catMap = {};
-    activeGroup.transactions.forEach((tx) => {
-      catMap[tx.category] = (catMap[tx.category] || 0) + (Number(tx.amount) || 0);
-    });
-    return Object.entries(catMap)
-      .sort((a, b) => b[1] - a[1])
-      .map(([cat, amount]) => ({
-        category: cat,
-        amount,
-        percentage: activeGroup.total > 0 ? Math.round((amount / activeGroup.total) * 100) : 0,
-      }));
-  }, [activeGroup]);
-
-  // Available categories in the current month for the filter dropdown
+  // Available categories in the active month
   const availableCategories = useMemo(() => {
     if (!activeGroup) return [];
     return Array.from(new Set(activeGroup.transactions.map((t) => t.category)));
   }, [activeGroup]);
 
+  // Counts for the filter pills in active month
+  const counts = useMemo(() => {
+    if (!activeGroup) return { all: 0, expenses: 0, incomes: 0 };
+    const all = activeGroup.transactions.length;
+    const expenses = activeGroup.transactions.filter((t) => t.type === 'expense').length;
+    const incomes = activeGroup.transactions.filter((t) => t.type === 'income').length;
+    return { all, expenses, incomes };
+  }, [activeGroup]);
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Header Banner */}
-      <div className="liquid-glass-purple p-6 sm:p-8 space-y-4 relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-24 -right-24 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl" />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-rose-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
-              <Calendar className="w-6 h-6 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Historial de Gastos por Mes
-                </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  {allExpenses.length} Gastos Registrados
-                </span>
-              </div>
-              <p className="text-xs text-zinc-300 mt-1">
-                Consulta tus gastos agrupados cronológicamente mes a mes con concepto, cantidad, categoría, cuenta y fecha
-              </p>
-            </div>
-          </div>
-
+      {/* Sleek, Non-intrusive Month Selector Toolbar (Flows naturally with the page, no huge overlay) */}
+      <div className="liquid-glass p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Left: Compact Month Picker with Prev/Next Steppers */}
           <div className="flex items-center gap-2">
             <button
-              onClick={onOpenNewTransaction}
-              className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer"
+              onClick={handlePrevMonth}
+              disabled={activeIndex >= monthGroups.length - 1}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+              title="Mes Anterior"
             >
-              <Plus className="w-4 h-4" />
-              <span>Registrar Gasto</span>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Dropdown Selector */}
+            <div className="relative">
+              <select
+                value={activeGroup?.monthKey || ''}
+                onChange={(e) => {
+                  setActiveMonthKey(e.target.value);
+                  setSelectedCategory('all');
+                }}
+                className="liquid-input font-bold text-sm sm:text-base py-2 pl-3 pr-8 cursor-pointer bg-[#14121E] border-purple-500/40 text-white"
+              >
+                {monthGroups.map((g) => (
+                  <option key={g.monthKey} value={g.monthKey}>
+                    {formatMonthName(g.monthKey)} ({g.transactions.length} movs)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={handleNextMonth}
+              disabled={activeIndex <= 0}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+              title="Mes Siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Right: Movement Type Filter Pills: Todos, Gastos, Ingresos */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                filterType === 'all'
+                  ? 'bg-purple-600/40 text-purple-200 border border-purple-400/50 shadow-liquid-purple'
+                  : 'bg-white/[0.03] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              Todos ({counts.all})
+            </button>
+            <button
+              onClick={() => setFilterType('expense')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                filterType === 'expense'
+                  ? 'bg-rose-600/35 text-rose-200 border border-rose-400/50 shadow-sm'
+                  : 'bg-white/[0.03] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+              <span>Gastos ({counts.expenses})</span>
+            </button>
+            <button
+              onClick={() => setFilterType('income')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                filterType === 'income'
+                  ? 'bg-emerald-600/35 text-emerald-200 border border-emerald-400/50 shadow-sm'
+                  : 'bg-white/[0.03] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ingresos ({counts.incomes})</span>
             </button>
           </div>
         </div>
 
-        {/* Horizontal Scrollable Months Timeline Pills Bar */}
-        <div className="pt-2 border-t border-white/10 relative z-10">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-            Selecciona el Mes a Consultar ({monthGroups.length} meses con historial):
-          </p>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-            {monthGroups.map((g) => {
-              const isActive = activeMonthKey === g.monthKey;
-              return (
-                <button
-                  key={g.monthKey}
-                  onClick={() => {
-                    setActiveMonthKey(g.monthKey);
-                    setSelectedCategory('all');
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-purple-600 to-rose-600 text-white shadow-liquid-purple border border-purple-400/50 scale-105'
-                      : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08] border border-white/5'
-                  }`}
-                >
-                  <span>{formatMonthName(g.monthKey)}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/30 text-white font-mono' : 'bg-white/5 text-zinc-400'}`}>
-                    {g.transactions.length}
-                  </span>
-                </button>
-              );
-            })}
+        {/* 3 Metric Summary Cards for the Active Month */}
+        {activeGroup && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
+            {/* Ingresos */}
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
+              <span className="text-zinc-400 text-[11px] flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                Ingresos de {formatMonthName(activeGroup.monthKey)}
+              </span>
+              <p className="text-xl font-black text-emerald-400">
+                +{formatCurrency(activeGroup.totalIncome, currency, exchangeRate)}
+              </p>
+            </div>
+
+            {/* Gastos */}
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1">
+              <span className="text-zinc-400 text-[11px] flex items-center gap-1">
+                <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+                Gastos de {formatMonthName(activeGroup.monthKey)}
+              </span>
+              <p className="text-xl font-black text-rose-400">
+                -{formatCurrency(activeGroup.totalExpense, currency, exchangeRate)}
+              </p>
+            </div>
+
+            {/* Balance Neto */}
+            <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 space-y-1">
+              <span className="text-zinc-400 text-[11px] flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5 text-purple-400" />
+                Balance Neto del Mes
+              </span>
+              <p
+                className={`text-xl font-black ${
+                  activeGroup.netBalance >= 0 ? 'text-emerald-300' : 'text-rose-400'
+                }`}
+              >
+                {activeGroup.netBalance >= 0 ? '+' : ''}
+                {formatCurrency(activeGroup.netBalance, currency, exchangeRate)}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {allExpenses.length === 0 ? (
+      {transactions.length === 0 ? (
         <div className="liquid-glass p-12 text-center space-y-4 max-w-lg mx-auto">
-          <TrendingDown className="w-12 h-12 text-rose-400 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No hay gastos registrados</h3>
+          <Clock className="w-12 h-12 text-purple-400 mx-auto" />
+          <h3 className="text-lg font-bold text-white">No hay movimientos registrados</h3>
           <p className="text-xs text-zinc-400">
-            Comienza registrando tus primeros egresos para visualizarlos ordenados por fecha y agrupados mensualmente.
+            Registra tus primeros ingresos o egresos para consultarlos agrupados mes por mes.
           </p>
           <button
             onClick={onOpenNewTransaction}
             className="liquid-button-primary px-5 py-2.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-neon-purple"
           >
-            <span>+ Registrar Primer Gasto</span>
+            <span>+ Registrar Movimiento</span>
           </button>
         </div>
       ) : activeGroup ? (
-        <div className="space-y-6">
-          {/* Active Month Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="liquid-glass p-5 space-y-2 border-rose-500/30">
-              <span className="text-xs text-zinc-400 font-medium">Total Gastado en {formatMonthName(activeGroup.monthKey)}</span>
-              <p className="text-2xl font-black text-rose-400">
-                {formatCurrency(activeGroup.total, currency, exchangeRate)}
-              </p>
-              <span className="text-[11px] text-zinc-400 block">
-                {activeGroup.transactions.length} movimientos en el mes
-              </span>
-            </div>
-
-            <div className="liquid-glass p-5 space-y-2 border-amber-500/30">
-              <span className="text-xs text-zinc-400 font-medium">Promedio Diario del Mes</span>
-              <p className="text-2xl font-black text-amber-300">
-                {formatCurrency(activeGroup.total / 30, currency, exchangeRate)}
-                <span className="text-xs text-zinc-400 font-normal"> / día</span>
-              </p>
-              <span className="text-[11px] text-zinc-400 block">
-                Ritmo de consumo diario
-              </span>
-            </div>
-
-            <div className="liquid-glass p-5 space-y-2 border-purple-500/30">
-              <span className="text-xs text-zinc-400 font-medium">Fuga Gastos Hormiga (≤ $15)</span>
-              <p className="text-2xl font-black text-purple-300">
-                {formatCurrency(activeGroup.antTotal, currency, exchangeRate)}
-              </p>
-              <span className="text-[11px] text-zinc-400 block">
-                {activeGroup.total > 0 ? Math.round((activeGroup.antTotal / activeGroup.total) * 100) : 0}% del gasto de este mes
-              </span>
-            </div>
-
-            <div className="liquid-glass p-5 space-y-2 border-fuchsia-500/30">
-              <span className="text-xs text-zinc-400 font-medium">Categoría Principal</span>
-              <p className="text-xl font-bold text-white truncate">
-                {categorySummary[0]?.category || 'N/A'}
-              </p>
-              <span className="text-[11px] text-fuchsia-300 block">
-                {categorySummary[0] ? `${formatCurrency(categorySummary[0].amount, currency, exchangeRate)} (${categorySummary[0].percentage}%)` : ''}
-              </span>
-            </div>
-          </div>
-
-          {/* Filters Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl liquid-glass">
-            {/* Search Input */}
+        <div className="space-y-4">
+          {/* Search & Category Filter Sub-toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl liquid-glass">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder={`Buscar en ${formatMonthName(activeGroup.monthKey)} (concepto, nota)...`}
+                placeholder={`Buscar en ${formatMonthName(activeGroup.monthKey)}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="liquid-input pl-9 text-xs"
+                className="liquid-input pl-9 text-xs py-2"
               />
             </div>
 
-            {/* Category and Account filter dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={selectedCategory}
@@ -296,39 +329,51 @@ export const MonthlyExpensesView = ({
             </div>
           </div>
 
-          {/* Expenses List / Table strictly ordered by date */}
+          {/* Chronological List of Transactions for the Month */}
           <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
-            <div className="p-4 bg-white/[0.02] border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <div className="p-4 bg-white/[0.02] border-b border-white/10 flex items-center justify-between text-xs">
+              <h3 className="font-bold text-white flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-400" />
-                <span>Gastos de {formatMonthName(activeGroup.monthKey)} en Orden Cronológico</span>
+                <span>Movimientos de {formatMonthName(activeGroup.monthKey)} en Orden Cronológico</span>
               </h3>
-              <span className="text-xs text-zinc-400 font-mono">
-                {displayedTransactions.length} de {activeGroup.transactions.length} movimientos
+              <span className="text-zinc-400 font-mono">
+                {displayedTransactions.length} de {activeGroup.transactions.length} registrados
               </span>
             </div>
 
             {displayedTransactions.length === 0 ? (
               <div className="p-8 text-center text-zinc-400 space-y-2">
-                <p className="text-sm font-semibold text-white">No hay gastos que coincidan con el filtro</p>
-                <p className="text-xs text-zinc-400">Prueba ajustando el término de búsqueda o la categoría.</p>
+                <p className="text-sm font-semibold text-white">No hay movimientos que coincidan con el filtro</p>
+                <p className="text-xs text-zinc-400">Prueba cambiando la búsqueda o los filtros de tipo y categoría.</p>
               </div>
             ) : (
               <div className="divide-y divide-white/5">
                 {displayedTransactions.map((tx) => {
                   const acc = accounts.find((a) => a.id === tx.accountId);
-                  const isAnt = tx.isAntExpense || Number(tx.amount) <= 15;
+                  const isIncome = tx.type === 'income';
+                  const isAnt = tx.isAntExpense || (!isIncome && Number(tx.amount) <= 15);
 
                   return (
                     <div
                       key={tx.id}
-                      className="p-4 hover:bg-white/[0.04] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      className="p-3.5 sm:p-4 hover:bg-white/[0.04] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
-                      {/* Left: Date + Concept + Tags */}
+                      {/* Left: Date + Title + Notes */}
                       <div className="flex items-start sm:items-center gap-3 min-w-0">
                         {/* Date badge */}
                         <div className="px-2.5 py-1 rounded-xl bg-purple-900/30 border border-purple-500/30 text-purple-200 font-mono text-[11px] font-bold shrink-0">
                           {tx.date}
+                        </div>
+
+                        {/* Type Icon */}
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                            isIncome
+                              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                              : 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                          }`}
+                        >
+                          {isIncome ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
                         </div>
 
                         <div className="min-w-0">
@@ -352,8 +397,8 @@ export const MonthlyExpensesView = ({
                       </div>
 
                       {/* Right: Category + Account + Amount */}
-                      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-11 sm:pl-0">
-                        {/* Category */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pl-11 sm:pl-0">
+                        {/* Category badge */}
                         <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300">
                           {tx.category}
                         </span>
@@ -364,10 +409,15 @@ export const MonthlyExpensesView = ({
                           <span>{acc ? acc.name : 'Cuenta Principal'}</span>
                         </span>
 
-                        {/* Amount in active currency */}
-                        <div className="text-right min-w-[90px]">
-                          <span className="text-sm font-black text-rose-400 font-mono">
-                            -{formatCurrency(tx.amount, currency, exchangeRate)}
+                        {/* Amount */}
+                        <div className="text-right min-w-[95px]">
+                          <span
+                            className={`text-sm font-black font-mono ${
+                              isIncome ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
+                          >
+                            {isIncome ? '+' : '-'}
+                            {formatCurrency(tx.amount, currency, exchangeRate)}
                           </span>
                         </div>
                       </div>

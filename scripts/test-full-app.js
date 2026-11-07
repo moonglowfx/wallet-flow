@@ -97,10 +97,11 @@ async function verifyDB() {
   assert(commitmentsCode.includes('SubscriptionsView'), 'CommitmentsView integra la gestión de suscripciones');
   assert(commitmentsCode.includes('DebtsView'), 'CommitmentsView integra la gestión de deudas');
 
-  // Nueva sección de Gastos Mensuales ordenados cronológicamente
+  // Nueva sección de Movimientos Mensuales (Ingresos & Gastos) ordenados cronológicamente
   assert(fs.existsSync('src/components/MonthlyExpensesView.jsx'), 'MonthlyExpensesView.jsx existe');
   const monthlyCode = fs.readFileSync('src/components/MonthlyExpensesView.jsx', 'utf-8');
-  assert(monthlyCode.includes('allExpenses'), 'MonthlyExpensesView filtra y agrupa gastos');
+  assert(monthlyCode.includes('totalIncome') && monthlyCode.includes('totalExpense'), 'MonthlyExpensesView incluye tanto ingresos como gastos');
+  assert(monthlyCode.includes('monthGroups'), 'MonthlyExpensesView agrupa y ordena movimientos por mes');
   assert(monthlyCode.includes('formatMonthName'), 'MonthlyExpensesView muestra los meses en orden');
 
   // AccountModal sin tasa de rendimiento anual
@@ -129,10 +130,8 @@ async function verifyDB() {
   assert(Math.round(realIncome2026) === 17611, `Ingresos reales año en curso (2026) exactos: ${formatCurrency(realIncome2026)} (NO números inflados)`);
   assert(Math.round(realExpense2026) === 16682, `Gastos reales año en curso (2026) exactos: ${formatCurrency(realExpense2026)}`);
 
-  // Sticky Header verification
-  const indexHtml = fs.readFileSync('index.html', 'utf-8');
-  assert(!indexHtml.includes('overflow-x-hidden'), 'index.html no bloquea el sticky header con overflow-x-hidden en body');
-  assert(headerCode.includes('sticky top-0 z-30'), 'Header tiene posición sticky fija en z-30');
+  // Header scroll natural sin ventanas fijas obstruyendo
+  assert(!headerCode.includes('sticky top-0 z-30'), 'Header fluye naturalmente sin superponerse de forma invasiva sobre el contenido');
 
   // -------------------------------------------------------------
   // 6. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)

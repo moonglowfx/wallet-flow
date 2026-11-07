@@ -31,7 +31,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'monthly-expenses',
-    label: 'Gastos Mensuales',
+    label: 'Movimientos por Mes',
     shortLabel: 'Por Mes',
     icon: CalendarDays,
   },
