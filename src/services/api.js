@@ -8,13 +8,38 @@ export const api = {
   async getAccounts(userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/accounts?userId=${userId}`);
-      if (res.ok) {
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
+
+    if (userId === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_accounts');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((a) => a.id?.startsWith('acc-tiago-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
+
     const saved = localStorage.getItem(`wf_user_${userId}_accounts`);
-    return saved ? JSON.parse(saved) : getUserInitialData(userId).accounts;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.some((a) => a.id === 'acc-bofa-checking')) {
+          return parsed;
+        }
+      } catch (_) {}
+    }
+    const fresh = getUserInitialData(userId).accounts;
+    localStorage.setItem(`wf_user_${userId}_accounts`, JSON.stringify(fresh));
+    return fresh;
   },
 
   async createAccount(account, userId = 'munboi') {
@@ -24,7 +49,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...account, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return account;
   },
@@ -33,13 +59,38 @@ export const api = {
   async getTransactions(userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/transactions?userId=${userId}`);
-      if (res.ok) {
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
+
+    if (userId === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_transactions');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((t) => t.id?.startsWith('tx-tg-') || t.id === 'tx-01')) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
+
     const saved = localStorage.getItem(`wf_user_${userId}_transactions`);
-    return saved ? JSON.parse(saved) : getUserInitialData(userId).transactions;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 700 && !parsed.some((t) => t.id === 'tx-01' || t.id === 'tx-02')) {
+          return parsed;
+        }
+      } catch (_) {}
+    }
+    const fresh = getUserInitialData(userId).transactions;
+    localStorage.setItem(`wf_user_${userId}_transactions`, JSON.stringify(fresh));
+    return fresh;
   },
 
   async createTransaction(transaction, userId = 'munboi') {
@@ -49,7 +100,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...transaction, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return transaction;
   },
@@ -58,11 +110,26 @@ export const api = {
   async getSubscriptions(userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/subscriptions?userId=${userId}`);
-      if (res.ok) {
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
+
+    if (userId === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_subscriptions');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((s) => s.id?.startsWith('sub-tg-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
+
     const saved = localStorage.getItem(`wf_user_${userId}_subscriptions`);
     return saved ? JSON.parse(saved) : getUserInitialData(userId).subscriptions;
   },
@@ -74,7 +141,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...subscription, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return subscription;
   },
@@ -84,7 +152,8 @@ export const api = {
       const res = await fetch(`${API_BASE}/subscriptions/${id}/toggle`, {
         method: 'PATCH',
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return null;
   },
@@ -93,11 +162,26 @@ export const api = {
   async getDebts(userId = 'munboi') {
     try {
       const res = await fetch(`${API_BASE}/debts?userId=${userId}`);
-      if (res.ok) {
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
       }
     } catch (_) {}
+
+    if (userId === 'tiago') {
+      const saved = localStorage.getItem('wf_user_tiago_debts');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && !parsed.some((d) => d.id?.startsWith('debt-tg-'))) {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+      return [];
+    }
+
     const saved = localStorage.getItem(`wf_user_${userId}_debts`);
     return saved ? JSON.parse(saved) : getUserInitialData(userId).debts;
   },
@@ -109,7 +193,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...debt, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return debt;
   },
@@ -121,7 +206,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payment, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return payment;
   },
@@ -134,7 +220,8 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, mode, userId }),
       });
-      if (res.ok) return await res.json();
+      const ct = res.headers.get('content-type');
+      if (res.ok && ct && ct.includes('application/json')) return await res.json();
     } catch (_) {}
     return null;
   },

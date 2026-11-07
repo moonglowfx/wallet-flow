@@ -17,20 +17,61 @@ import { USERS, getUserInitialData } from './data/users.js';
 import { DEFAULT_USD_COP_RATE } from './data/mockData.js';
 import { api } from './services/api.js';
 
-// Ensure Tiago is 100% wiped clean of any past mock data in browser localStorage
-if (typeof window !== 'undefined' && window.localStorage) {
-  const hasOldTiagoData = () => {
-    const accs = localStorage.getItem('wf_user_tiago_accounts') || '';
-    const txs = localStorage.getItem('wf_user_tiago_transactions') || '';
-    return accs.includes('acc-tiago-') || accs.includes('Chase') || accs.includes('Wells Fargo') || txs.includes('tx-tg-');
-  };
+export const APP_BUILD_VERSION = 'v2026.11.06-r5';
 
-  if (hasOldTiagoData() || localStorage.getItem('wf_tiago_clean_v4') !== 'true') {
-    localStorage.setItem('wf_user_tiago_accounts', JSON.stringify([]));
-    localStorage.setItem('wf_user_tiago_transactions', JSON.stringify([]));
-    localStorage.setItem('wf_user_tiago_subscriptions', JSON.stringify([]));
-    localStorage.setItem('wf_user_tiago_debts', JSON.stringify([]));
-    localStorage.setItem('wf_tiago_clean_v4', 'true');
+// Self-healing migration for browser localStorage: guarantees immediate sync on Vercel deploys
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const storedBuild = localStorage.getItem('wf_data_build');
+
+    // 1. Munboi Data Verification: must have 726 transactions and real BofA accounts
+    const rawMunboiTxs = localStorage.getItem('wf_user_munboi_transactions');
+    const rawMunboiAccs = localStorage.getItem('wf_user_munboi_accounts');
+    let munboiStale = false;
+
+    if (!rawMunboiTxs || !rawMunboiAccs || storedBuild !== APP_BUILD_VERSION) {
+      if (!rawMunboiTxs || !rawMunboiAccs) {
+        munboiStale = true;
+      } else {
+        const pTxs = JSON.parse(rawMunboiTxs);
+        const pAccs = JSON.parse(rawMunboiAccs);
+        if (!Array.isArray(pTxs) || pTxs.length < 700 || pTxs.some((t) => t.id === 'tx-01' || t.id === 'tx-02')) {
+          munboiStale = true;
+        }
+        if (!Array.isArray(pAccs) || !pAccs.some((a) => a.id === 'acc-bofa-checking')) {
+          munboiStale = true;
+        }
+      }
+    }
+
+    if (munboiStale) {
+      const munboiInit = getUserInitialData('munboi');
+      localStorage.setItem('wf_user_munboi_accounts', JSON.stringify(munboiInit.accounts));
+      localStorage.setItem('wf_user_munboi_transactions', JSON.stringify(munboiInit.transactions));
+      localStorage.setItem('wf_user_munboi_subscriptions', JSON.stringify(munboiInit.subscriptions));
+      localStorage.setItem('wf_user_munboi_debts', JSON.stringify(munboiInit.debts));
+    }
+
+    // 2. Tiago Data Verification: strictly 0 data (no legacy dummy items)
+    const rawTiagoAccs = localStorage.getItem('wf_user_tiago_accounts');
+    const rawTiagoTxs = localStorage.getItem('wf_user_tiago_transactions');
+    let tiagoStale = false;
+    if (rawTiagoAccs && (rawTiagoAccs.includes('acc-tiago-') || rawTiagoAccs.includes('Chase') || rawTiagoAccs.includes('Wells Fargo'))) {
+      tiagoStale = true;
+    }
+    if (rawTiagoTxs && (rawTiagoTxs.includes('tx-tg-') || rawTiagoTxs.includes('tx-01'))) {
+      tiagoStale = true;
+    }
+    if (tiagoStale || !rawTiagoAccs) {
+      localStorage.setItem('wf_user_tiago_accounts', JSON.stringify([]));
+      localStorage.setItem('wf_user_tiago_transactions', JSON.stringify([]));
+      localStorage.setItem('wf_user_tiago_subscriptions', JSON.stringify([]));
+      localStorage.setItem('wf_user_tiago_debts', JSON.stringify([]));
+    }
+
+    localStorage.setItem('wf_data_build', APP_BUILD_VERSION);
+  } catch (err) {
+    console.error('Error auto-syncing storage version:', err);
   }
 }
 
@@ -69,7 +110,7 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.some((a) => a.id === 'acc-bofa-checking')) return parsed;
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).accounts;
@@ -81,7 +122,7 @@ export function App() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && !parsed.some((t) => t.id?.startsWith('tx-tg-'))) {
+          if (Array.isArray(parsed) && !parsed.some((t) => t.id?.startsWith('tx-tg-') || t.id === 'tx-01')) {
             return parsed;
           }
         } catch (_) {}
@@ -92,7 +133,9 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 700 && !parsed.some((t) => t.id === 'tx-01' || t.id === 'tx-02')) {
+          return parsed;
+        }
       } catch (_) {}
     }
     return getUserInitialData(currentUser.id).transactions;
@@ -209,6 +252,18 @@ export function App() {
       } catch (_) {}
     }
 
+    // Strict guarantee for Munboi: ensure real Excel dataset
+    if (userId === 'munboi') {
+      if (!loadedAccs || !loadedAccs.some((a) => a.id === 'acc-bofa-checking')) {
+        loadedAccs = initial.accounts;
+        localStorage.setItem('wf_user_munboi_accounts', JSON.stringify(loadedAccs));
+      }
+      if (!loadedTxs || loadedTxs.length < 700 || loadedTxs.some((t) => t.id === 'tx-01' || t.id === 'tx-02')) {
+        loadedTxs = initial.transactions;
+        localStorage.setItem('wf_user_munboi_transactions', JSON.stringify(loadedTxs));
+      }
+    }
+
     // Strict guarantee for Tiago: purge any legacy mock data
     if (userId === 'tiago') {
       const isOld = (items) =>
@@ -256,8 +311,12 @@ export function App() {
           setSubscriptions(subs || []);
           setDebts(dts || []);
         } else {
-          if (accs && accs.length > 0) setAccounts(accs);
-          if (txs && txs.length > 0) setTransactions(txs);
+          if (accs && accs.length > 0 && accs.some((a) => a.id === 'acc-bofa-checking')) {
+            setAccounts(accs);
+          }
+          if (txs && txs.length >= 700 && !txs.some((t) => t.id === 'tx-01')) {
+            setTransactions(txs);
+          }
           if (subs && subs.length > 0) setSubscriptions(subs);
           if (dts && dts.length > 0) setDebts(dts);
         }
