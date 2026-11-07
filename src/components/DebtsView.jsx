@@ -308,10 +308,10 @@ export const DebtsView = ({
                 }`}
               >
                 {/* Header Row */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3">
+                  <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-white text-base tracking-tight">
+                      <h3 className="font-bold text-white text-base tracking-tight truncate">
                         {debt.title}
                       </h3>
                       {isLiquidated && (
@@ -320,12 +320,12 @@ export const DebtsView = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-zinc-400 truncate">
                       Acreedor: <span className="text-purple-300 font-medium">{debt.counterparty}</span> • {debt.category}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between sm:justify-end gap-1.5 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-white/5">
                     <button
                       type="button"
                       onClick={() => openEditDebt(debt)}
@@ -337,7 +337,7 @@ export const DebtsView = ({
                     <button
                       onClick={() => setSelectedDebtForPayment(debt)}
                       disabled={isLiquidated}
-                      className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
+                      className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial ${
                         isLiquidated ? 'opacity-40 cursor-not-allowed' : ''
                       }`}
                     >

@@ -3,7 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { db, initDatabase, seedUserData, clearDatabase } from './db.js';
+import { db, initDatabase, seedUserData, clearDatabase, getDatabaseConnectionInfo } from './db.js';
+import { createDatabaseBackup } from '../scripts/backup_db.js';
 
 export const app = express();
 const PORT = process.env.PORT || 3001;
@@ -101,10 +102,39 @@ function normalizeUserId(uid) {
   return uid === 'tiago' ? 'tiago' : 'munboi';
 }
 
+// Helper to get user's ordered account IDs from app_state
+async function getOrderedAccounts(userId) {
+  const [accsRes, orderRes] = await Promise.all([
+    db.execute({
+      sql: 'SELECT * FROM accounts WHERE userId = ? ORDER BY created_at ASC',
+      args: [userId],
+    }),
+    db.execute({
+      sql: 'SELECT value FROM app_state WHERE key = ?',
+      args: [`account_order_${userId}`],
+    }),
+  ]);
+  const rows = accsRes.rows.map(formatAccountRow);
+  const rawOrder = orderRes.rows[0]?.value;
+  if (!rawOrder) return rows;
+  try {
+    const orderIds = JSON.parse(rawOrder);
+    if (!Array.isArray(orderIds) || orderIds.length === 0) return rows;
+    const orderMap = new Map(orderIds.map((id, idx) => [id, idx]));
+    return [...rows].sort((a, b) => {
+      const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+      const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+      return idxA - idxB;
+    });
+  } catch (_) {
+    return rows;
+  }
+}
+
 // Helper to compute exact balance delta in the target account's native currency (USD or COP)
 async function getAccountDelta(accountId, txAmount, txCurrency, userId, type) {
   const [accRes, userRes] = await Promise.all([
-    db.execute({ sql: 'SELECT currency FROM accounts WHERE id = ?', args: [accountId] }),
+    db.execute({ sql: 'SELECT currency FROM accounts WHERE id = ? AND userId = ?', args: [accountId, userId] }),
     db.execute({ sql: 'SELECT exchangeRate FROM users WHERE id = ?', args: [userId] }),
   ]);
   const accCur = (accRes.rows[0]?.currency || 'USD').toUpperCase();
@@ -138,11 +168,8 @@ app.get('/api/state', async (req, res) => {
     const requestedUserId = req.query.userId ? normalizeUserId(req.query.userId) : null;
     const activeUserId = requestedUserId || cookieAccountId || normalizeUserId(stateRes.rows[0]?.value);
 
-    const [accsRes, txsRes, subsRes, debts] = await Promise.all([
-      db.execute({
-        sql: 'SELECT * FROM accounts WHERE userId = ? ORDER BY created_at ASC',
-        args: [activeUserId],
-      }),
+    const [orderedAccounts, txsRes, subsRes, debts] = await Promise.all([
+      getOrderedAccounts(activeUserId),
       db.execute({
         sql: 'SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC, created_at DESC',
         args: [activeUserId],
@@ -167,7 +194,7 @@ app.get('/api/state', async (req, res) => {
       authenticatedAccount: Boolean(cookieAccountId || requestedUserId),
       users,
       user: currentUser,
-      accounts: accsRes.rows.map(formatAccountRow),
+      accounts: orderedAccounts,
       transactions: txsRes.rows.map(formatTransactionRow),
       subscriptions: subsRes.rows.map(formatSubscriptionRow),
       debts,
@@ -274,12 +301,26 @@ app.delete('/api/session/device', async (_req, res) => {
 // ----------------- ACCOUNTS -----------------
 app.get('/api/accounts', async (req, res) => {
   try {
-    const userId = req.query.userId || 'munboi';
-    const result = await db.execute({
-      sql: 'SELECT * FROM accounts WHERE userId = ? ORDER BY created_at ASC',
-      args: [userId],
+    const userId = normalizeUserId(req.query.userId || 'munboi');
+    const ordered = await getOrderedAccounts(userId);
+    res.json(ordered);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/accounts/reorder', async (req, res) => {
+  try {
+    const { userId: rawUserId = 'munboi', accountIds = [] } = req.body;
+    const userId = normalizeUserId(rawUserId);
+    if (!Array.isArray(accountIds)) {
+      return res.status(400).json({ error: 'accountIds debe ser un arreglo' });
+    }
+    await db.execute({
+      sql: 'INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+      args: [`account_order_${userId}`, JSON.stringify(accountIds)],
     });
-    res.json(result.rows.map(formatAccountRow));
+    res.json({ success: true, userId, accountIds });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -356,7 +397,7 @@ app.put('/api/accounts/:id', async (req, res) => {
 app.delete('/api/accounts/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId || 'munboi';
+    const userId = normalizeUserId(req.query.userId || 'munboi');
     await db.execute({
       sql: 'DELETE FROM accounts WHERE id = ? AND userId = ?',
       args: [id, userId],
@@ -370,7 +411,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
 // ----------------- TRANSACTIONS -----------------
 app.get('/api/transactions', async (req, res) => {
   try {
-    const userId = req.query.userId || 'munboi';
+    const userId = normalizeUserId(req.query.userId || 'munboi');
     const result = await db.execute({
       sql: 'SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC, created_at DESC',
       args: [userId],
@@ -409,8 +450,8 @@ app.post('/api/transactions', async (req, res) => {
 
     const delta = await getAccountDelta(tx.accountId, origAmt, txCur, userId, tx.type);
     await db.execute({
-      sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ?',
-      args: [delta, tx.accountId],
+      sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ? AND userId = ?',
+      args: [delta, tx.accountId, userId],
     });
 
     res.status(201).json({ ...tx, currency: txCur, originalAmount: origAmt, userId });
@@ -462,18 +503,18 @@ app.put('/api/transactions/:id', async (req, res) => {
       if (prevTx.accountId === tx.accountId) {
         const diff = newSigned - oldSigned;
         await db.execute({
-          sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ?',
-          args: [diff, tx.accountId],
+          sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ? AND userId = ?',
+          args: [diff, tx.accountId, userId],
         });
       } else {
         await Promise.all([
           db.execute({
-            sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ?',
-            args: [oldSigned, prevTx.accountId],
+            sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ? AND userId = ?',
+            args: [oldSigned, prevTx.accountId, userId],
           }),
           db.execute({
-            sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ?',
-            args: [newSigned, tx.accountId],
+            sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ? AND userId = ?',
+            args: [newSigned, tx.accountId, userId],
           }),
         ]);
       }
@@ -506,8 +547,8 @@ app.delete('/api/transactions/:id', async (req, res) => {
       const prevCur = prevTx.currency || 'USD';
       const oldSigned = await getAccountDelta(prevTx.accountId, prevOrigAmt, prevCur, userId, prevTx.type);
       await db.execute({
-        sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ?',
-        args: [oldSigned, prevTx.accountId],
+        sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ? AND userId = ?',
+        args: [oldSigned, prevTx.accountId, userId],
       });
     }
 
@@ -517,10 +558,147 @@ app.delete('/api/transactions/:id', async (req, res) => {
   }
 });
 
+// ----------------- TRANSFERS BETWEEN ACCOUNTS -----------------
+app.post('/api/transfers', async (req, res) => {
+  try {
+    const {
+      fromAccountId,
+      toAccountId,
+      amount,
+      currency: rawCur = 'USD',
+      date = new Date().toISOString().split('T')[0],
+      notes = '',
+      userId: rawUserId = 'munboi',
+    } = req.body;
+
+    const userId = normalizeUserId(rawUserId);
+    const numAmt = Number(amount);
+
+    if (!fromAccountId || !toAccountId || fromAccountId === toAccountId) {
+      return res.status(400).json({ error: 'Debes seleccionar cuentas de origen y destino distintas.' });
+    }
+    if (!Number.isFinite(numAmt) || numAmt <= 0) {
+      return res.status(400).json({ error: 'El monto a transferir debe ser mayor a 0.' });
+    }
+
+    const [accsRes, userRes] = await Promise.all([
+      db.execute({
+        sql: 'SELECT * FROM accounts WHERE userId = ? AND id IN (?, ?)',
+        args: [userId, fromAccountId, toAccountId],
+      }),
+      db.execute({
+        sql: 'SELECT exchangeRate FROM users WHERE id = ?',
+        args: [userId],
+      }),
+    ]);
+
+    const fromAcc = accsRes.rows.find((r) => r.id === fromAccountId);
+    const toAcc = accsRes.rows.find((r) => r.id === toAccountId);
+    if (!fromAcc || !toAcc) {
+      return res.status(404).json({ error: 'Una de las cuentas seleccionadas no existe.' });
+    }
+
+    const rate = Number(userRes.rows[0]?.exchangeRate || 3200);
+    const txCur = (rawCur || 'USD').toUpperCase();
+    const usdAmount = txCur === 'COP' ? Math.round((numAmt / rate) * 100) / 100 : Math.round(numAmt * 100) / 100;
+
+    const fromDelta = await getAccountDelta(fromAccountId, numAmt, txCur, userId, 'expense');
+    const toDelta = await getAccountDelta(toAccountId, numAmt, txCur, userId, 'income');
+
+    const nowTs = Date.now();
+    const outTx = {
+      id: `tx-trf-out-${nowTs}`,
+      title: `Transferencia a ${toAcc.name}`,
+      amount: usdAmount,
+      currency: txCur,
+      originalAmount: numAmt,
+      type: 'expense',
+      category: 'Transferencias & Cambio',
+      accountId: fromAccountId,
+      date,
+      notes: notes || `Transferencia enviada hacia ${toAcc.name}`,
+      isAntExpense: false,
+      userId,
+    };
+
+    const inTx = {
+      id: `tx-trf-in-${nowTs + 1}`,
+      title: `Transferencia desde ${fromAcc.name}`,
+      amount: usdAmount,
+      currency: txCur,
+      originalAmount: numAmt,
+      type: 'income',
+      category: 'Transferencias & Cambio',
+      accountId: toAccountId,
+      date,
+      notes: notes || `Transferencia recibida desde ${fromAcc.name}`,
+      isAntExpense: false,
+      userId,
+    };
+
+    await db.batch([
+      {
+        sql: `INSERT OR REPLACE INTO transactions (id, title, amount, currency, originalAmount, type, category, accountId, date, notes, isAntExpense, userId)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          outTx.id,
+          outTx.title,
+          outTx.amount,
+          outTx.currency,
+          outTx.originalAmount,
+          outTx.type,
+          outTx.category,
+          outTx.accountId,
+          outTx.date,
+          outTx.notes,
+          0,
+          userId,
+        ],
+      },
+      {
+        sql: `INSERT OR REPLACE INTO transactions (id, title, amount, currency, originalAmount, type, category, accountId, date, notes, isAntExpense, userId)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          inTx.id,
+          inTx.title,
+          inTx.amount,
+          inTx.currency,
+          inTx.originalAmount,
+          inTx.type,
+          inTx.category,
+          inTx.accountId,
+          inTx.date,
+          inTx.notes,
+          0,
+          userId,
+        ],
+      },
+      {
+        sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ? AND userId = ?',
+        args: [fromDelta, fromAccountId, userId],
+      },
+      {
+        sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ? AND userId = ?',
+        args: [toDelta, toAccountId, userId],
+      },
+    ]);
+
+    res.status(201).json({
+      success: true,
+      outTransaction: outTx,
+      inTransaction: inTx,
+      fromDelta,
+      toDelta,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ----------------- SUBSCRIPTIONS -----------------
 app.get('/api/subscriptions', async (req, res) => {
   try {
-    const userId = req.query.userId || 'munboi';
+    const userId = normalizeUserId(req.query.userId || 'munboi');
     const result = await db.execute({
       sql: 'SELECT * FROM subscriptions WHERE userId = ? ORDER BY billingDay ASC',
       args: [userId],
@@ -594,10 +772,19 @@ app.put('/api/subscriptions/:id', async (req, res) => {
 app.patch('/api/subscriptions/:id/toggle', async (req, res) => {
   try {
     const { id } = req.params;
-    await db.execute({
-      sql: 'UPDATE subscriptions SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?',
-      args: [id],
-    });
+    const rawUserId = req.body?.userId || req.query?.userId;
+    if (rawUserId) {
+      const userId = normalizeUserId(rawUserId);
+      await db.execute({
+        sql: 'UPDATE subscriptions SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ? AND userId = ?',
+        args: [id, userId],
+      });
+    } else {
+      await db.execute({
+        sql: 'UPDATE subscriptions SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?',
+        args: [id],
+      });
+    }
     const updated = await db.execute({
       sql: 'SELECT * FROM subscriptions WHERE id = ?',
       args: [id],
@@ -611,7 +798,7 @@ app.patch('/api/subscriptions/:id/toggle', async (req, res) => {
 app.delete('/api/subscriptions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId || 'munboi';
+    const userId = normalizeUserId(req.query.userId || 'munboi');
     await db.execute({
       sql: 'DELETE FROM subscriptions WHERE id = ? AND userId = ?',
       args: [id, userId],
@@ -625,7 +812,7 @@ app.delete('/api/subscriptions/:id', async (req, res) => {
 // ----------------- DEBTS -----------------
 app.get('/api/debts', async (req, res) => {
   try {
-    const userId = req.query.userId || 'munboi';
+    const userId = normalizeUserId(req.query.userId || 'munboi');
     const debts = await fetchUserDebts(userId);
     res.json(debts);
   } catch (error) {
@@ -728,8 +915,8 @@ app.post('/api/debts/:id/payment', async (req, res) => {
         ],
       },
       {
-        sql: 'UPDATE debts SET paidAmount = MIN(totalAmount, ROUND((paidAmount + ?) * 100) / 100) WHERE id = ?',
-        args: [payment.amount, id],
+        sql: 'UPDATE debts SET paidAmount = MIN(totalAmount, ROUND((paidAmount + ?) * 100) / 100) WHERE id = ? AND userId = ?',
+        args: [payment.amount, id, userId],
       },
     ]);
 
@@ -762,6 +949,14 @@ app.post('/api/import', async (req, res) => {
         { sql: 'DELETE FROM transactions WHERE userId = ?', args: [userId] },
         { sql: 'DELETE FROM accounts WHERE userId = ?', args: [userId] }
       );
+    }
+
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      const orderIds = accounts.map((a) => a.id).filter(Boolean);
+      statements.push({
+        sql: 'INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+        args: [`account_order_${userId}`, JSON.stringify(orderIds)],
+      });
     }
 
     for (const acc of accounts) {
@@ -906,8 +1101,40 @@ app.post('/api/clear', async (req, res) => {
 app.post('/api/reset-demo', async (req, res) => {
   try {
     const userId = req.body?.userId || req.query?.userId || 'munboi';
+    await createDatabaseBackup(); // Safety backup before any intentional reset
     await seedUserData(userId);
     res.json({ message: `Datos SQLite restaurados para ${userId}` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ----------------- DATABASE BACKUP & PERSISTENCE INFO -----------------
+app.post('/api/database/backup', async (_req, res) => {
+  try {
+    const backupRes = await createDatabaseBackup();
+    res.json(backupRes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/database/info', async (_req, res) => {
+  try {
+    const info = getDatabaseConnectionInfo();
+    const [accsRes, txsRes, usersRes] = await Promise.all([
+      db.execute('SELECT COUNT(*) as c FROM accounts'),
+      db.execute('SELECT COUNT(*) as c FROM transactions'),
+      db.execute('SELECT COUNT(*) as c FROM users'),
+    ]);
+    res.json({
+      ...info,
+      records: {
+        accounts: accsRes.rows[0]?.c || 0,
+        transactions: txsRes.rows[0]?.c || 0,
+        users: usersRes.rows[0]?.c || 0,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

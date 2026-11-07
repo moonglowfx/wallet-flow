@@ -59,6 +59,7 @@ export function App() {
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [modalInitialType, setModalInitialType] = useState(null);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -286,6 +287,78 @@ export function App() {
     showToast('Movimiento eliminado de SQLite');
   };
 
+  const handleSaveTransfer = async ({ fromAccountId, toAccountId, amount, currency: trfCur, date, notes }) => {
+    const fromAcc = accounts.find((a) => a.id === fromAccountId);
+    const toAcc = accounts.find((a) => a.id === toAccountId);
+    if (!fromAcc || !toAcc) return;
+
+    const rate = exchangeRate || DEFAULT_USD_COP_RATE;
+    const numAmt = Number(amount) || 0;
+    const usdAmount = trfCur === 'COP' ? Math.round((numAmt / rate) * 100) / 100 : Math.round(numAmt * 100) / 100;
+    const txDate = date || new Date().toISOString().split('T')[0];
+
+    const nowTs = Date.now();
+    const outTx = {
+      id: `tx-trf-out-${nowTs}`,
+      title: `Transferencia a ${toAcc.name}`,
+      amount: usdAmount,
+      originalAmount: numAmt,
+      currency: trfCur,
+      type: 'expense',
+      category: 'Transferencias & Cambio',
+      accountId: fromAccountId,
+      date: txDate,
+      notes: notes || `Transferencia enviada hacia ${toAcc.name}`,
+      userId: currentUser.id,
+      isAntExpense: false,
+    };
+
+    const inTx = {
+      id: `tx-trf-in-${nowTs + 1}`,
+      title: `Transferencia desde ${fromAcc.name}`,
+      amount: usdAmount,
+      originalAmount: numAmt,
+      currency: trfCur,
+      type: 'income',
+      category: 'Transferencias & Cambio',
+      accountId: toAccountId,
+      date: txDate,
+      notes: notes || `Transferencia recibida desde ${fromAcc.name}`,
+      userId: currentUser.id,
+      isAntExpense: false,
+    };
+
+    setTransactions((prev) => [outTx, inTx, ...prev]);
+
+    setAccounts((prevAccs) =>
+      prevAccs.map((acc) => {
+        if (acc.id === fromAccountId) {
+          const delta = calcDelta(acc, outTx);
+          const nextBal = acc.balance + delta;
+          return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
+        }
+        if (acc.id === toAccountId) {
+          const delta = calcDelta(acc, inTx);
+          const nextBal = acc.balance + delta;
+          return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
+        }
+        return acc;
+      })
+    );
+
+    await api.createTransfer({
+      fromAccountId,
+      toAccountId,
+      amount: numAmt,
+      currency: trfCur,
+      date: txDate,
+      notes,
+      userId: currentUser.id,
+    });
+
+    showToast(`Transferencia realizada: ${fromAcc.name} ➔ ${toAcc.name}`);
+  };
+
   // Automatic execution of active subscriptions / fixed expenses on billing dates
   const handleExecuteDueSubscriptions = useCallback(
     async (subsToProcess, accsToProcess, txsToProcess, forceManual = false) => {
@@ -421,11 +494,19 @@ export function App() {
 
   const handleOpenEditTransaction = useCallback((tx) => {
     setEditingTransaction(tx);
+    setModalInitialType(null);
     setIsTransactionModalOpen(true);
   }, []);
 
   const handleOpenNewTransaction = useCallback(() => {
     setEditingTransaction(null);
+    setModalInitialType(null);
+    setIsTransactionModalOpen(true);
+  }, []);
+
+  const handleOpenTransfer = useCallback(() => {
+    setEditingTransaction(null);
+    setModalInitialType('transfer');
     setIsTransactionModalOpen(true);
   }, []);
 
@@ -525,6 +606,7 @@ export function App() {
               exchangeRate={exchangeRate}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
               onOpenNewTransaction={handleOpenNewTransaction}
+              onOpenTransfer={handleOpenTransfer}
               onEditTransaction={handleOpenEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               selectedAccountId={selectedAccountId}
@@ -632,13 +714,16 @@ export function App() {
         onClose={() => {
           setIsTransactionModalOpen(false);
           setEditingTransaction(null);
+          setModalInitialType(null);
         }}
         accounts={accounts}
         currency={currency}
         exchangeRate={exchangeRate}
         onSaveTransaction={handleSaveTransaction}
+        onSaveTransfer={handleSaveTransfer}
         onDeleteTransaction={handleDeleteTransaction}
         editingTransaction={editingTransaction}
+        initialType={modalInitialType}
       />
 
       {/* Create Account Modal */}

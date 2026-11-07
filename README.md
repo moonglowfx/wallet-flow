@@ -25,21 +25,30 @@ Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la e
    - Resumen visual con gráficos fluidos en SVG (Curvas Bezier de Ingresos vs. Gastos y Anillo Donut de distribución por categoría).
    - Feed de movimientos con filtro rápido (Todos, Ingresos, Gastos, Gastos Hormiga).
 
-4. **Gestión de Cuentas y Transacciones:**
+4. **Gestión de Cuentas, Transferencias y Reordenamiento:**
    - Soporte para **Efectivo**, **Cuentas Bancarias (Débito/Ahorro con tasas de rendimiento)** y **Tarjetas de Crédito (con límite y uso)**.
-   - Modal de registro rápido para **Entrada / Salida** con asignación obligatoria a cuenta, categoría, fecha, notas y divisa.
-   - Actualización atómica en tiempo real del saldo de cada cuenta al registrar un movimiento.
+   - **Transferencias entre Cuentas:** Módulo especializado para mover fondos entre cuentas con conversión multi-divisa automática en tiempo real (USD ⇄ COP) y actualización atómica del saldo de ambas cuentas.
+   - **Reordenamiento Manual de Cuentas:** Reorganiza tus cuentas manualmente con Drag & Drop o flechas interactivas (`ChevronLeft` / `ChevronRight`); el orden se almacena de forma persistente en SQLite / Turso.
+   - Modal de registro rápido para **Gasto / Ingreso / Transferir** con asignación obligatoria a cuenta, categoría, fecha, notas y divisa.
+   - **1-Touch Edit & Delete:** Acceso directo a edición y borrado en un toque en el Libro Mayor y Movimientos por Mes.
 
-5. **Gastos Fijos y Suscripciones:**
+5. **Base de Datos Persistente & Respaldos (SQLite & Turso):**
+   - **Persistencia Robusta:** La base de datos es estrictamente no destructiva. No se eliminan ni sobreescriben datos en reinicios del servidor o despliegues.
+   - **Compatibilidad Dual:** Funciona localmente en SQLite (`wallet_flow.db`) o en la nube mediante **Turso (libSQL)** con réplica embebida o conexión remota.
+   - **Respaldos Automáticos y a Demanda:**
+     - `npm run db:backup`: Genera una copia binaria timestamped `.db` y un snapshot JSON completo con metadata.
+     - `npm run db:restore`: Restaura la base de datos completa desde el snapshot JSON más reciente.
+
+6. **Gastos Fijos y Suscripciones:**
    - Panel de control de pasivos recurrentes (renta, gimnasio, streaming, seguros).
    - Cálculo automático de impacto mensual y proyección anualizada.
    - Interruptor de estado activo/pausado y categorización de esencialidad.
 
-6. **Gestor de Deudas y Abonos:**
+7. **Gestor de Deudas y Abonos:**
    - Amortización progresiva de créditos automotrices, préstamos personales y tarjetas.
    - Registro de **abonos a capital** con selector de cuenta de origen, fecha, notas y barras de progreso hacia la liquidación total.
 
-7. **Aura AI — Smart Financial Advisor:**
+8. **Aura AI — Smart Financial Advisor:**
    - Diagnóstico algorítmico de fugas ("Qué estás haciendo mal": detección de gastos hormiga y sobreutilización de crédito).
    - Simulador interactivo predictivo con slider de ahorro y cálculo con interés compuesto.
    - Auditoría matemática bajo la **Regla 50 / 30 / 20** y plan de acción escalonado (Método Avalancha).
@@ -71,10 +80,16 @@ npm install
 # 3. Iniciar entorno de desarrollo
 npm run dev
 
-# 4. Iniciar servidor SQLite local (opcional para API REST)
+# 4. Iniciar servidor SQLite / Turso local
 npm run server
 
-# 5. Compilar para producción
+# 5. Generar backup de la base de datos (binario + snapshot JSON)
+npm run db:backup
+
+# 6. Restaurar base de datos desde el snapshot JSON más reciente
+npm run db:restore
+
+# 7. Compilar para producción
 npm run build
 ```
 

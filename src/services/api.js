@@ -94,6 +94,23 @@ export const api = {
     );
   },
 
+  async reorderAccounts(accountIds = [], userId = 'munboi') {
+    return await sqliteFetch(`${API_BASE}/accounts/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountIds, userId }),
+    });
+  },
+
+  // Transfers between accounts
+  async createTransfer(transferData, userId = 'munboi') {
+    return await sqliteFetch(`${API_BASE}/transfers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...transferData, userId }),
+    });
+  },
+
   // Transactions
   async getTransactions(userId = 'munboi') {
     const data = await sqliteFetch(`${API_BASE}/transactions?userId=${encodeURIComponent(userId)}`);
@@ -236,5 +253,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
     });
+  },
+
+  // Database Backup & Persistence Info
+  async backupDatabase() {
+    return await sqliteFetch(`${API_BASE}/database/backup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async getDatabaseInfo() {
+    return await sqliteFetch(`${API_BASE}/database/info`);
   },
 };

@@ -11,21 +11,49 @@ import {
 dotenv.config();
 
 const defaultLocalUrl = process.env.VERCEL ? 'file:/tmp/wallet_flow.db' : 'file:wallet_flow.db';
-const url =
+const rawUrl =
   process.env.TURSO_DATABASE_URL ||
   process.env.DATABASE_URL ||
-  process.env.LIBSQL_CLIENT_URL ||
-  defaultLocalUrl;
+  process.env.LIBSQL_CLIENT_URL;
+
 const authToken =
   process.env.TURSO_AUTH_TOKEN ||
   process.env.DATABASE_AUTH_TOKEN ||
   process.env.LIBSQL_CLIENT_AUTH_TOKEN ||
   undefined;
 
-export const db = createClient({
-  url,
-  authToken,
-});
+// Determine connection strategy: Turso Cloud, Embedded Replica (local SQLite + Turso sync), or Local SQLite
+const isRemoteTurso = Boolean(
+  rawUrl && (rawUrl.startsWith('libsql://') || rawUrl.startsWith('https://'))
+);
+
+let clientConfig = {};
+if (isRemoteTurso) {
+  if (process.env.TURSO_EMBEDDED_REPLICA === 'true') {
+    clientConfig = {
+      url: 'file:wallet_flow.db',
+      syncUrl: rawUrl,
+      authToken,
+      syncInterval: 60000,
+    };
+    console.log('🔗 Turso: Conectado en modo réplica embebida (SQLite local + Turso Cloud sync)');
+  } else {
+    clientConfig = {
+      url: rawUrl,
+      authToken,
+    };
+    console.log(`🔗 Turso: Conectado directamente a base de datos en la nube (${rawUrl})`);
+  }
+} else {
+  const localUrl = rawUrl || defaultLocalUrl;
+  clientConfig = {
+    url: localUrl,
+    authToken,
+  };
+  console.log(`💾 SQLite: Conectado a archivo persistente (${localUrl})`);
+}
+
+export const db = createClient(clientConfig);
 
 const DEFAULT_USERS = [
   {
@@ -54,11 +82,26 @@ const DEFAULT_USERS = [
 
 let initPromise = null;
 
+/**
+ * Inicializador estrictamente no destructivo e idempotente de la base de datos.
+ * Crea tablas e índices si no existen y PRESERVA el 100% de los datos preexistentes.
+ * NUNCA elimina ni sobreescribe registros de usuarios en reinicios o despliegues.
+ */
 export async function initDatabase() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    // 1. Users & Session State tables in SQLite
+    // 0. Si se usa réplica embebida de Turso, sincronizar antes de consultar
+    if (typeof db.sync === 'function' && clientConfig.syncUrl) {
+      try {
+        await db.sync();
+        console.log('🔄 Turso: Réplica local sincronizada con la nube.');
+      } catch (syncErr) {
+        console.warn('⚠️ Turso sync warning (offline o primer inicio):', syncErr.message);
+      }
+    }
+
+    // 1. Users & Session State tables
     await db.execute(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -140,11 +183,6 @@ export async function initDatabase() {
       );
     `);
 
-    // Ensure autoCharge column exists if migrated from earlier schema
-    try {
-      await db.execute('ALTER TABLE subscriptions ADD COLUMN autoCharge INTEGER DEFAULT 1;');
-    } catch (_) {}
-
     await db.execute(`
       CREATE TABLE IF NOT EXISTS debts (
         id TEXT PRIMARY KEY,
@@ -177,7 +215,7 @@ export async function initDatabase() {
       );
     `);
 
-    // Ensure userId and currency columns exist for older DB files without losing data
+    // 3. Garantizar columnas no disruptivas de compatibilidad
     const tables = ['accounts', 'transactions', 'subscriptions', 'debts', 'debt_payments'];
     for (const t of tables) {
       try {
@@ -190,22 +228,68 @@ export async function initDatabase() {
     try {
       await db.execute(`ALTER TABLE transactions ADD COLUMN originalAmount REAL`);
     } catch (_) {}
+    try {
+      await db.execute(`ALTER TABLE subscriptions ADD COLUMN autoCharge INTEGER DEFAULT 1`);
+    } catch (_) {}
 
-    // Remove any obsolete extra users that are not 'munboi' or 'tiago'
-    await db.execute("DELETE FROM users WHERE id NOT IN ('munboi', 'tiago')");
-    // Update default exchangeRate to 3200 if it was still on old default 4150
-    await db.execute("UPDATE users SET exchangeRate = 3200 WHERE exchangeRate = 4150 OR exchangeRate IS NULL");
-    // Ensure Bancolombia account has native COP currency & exact COP balance if still on legacy USD 7.98
-    await db.execute("UPDATE accounts SET currency = 'COP', balance = 25536 WHERE id = 'acc-bancolombia' AND balance = 7.98");
-
-    // Create indexes for fast queries by userId and date
+    // 4. Crear índices para rendimiento
     await db.execute('CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(userId)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(userId, date DESC)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(userId)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_debts_user ON debts(userId)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_debt_payments_user ON debt_payments(userId)');
 
-    // Seed default users if not present
+    // 5. Garantizar active_user_id en app_state
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO app_state (key, value) VALUES ('active_user_id', 'munboi')`,
+      args: [],
+    });
+
+    // 6. Verificar si ya existen datos en la base de datos
+    const [initStateRes, accountsCountRes] = await Promise.all([
+      db.execute("SELECT value FROM app_state WHERE key = 'db_initialized'"),
+      db.execute("SELECT COUNT(*) as c FROM accounts"),
+    ]);
+
+    const isInitialized = initStateRes.rows[0]?.value === 'true';
+    const totalAccounts = Number(accountsCountRes.rows[0]?.c || 0);
+
+    // REGLA DE ORO DE PERSISTENCIA: Si ya hay cuentas o el estado marca inicializado,
+    // NO ELIMINAR NINGÚN DATO, NO SOBREESCRIBIR Y NO RE-SEMBRAR.
+    if (isInitialized || totalAccounts > 0) {
+      // Registrar usuarios por defecto si faltaran, pero sin tocar nada preexistente
+      for (const u of DEFAULT_USERS) {
+        await db.execute({
+          sql: `INSERT OR IGNORE INTO users (id, username, displayName, pin, role, avatarGradient, description, currency, exchangeRate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            u.id,
+            u.username,
+            u.displayName,
+            u.pin,
+            u.role,
+            u.avatarGradient,
+            u.description,
+            u.currency,
+            u.exchangeRate,
+          ],
+        });
+      }
+
+      await db.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('db_initialized', 'true')"
+      );
+
+      console.log(
+        `✅ Base de datos persistente verificada: ${totalAccounts} cuentas preservadas intactas en ${
+          isRemoteTurso ? 'Turso Cloud' : 'SQLite local'
+        }.`
+      );
+      return;
+    }
+
+    // 7. Únicamente si la base de datos está 100% vacía (primera vez absoluta):
+    console.log('🌱 Primera ejecución: sembrando base de datos limpia por única vez...');
     for (const u of DEFAULT_USERS) {
       await db.execute({
         sql: `INSERT OR IGNORE INTO users (id, username, displayName, pin, role, avatarGradient, description, currency, exchangeRate)
@@ -224,41 +308,11 @@ export async function initDatabase() {
       });
     }
 
-    // Ensure active_user_id exists in app_state
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO app_state (key, value) VALUES ('active_user_id', 'munboi')`,
-      args: [],
-    });
-
-    // Verify Munboi's real data in SQLite; auto-seed if empty or incomplete
-    const munboiCountRes = await db.execute(
-      "SELECT COUNT(*) as c FROM transactions WHERE userId = 'munboi'"
-    );
-    const munboiAccRes = await db.execute(
-      "SELECT COUNT(*) as c FROM accounts WHERE userId = 'munboi' AND id = 'acc-bofa-checking'"
-    );
-    const munboiTxCount = Number(munboiCountRes.rows[0]?.c || 0);
-    const hasBofa = Number(munboiAccRes.rows[0]?.c || 0) > 0;
-
-    if (munboiTxCount < 700 || !hasBofa) {
-      await seedUserData('munboi');
-    }
-
-    // Clean any legacy dummy Tiago records if present
+    await seedUserData('munboi');
     await db.execute(
-      "DELETE FROM accounts WHERE userId = 'tiago' AND id LIKE 'acc-tiago-%'"
+      "INSERT OR REPLACE INTO app_state (key, value) VALUES ('db_initialized', 'true')"
     );
-    await db.execute(
-      "DELETE FROM transactions WHERE userId = 'tiago' AND (id LIKE 'tx-tg-%' OR id = 'tx-01')"
-    );
-    await db.execute(
-      "DELETE FROM subscriptions WHERE userId = 'tiago' AND id LIKE 'sub-tg-%'"
-    );
-    await db.execute(
-      "DELETE FROM debts WHERE userId = 'tiago' AND id LIKE 'debt-tg-%'"
-    );
-
-    console.log('✅ SQLite: Base de datos verificada y sincronizada (wallet_flow.db).');
+    console.log('✅ Siembra inicial completada exitosamente.');
   })();
 
   return initPromise;
@@ -273,7 +327,7 @@ export async function clearDatabase(userId = null) {
       { sql: 'DELETE FROM transactions WHERE userId = ?', args: [userId] },
       { sql: 'DELETE FROM accounts WHERE userId = ?', args: [userId] },
     ]);
-    console.log(`🧹 SQLite: Datos del usuario '${userId}' limpiados.`);
+    console.log(`🧹 SQLite/Turso: Datos del usuario '${userId}' limpiados.`);
   } else {
     await db.batch([
       'DELETE FROM debt_payments',
@@ -282,7 +336,7 @@ export async function clearDatabase(userId = null) {
       'DELETE FROM transactions',
       'DELETE FROM accounts',
     ]);
-    console.log('🧹 SQLite: Base de datos limpiada por completo.');
+    console.log('🧹 SQLite/Turso: Base de datos limpiada por completo.');
   }
 }
 
@@ -340,8 +394,8 @@ export async function seedUserData(userId = 'munboi') {
 
   for (const sub of INITIAL_SUBSCRIPTIONS) {
     statements.push({
-      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, autoCharge, userId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         sub.id,
         sub.name,
@@ -353,6 +407,7 @@ export async function seedUserData(userId = 'munboi') {
         sub.active ? 1 : 0,
         sub.essential ? 1 : 0,
         sub.badgeColor || '#A855F7',
+        sub.autoCharge !== 0 ? 1 : 0,
         userId,
       ],
     });
@@ -397,11 +452,23 @@ export async function seedUserData(userId = 'munboi') {
     }
   }
 
-  if (statements.length > 0) {
-    await db.batch(statements);
+  // Ejecución en lotes seguros
+  const CHUNK_SIZE = 100;
+  for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
+    const chunk = statements.slice(i, i + CHUNK_SIZE);
+    await db.batch(chunk);
   }
 }
 
 export async function seedDemoData() {
   await seedUserData('munboi');
+}
+
+export function getDatabaseConnectionInfo() {
+  return {
+    isRemoteTurso,
+    clientUrl: clientConfig.url,
+    syncUrl: clientConfig.syncUrl || null,
+    hasAuthToken: Boolean(clientConfig.authToken),
+  };
 }

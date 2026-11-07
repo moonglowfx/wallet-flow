@@ -24,6 +24,7 @@ import {
   Banknote,
   Building2,
   X,
+  ShieldCheck,
 } from 'lucide-react';
 import { getUserPin, setUserPin, setUserProfile } from '../data/users.js';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
@@ -159,14 +160,20 @@ export const SettingsView = ({
     if (!editingAccount) return;
 
     let editedObj = null;
+    const parsedBal = accBalance === '' ? 0 : parseFloat(accBalance);
+    const validBal = Number.isFinite(parsedBal) ? parsedBal : 0;
+    const parsedLim = parseFloat(accLimit);
+    const validLim = Number.isFinite(parsedLim) ? parsedLim : editingAccount.creditLimit;
+
     const updated = accounts.map((a) => {
       if (a.id === editingAccount.id) {
+        const cur = a.currency || 'USD';
         editedObj = {
           ...a,
           name: accName.trim() || a.name,
           institution: accInstitution.trim() || a.institution,
-          balance: parseFloat(accBalance) || 0,
-          creditLimit: a.type === 'credit' ? parseFloat(accLimit) || a.creditLimit : undefined,
+          balance: cur === 'COP' ? Math.round(validBal) : Math.round(validBal * 100) / 100,
+          creditLimit: a.type === 'credit' ? validLim : undefined,
           accountNumber: accNumber.trim() || a.accountNumber,
         };
         return editedObj;
@@ -926,11 +933,30 @@ export const SettingsView = ({
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await api.backupDatabase();
+                    if (res && res.success) {
+                      if (showToast) showToast('Backup de base de datos generado con éxito');
+                    } else {
+                      handleExportBackup();
+                    }
+                  } catch (_) {
+                    handleExportBackup();
+                  }
+                }}
+                className="liquid-button-primary px-4 py-2.5 text-xs font-bold flex items-center gap-2 cursor-pointer shadow-neon-purple active:scale-95"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Generar Backup SQLite / Turso</span>
+              </button>
+              <button
                 onClick={handleExportBackup}
                 className="liquid-pill px-4 py-2.5 text-xs font-bold text-purple-200 hover:text-white flex items-center gap-2 cursor-pointer border-purple-500/40"
               >
                 <Download className="w-4 h-4 text-purple-400" />
-                <span>Exportar Respaldo JSON</span>
+                <span>Descargar Respaldo JSON</span>
               </button>
             </div>
           </div>

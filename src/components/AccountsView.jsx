@@ -19,6 +19,10 @@ import {
   Trash2,
   X,
   ArrowLeft,
+  ArrowRightLeft,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
 } from 'lucide-react';
 import {
   formatCurrency,
@@ -44,6 +48,7 @@ export const AccountsView = ({
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewAccount,
   onOpenNewTransaction,
+  onOpenTransfer,
   onEditTransaction,
   onDeleteTransaction,
   selectedAccountId,
@@ -106,6 +111,57 @@ export const AccountsView = ({
     }
     setEditingAccount(null);
     if (showToast) showToast('Cuenta actualizada en SQLite');
+  };
+
+  const [draggedAccountId, setDraggedAccountId] = useState(null);
+
+  const persistAccountOrder = async (newAccs) => {
+    if (!setAccounts) return;
+    setAccounts(newAccs);
+    const orderIds = newAccs.map((a) => a.id);
+    await api.reorderAccounts(orderIds, currentUser?.id || 'munboi');
+    if (showToast) showToast('Orden de cuentas guardado');
+  };
+
+  const handleMoveAccount = (accountId, direction, e) => {
+    if (e) e.stopPropagation();
+    const currentIndex = accounts.findIndex((a) => a.id === accountId);
+    if (currentIndex === -1) return;
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= accounts.length) return;
+
+    const newAccounts = [...accounts];
+    const [moved] = newAccounts.splice(currentIndex, 1);
+    newAccounts.splice(targetIndex, 0, moved);
+
+    persistAccountOrder(newAccounts);
+  };
+
+  const handleDragStart = (e, accountId) => {
+    setDraggedAccountId(accountId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', accountId);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetAccountId) => {
+    e.preventDefault();
+    if (!draggedAccountId || draggedAccountId === targetAccountId) return;
+
+    const fromIndex = accounts.findIndex((a) => a.id === draggedAccountId);
+    const toIndex = accounts.findIndex((a) => a.id === targetAccountId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const newAccounts = [...accounts];
+    const [moved] = newAccounts.splice(fromIndex, 1);
+    newAccounts.splice(toIndex, 0, moved);
+
+    setDraggedAccountId(null);
+    persistAccountOrder(newAccounts);
   };
 
   // Dynamic transactions filtered in real time by the active global timeframe and year
@@ -194,6 +250,16 @@ export const AccountsView = ({
         </div>
 
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+          {onOpenTransfer && (
+            <button
+              onClick={onOpenTransfer}
+              className="liquid-pill px-4 py-2.5 text-xs font-semibold text-purple-200 hover:text-white flex items-center justify-center gap-2 border-purple-500/40 hover:bg-purple-600/20 transition-all cursor-pointer"
+              title="Transferir fondos entre cuentas con conversión de divisa"
+            >
+              <ArrowRightLeft className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>Transferir Fondos</span>
+            </button>
+          )}
           <button
             onClick={onOpenNewAccount}
             className="liquid-pill px-4 py-2.5 text-xs font-semibold text-purple-200 hover:text-white flex items-center justify-center gap-2 border-purple-500/40 hover:bg-purple-600/20 transition-all cursor-pointer"
@@ -292,8 +358,14 @@ export const AccountsView = ({
             return (
               <div
                 key={acc.id}
+                draggable={!activeAccountId}
+                onDragStart={(e) => handleDragStart(e, acc.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, acc.id)}
                 onClick={() => setActiveAccountId(isSelected ? null : acc.id)}
                 className={`relative p-5 rounded-2xl backdrop-blur-xl border hover-lift animate-card-sheen transition-all duration-300 cursor-pointer overflow-hidden ${
+                  draggedAccountId === acc.id ? 'opacity-40 border-purple-400 border-dashed scale-95' : ''
+                } ${
                   isSelected
                     ? 'bg-purple-900/35 border-purple-400/70 shadow-liquid-purple ring-2 ring-purple-400/50 scale-[1.01]'
                     : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/10 hover:border-purple-500/40 shadow-liquid'
@@ -310,8 +382,8 @@ export const AccountsView = ({
                   }`}
                 />
 
-                <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2.5 mb-3.5 relative z-10">
+                  <div className="flex items-center gap-3 min-w-0 flex-1 pr-1">
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
                         acc.type === 'credit'
@@ -323,7 +395,7 @@ export const AccountsView = ({
                     >
                       <Icon className="w-5 h-5" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-white text-sm tracking-tight truncate">
                         {acc.name}
                       </h3>
@@ -331,12 +403,43 @@ export const AccountsView = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                     <span
                       className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.color}`}
                     >
                       {badge.label}
                     </span>
+
+                    {/* Reordering Controls (Desktop & Mobile) */}
+                    {!activeAccountId && (
+                      <div className="flex items-center gap-0.5 bg-white/5 rounded-lg border border-white/10 p-0.5">
+                        <button
+                          type="button"
+                          disabled={accounts.findIndex((a) => a.id === acc.id) === 0}
+                          onClick={(e) => handleMoveAccount(acc.id, -1, e)}
+                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                          title="Mover cuenta hacia la izquierda / arriba"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <span
+                          className="px-0.5 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing"
+                          title="Arrastrar para ordenar"
+                        >
+                          <GripVertical className="w-3 h-3" />
+                        </span>
+                        <button
+                          type="button"
+                          disabled={accounts.findIndex((a) => a.id === acc.id) === accounts.length - 1}
+                          onClick={(e) => handleMoveAccount(acc.id, 1, e)}
+                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                          title="Mover cuenta hacia la derecha / abajo"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => openEditAccountModal(acc, e)}
@@ -604,22 +707,38 @@ export const AccountsView = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditTransaction && onEditTransaction(tx);
-                      }}
-                      className="liquid-pill px-2.5 py-1 text-[11px] font-semibold text-purple-200 hover:text-white flex items-center gap-1 border-purple-500/30 hover:border-purple-400 cursor-pointer"
-                      title="Editar movimiento"
-                    >
-                      <Edit2 className="w-3 h-3 text-purple-400" />
-                      <span>Editar</span>
-                    </button>
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransaction && onEditTransaction(tx);
+                        }}
+                        className="p-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-400 transition-all cursor-pointer active:scale-95 shadow-sm"
+                        title="Editar movimiento"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      {onDeleteTransaction && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm ? window.confirm(`¿Eliminar movimiento "${tx.title}"?`) : true) {
+                              onDeleteTransaction(tx.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400 transition-all cursor-pointer active:scale-95 shadow-sm"
+                          title="Eliminar movimiento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                     <div className="text-right">
                       <p
-                        className={`text-sm sm:text-base font-bold tracking-tight ${
+                        className={`text-sm sm:text-base font-bold tracking-tight font-mono ${
                           isIncome ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >

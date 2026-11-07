@@ -617,7 +617,7 @@ export const MonthlyExpensesView = ({
                             {isIncome ? '+' : '-'}
                             {tx.currency === 'COP' && currency === 'COP' && tx.originalAmount
                               ? `$${Math.round(tx.originalAmount).toLocaleString('es-CO')} COP`
-                              : formatCurrency(tx.amount, currency, exchangeRate, tx.currency || 'USD')}
+                              : formatCurrency(tx.amount, currency, exchangeRate, true, 'USD')}
                           </span>
                         </div>
                       </div>
