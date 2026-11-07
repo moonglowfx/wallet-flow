@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { USERS, getUserPin, setUserPin } from '../data/users.js';
+import { api } from '../services/api.js';
 
 export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
   const [selectedUser, setSelectedUser] = useState(
@@ -127,8 +128,11 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
       return;
     }
 
-    // Save customized PIN
+    // Save customized PIN in runtime cache + SQLite
     setUserPin(selectedUser.id, newPinInput);
+    api
+      .updateUser(selectedUser.id, { pin: newPinInput })
+      .catch((err) => console.error('Error SQLite updateUser pin:', err));
     setChangeSuccessMessage(`¡PIN de ${selectedUser.username} actualizado correctamente!`);
 
     setTimeout(() => {
@@ -149,7 +153,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
       <div className="pointer-events-none absolute w-96 h-96 rounded-full bg-purple-600/20 blur-[130px] -top-20 -left-20" />
       <div className="pointer-events-none absolute w-96 h-96 rounded-full bg-fuchsia-600/15 blur-[140px] -bottom-20 -right-20" />
 
-      <div className="w-full max-w-md rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-6 sm:p-8 shadow-[0_30px_70px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden text-center space-y-6">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-5 sm:p-8 shadow-[0_30px_70px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative text-center space-y-5 sm:space-y-6">
         {/* Glow */}
         <div className="pointer-events-none absolute -top-16 -right-16 w-44 h-44 rounded-full bg-violet-600/20 blur-3xl" />
 
@@ -325,13 +329,13 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
             </div>
 
             {/* Liquid Glass Numeric Keypad (iOS Style) */}
-            <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto relative z-10">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 max-w-xs mx-auto relative z-10">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
                 <button
                   key={digit}
                   type="button"
                   onClick={() => handleDigitPress(digit.toString())}
-                  className="h-13 rounded-2xl bg-white/[0.05] hover:bg-white/[0.12] active:bg-purple-600/40 border border-white/10 hover:border-purple-500/40 text-xl font-bold text-white transition-all duration-150 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                  className="h-12 sm:h-14 rounded-2xl bg-white/[0.05] hover:bg-white/[0.12] active:bg-purple-600/40 border border-white/10 hover:border-purple-500/40 text-lg sm:text-xl font-bold text-white transition-all duration-150 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
                 >
                   {digit}
                 </button>
@@ -341,7 +345,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
               <button
                 type="button"
                 onClick={handleClear}
-                className="h-13 rounded-2xl bg-white/[0.02] hover:bg-white/[0.08] text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] hover:bg-white/[0.08] text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
               >
                 Limpiar
               </button>
@@ -349,7 +353,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
               <button
                 type="button"
                 onClick={() => handleDigitPress('0')}
-                className="h-13 rounded-2xl bg-white/[0.05] hover:bg-white/[0.12] active:bg-purple-600/40 border border-white/10 hover:border-purple-500/40 text-xl font-bold text-white transition-all duration-150 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                className="h-12 sm:h-14 rounded-2xl bg-white/[0.05] hover:bg-white/[0.12] active:bg-purple-600/40 border border-white/10 hover:border-purple-500/40 text-lg sm:text-xl font-bold text-white transition-all duration-150 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
               >
                 0
               </button>
@@ -358,7 +362,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
                 type="button"
                 onClick={handleBackspace}
                 aria-label="Borrar dígito"
-                className="h-13 rounded-2xl bg-white/[0.02] hover:bg-white/[0.08] active:bg-rose-500/20 text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] hover:bg-white/[0.08] active:bg-rose-500/20 text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
               >
                 <Delete className="w-5 h-5" />
               </button>

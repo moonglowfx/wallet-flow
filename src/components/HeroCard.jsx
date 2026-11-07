@@ -69,17 +69,19 @@ export const HeroCard = ({
   };
 
   return (
-    <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-purple-950/40 via-[#181326]/60 to-[#0F0F13]/90 backdrop-blur-2xl border border-purple-500/30 shadow-[0_25px_60px_rgba(76,29,149,0.35),inset_0_1px_0_0_rgba(255,255,255,0.2)] overflow-hidden">
+    <div className="relative rounded-3xl p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-purple-900/35 via-[#161127]/75 to-[#0C0A14]/90 backdrop-blur-3xl border border-purple-400/35 shadow-[0_28px_70px_-10px_rgba(88,28,135,0.45),inset_0_1px_0_0_rgba(255,255,255,0.28),inset_0_-1px_0_0_rgba(168,85,247,0.15)] overflow-hidden">
+      {/* Top Specular Liquid Glass Edge Highlight */}
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-purple-200/50 to-transparent" />
       {/* Dynamic Liquid Glow Orbs */}
       <div className="pointer-events-none absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-br from-purple-500/25 to-fuchsia-600/20 blur-3xl animate-pulse" />
       <div className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-indigo-600/15 blur-3xl" />
 
       {/* Top Banner Row */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-200 border border-purple-400/30 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />
-            Capital Neto Consolidado
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-5 sm:mb-6">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-purple-500/20 text-purple-200 border border-purple-400/30 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-fuchsia-400 shrink-0" />
+            <span>Capital Neto Consolidado</span>
           </span>
           <span className="text-xs text-zinc-400 hidden sm:inline">
             {TIMEFRAME_CONFIG[timeframe]?.label || 'Periodo Activo'}
@@ -89,31 +91,31 @@ export const HeroCard = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowValues(!showValues)}
-            className="liquid-pill px-3 py-1.5 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
+            className="liquid-pill px-2.5 sm:px-3 py-1.5 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
             title={showValues ? 'Ocultar balances' : 'Mostrar balances'}
           >
             {showValues ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">{showValues ? 'Ocultar' : 'Ver'}</span>
           </button>
-          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
-            <TrendingUp className="w-3 h-3" />
-            <span>{currency === 'USD' ? 'USD Principal' : 'COP Secundaria'}</span>
+          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
+            <TrendingUp className="w-3 h-3 shrink-0" />
+            <span>{currency === 'USD' ? 'USD' : 'COP'}</span>
           </div>
         </div>
       </div>
 
       {/* Central Big Metric: Balance Total Neto */}
-      <div className="relative z-10 mb-8">
+      <div className="relative z-10 mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
-          <div>
-            <p className="text-xs sm:text-sm font-medium uppercase tracking-wider text-purple-200/80 mb-1">
+          <div className="min-w-0">
+            <p className="text-[11px] sm:text-sm font-medium uppercase tracking-wider text-purple-200/80 mb-1">
               Patrimonio Neto Líquido (Activos − Pasivos)
             </p>
-            <div className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white flex items-baseline gap-2">
+            <div className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white flex items-baseline gap-2 break-words">
               <span>{showValues ? formatCurrency(netCapital, currency, exchangeRate) : '••••••••'}</span>
             </div>
             {showValues && (
-              <p className="text-xs sm:text-sm font-semibold text-emerald-300/90 mt-1 flex items-center gap-1.5">
+              <p className="text-xs sm:text-sm font-semibold text-emerald-300/90 mt-1 flex items-center gap-1.5 flex-wrap">
                 <span className="text-zinc-400 font-normal">Equivalente:</span>
                 <span className="font-mono">
                   {formatSecondaryCurrency(netCapital, currency, exchangeRate)}
@@ -122,10 +124,10 @@ export const HeroCard = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
             <button
               onClick={onOpenNewTransaction}
-              className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>+ Registrar Movimiento</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -134,38 +136,40 @@ export const HeroCard = ({
         </div>
 
         {/* Mini stats pill-row */}
-        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="liquid-pill p-2.5">
-            <span className="text-zinc-400 block text-[11px]">Bancos & Ahorro</span>
-            <span className="text-sm font-semibold text-purple-200">
+        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+          <div className="liquid-pill p-2.5 min-w-0">
+            <span className="text-zinc-400 block text-[11px] truncate">Bancos & Ahorro</span>
+            <span className="text-xs sm:text-sm font-semibold text-purple-200 block truncate">
               {showValues ? formatCurrency(bankDeposits, currency, exchangeRate) : '••••'}
             </span>
           </div>
-          <div className="liquid-pill p-2.5">
-            <span className="text-zinc-400 block text-[11px]">Efectivo Líquido</span>
-            <span className="text-sm font-semibold text-emerald-300">
+          <div className="liquid-pill p-2.5 min-w-0">
+            <span className="text-zinc-400 block text-[11px] truncate">Efectivo Líquido</span>
+            <span className="text-xs sm:text-sm font-semibold text-emerald-300 block truncate">
               {showValues ? formatCurrency(liquidCash, currency, exchangeRate) : '••••'}
             </span>
           </div>
-          <div className="liquid-pill p-2.5">
-            <span className="text-zinc-400 block text-[11px]">Deuda en TDC</span>
-            <span className="text-sm font-semibold text-rose-300">
+          <div className="liquid-pill p-2.5 min-w-0">
+            <span className="text-zinc-400 block text-[11px] truncate">Deuda en TDC</span>
+            <span className="text-xs sm:text-sm font-semibold text-rose-300 block truncate">
               {showValues ? formatCurrency(creditDebt, currency, exchangeRate) : '••••'}
             </span>
           </div>
-          <div className="liquid-pill p-2.5">
-            <span className="text-zinc-400 block text-[11px]">Apalancamiento</span>
-            <span className="text-sm font-semibold text-amber-300">{leveragePercent}% del activo</span>
+          <div className="liquid-pill p-2.5 min-w-0">
+            <span className="text-zinc-400 block text-[11px] truncate">Apalancamiento</span>
+            <span className="text-xs sm:text-sm font-semibold text-amber-300 block truncate">
+              {leveragePercent}% del activo
+            </span>
           </div>
         </div>
       </div>
 
       {/* DESGLOSE VISUAL SECCIONADO POR CUENTAS */}
       <div className="relative z-10 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-1.5">
           <h2 className="text-xs font-bold uppercase tracking-wider text-purple-200/90 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            Desglose Seccionado por Cuentas Activas
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span>Desglose Seccionado por Cuentas Activas</span>
           </h2>
           <span className="text-[11px] text-zinc-400">
             {accounts.length} Cuentas conectadas
@@ -198,7 +202,7 @@ export const HeroCard = ({
                 <div
                   key={acc.id}
                   onClick={() => onSelectAccount && onSelectAccount(acc.id)}
-                  className="group relative p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-purple-400/40 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-liquid-purple"
+                  className="liquid-glass-interactive group relative p-3.5 rounded-2xl cursor-pointer min-w-0"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -236,10 +240,10 @@ export const HeroCard = ({
                     </span>
                   </div>
 
-                  <div className="flex items-baseline justify-between pt-2 border-t border-white/[0.06]">
-                    <span className="text-[11px] text-zinc-400">Balance</span>
+                  <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-white/[0.06]">
+                    <span className="text-[11px] text-zinc-400 shrink-0">Balance</span>
                     <span
-                      className={`text-sm font-bold tracking-tight ${
+                      className={`text-sm font-bold tracking-tight truncate ${
                         isNegative ? 'text-rose-400' : 'text-purple-100'
                       }`}
                     >
@@ -249,9 +253,11 @@ export const HeroCard = ({
 
                   {acc.type === 'credit' && acc.creditLimit && (
                     <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                        <span>Límite {formatCurrency(acc.creditLimit, currency, exchangeRate)}</span>
-                        <span className="text-rose-300 font-medium">
+                      <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400">
+                        <span className="truncate">
+                          Límite {formatCurrency(acc.creditLimit, currency, exchangeRate)}
+                        </span>
+                        <span className="text-rose-300 font-medium shrink-0">
                           {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}% Usado
                         </span>
                       </div>

@@ -98,7 +98,7 @@ export const AccountModal = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-5 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative"
       >
         {/* Glow */}
         <div className="pointer-events-none absolute -top-20 -left-20 w-52 h-52 rounded-full bg-violet-600/25 blur-3xl" />

@@ -1,0 +1,29 @@
+{
+  "name": "Wallet Flow — Liquid Glass Finance",
+  "short_name": "Wallet Flow",
+  "description": "Plataforma de gestión patrimonial y finanzas personales con diseño Liquid Glass y SQLite.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09080E",
+  "theme_color": "#09080E",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

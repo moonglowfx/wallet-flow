@@ -13,7 +13,6 @@ import {
   Percent,
   Calendar,
   AlertCircle,
-  FileSpreadsheet,
   CalendarDays,
   Clock,
 } from 'lucide-react';
@@ -33,7 +32,6 @@ export const AccountsView = ({
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewAccount,
   onOpenNewTransaction,
-  onOpenImportModal,
   selectedAccountId,
   setSelectedAccountId,
 }) => {
@@ -105,47 +103,39 @@ export const AccountsView = ({
   const currentSelectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 sm:space-y-8 pb-6">
       {/* Header with CTA buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-purple-400" />
-            Bóveda de Cuentas y Liquidez
+          <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-purple-400 shrink-0" />
+            <span>Bóveda de Cuentas y Liquidez</span>
           </h2>
           <p className="text-xs text-zinc-400">
             Administración de Efectivo, Cuentas Bancarias y Tarjetas de Crédito
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={onOpenImportModal}
-            className="liquid-pill px-3.5 py-2.5 text-xs font-semibold text-emerald-300 hover:text-white flex items-center gap-1.5 border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
-            title="Importar archivo Excel (.xlsx)"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Importar XLSX</span>
-          </button>
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={onOpenNewAccount}
-            className="liquid-pill px-4 py-2.5 text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-2 border-purple-500/40 hover:bg-purple-600/20 transition-all cursor-pointer"
+            className="liquid-pill px-4 py-2.5 text-xs font-semibold text-purple-200 hover:text-white flex items-center justify-center gap-2 border-purple-500/40 hover:bg-purple-600/20 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-purple-400" />
-            <span>Crear Nueva Cuenta</span>
+            <Plus className="w-4 h-4 text-purple-400 shrink-0" />
+            <span className="truncate">Nueva Cuenta</span>
           </button>
           <button
             onClick={onOpenNewTransaction}
-            className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer"
+            className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 shrink-0" />
             <span>Registrar Movimiento</span>
           </button>
         </div>
       </div>
 
       {/* Account Type Filter Pills */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
         {[
           { id: 'all', label: 'Todas las Cuentas' },
           { id: 'bank', label: 'Cuentas Bancarias (Débito/Ahorro)' },
@@ -157,7 +147,7 @@ export const AccountsView = ({
             <button
               key={tab.id}
               onClick={() => setActiveAccountType(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 isActive
                   ? 'bg-purple-600/35 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
                   : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
@@ -315,15 +305,15 @@ export const AccountsView = ({
       )}
 
       {/* Transactions Ledger Panel with Real-Time Period Synchronization */}
-      <div className="liquid-glass p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+      <div className="liquid-glass p-4 sm:p-6 space-y-4 sm:space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-bold text-white tracking-tight">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
                 Libro Mayor de Movimientos
               </h3>
               {currentSelectedAccount && (
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 truncate max-w-[180px]">
                   {currentSelectedAccount.name}
                 </span>
               )}
@@ -341,12 +331,12 @@ export const AccountsView = ({
           </div>
 
           {/* Scope Selector (Period vs All) & Search Bar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="bg-black/40 p-1 rounded-xl border border-white/10 flex items-center text-xs">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+            <div className="w-full sm:w-auto bg-black/40 p-1 rounded-xl border border-white/10 grid grid-cols-2 sm:flex items-center text-xs">
               <button
                 type="button"
                 onClick={() => setScopeFilter('period')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer text-center ${
                   scopeFilter === 'period'
                     ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
                     : 'text-zinc-400 hover:text-white'
@@ -357,7 +347,7 @@ export const AccountsView = ({
               <button
                 type="button"
                 onClick={() => setScopeFilter('all')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer text-center ${
                   scopeFilter === 'all'
                     ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
                     : 'text-zinc-400 hover:text-white'
@@ -381,16 +371,16 @@ export const AccountsView = ({
         </div>
 
         {/* Period Summary Metric Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 pt-1 text-xs">
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-            <span className="text-zinc-400 text-[11px]">Entradas en este período:</span>
-            <span className="font-bold text-emerald-400 font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-1 text-xs">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-2 min-w-0">
+            <span className="text-zinc-400 text-[11px] truncate">Entradas en este período:</span>
+            <span className="font-bold text-emerald-400 font-mono shrink-0">
               +{formatCurrency(periodIncomeTotal, currency, exchangeRate)}
             </span>
           </div>
-          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
-            <span className="text-zinc-400 text-[11px]">Salidas en este período:</span>
-            <span className="font-bold text-rose-400 font-mono">
+          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between gap-2 min-w-0">
+            <span className="text-zinc-400 text-[11px] truncate">Salidas en este período:</span>
+            <span className="font-bold text-rose-400 font-mono shrink-0">
               -{formatCurrency(periodExpenseTotal, currency, exchangeRate)}
             </span>
           </div>
@@ -420,9 +410,9 @@ export const AccountsView = ({
               return (
                 <div
                   key={tx.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-150"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-150"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
                         isIncome
@@ -437,21 +427,21 @@ export const AccountsView = ({
                       )}
                     </div>
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-white truncate">
                           {tx.title}
                         </span>
                         {tx.isAntExpense && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
                             Hormiga
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-zinc-400 mt-0.5 flex-wrap">
                         <span className="text-purple-300 font-medium">{tx.category}</span>
                         <span>•</span>
-                        <span className="text-zinc-300">{acc?.name || 'Cuenta'}</span>
+                        <span className="text-zinc-300 truncate max-w-[150px] sm:max-w-none">{acc?.name || 'Cuenta'}</span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-zinc-500" />
@@ -461,21 +451,24 @@ export const AccountsView = ({
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <p
-                      className={`text-base font-bold tracking-tight ${
-                        isIncome ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {isIncome
-                        ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
-                        : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
-                    </p>
-                    {tx.notes && (
-                      <p className="text-[11px] text-zinc-500 max-w-[240px] truncate">
-                        {tx.notes}
+                  <div className="flex items-center justify-between sm:justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                    <span className="text-[11px] text-zinc-500 sm:hidden">Importe:</span>
+                    <div className="text-right">
+                      <p
+                        className={`text-sm sm:text-base font-bold tracking-tight ${
+                          isIncome ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {isIncome
+                          ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
+                          : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
                       </p>
-                    )}
+                      {tx.notes && (
+                        <p className="text-[11px] text-zinc-500 max-w-[240px] truncate hidden sm:block">
+                          {tx.notes}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

@@ -25,11 +25,13 @@ import {
   Building2,
   X,
 } from 'lucide-react';
-import { getUserPin, setUserPin } from '../data/users.js';
+import { getUserPin, setUserPin, setUserProfile } from '../data/users.js';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { api } from '../services/api.js';
 
 export const SettingsView = ({
   currentUser,
+  setCurrentUser,
   currency,
   setCurrency,
   exchangeRate,
@@ -110,23 +112,25 @@ export const SettingsView = ({
     }
 
     setUserPin(currentUser.id, newPin);
+    api.updateUser(currentUser.id, { pin: newPin }).catch((err) => console.error('Error SQLite updatePin:', err));
     setPinSuccess('¡Tu PIN de seguridad ha sido actualizado con éxito!');
     setCurrentPin('');
     setNewPin('');
     setConfirmPin('');
-    if (showToast) showToast('PIN actualizado con éxito');
+    if (showToast) showToast('PIN actualizado en la base de datos SQLite');
   };
 
   // ----------------- PROFILE HANDLER -----------------
   const handleSaveProfile = (e) => {
     e.preventDefault();
-    currentUser.displayName = profileName.trim() || currentUser.username;
-    currentUser.role = profileRole.trim() || currentUser.role;
-    localStorage.setItem(
-      `wf_user_${currentUser.id}_profile`,
-      JSON.stringify({ displayName: currentUser.displayName, role: currentUser.role })
-    );
-    if (showToast) showToast('Perfil actualizado correctamente');
+    const displayName = profileName.trim() || currentUser.username;
+    const role = profileRole.trim() || currentUser.role;
+    setUserProfile(currentUser.id, { displayName, role });
+    if (setCurrentUser) {
+      setCurrentUser((prev) => ({ ...prev, displayName, role }));
+    }
+    api.updateUser(currentUser.id, { displayName, role }).catch((err) => console.error('Error SQLite updateProfile:', err));
+    if (showToast) showToast('Perfil actualizado en la base de datos SQLite');
   };
 
   // ----------------- CURRENCY HANDLER -----------------
@@ -135,7 +139,6 @@ export const SettingsView = ({
     const rateNum = parseFloat(customRate);
     if (rateNum && rateNum > 0) {
       setExchangeRate(rateNum);
-      localStorage.setItem('wf_custom_usd_cop_rate', rateNum.toString());
       if (showToast) showToast(`Tipo de cambio guardado: 1 USD = $${rateNum.toLocaleString('es-CO')} COP`);
     }
   };
@@ -154,9 +157,10 @@ export const SettingsView = ({
     e.preventDefault();
     if (!editingAccount) return;
 
+    let editedObj = null;
     const updated = accounts.map((a) => {
       if (a.id === editingAccount.id) {
-        return {
+        editedObj = {
           ...a,
           name: accName.trim() || a.name,
           institution: accInstitution.trim() || a.institution,
@@ -164,12 +168,15 @@ export const SettingsView = ({
           creditLimit: a.type === 'credit' ? parseFloat(accLimit) || a.creditLimit : undefined,
           accountNumber: accNumber.trim() || a.accountNumber,
         };
+        return editedObj;
       }
       return a;
     });
 
     setAccounts(updated);
-    localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(updated));
+    if (editedObj) {
+      api.updateAccount(editedObj.id, editedObj).catch((err) => console.error('Error SQLite updateAccount:', err));
+    }
     setEditingAccount(null);
     if (showToast) showToast('Cuenta modificada correctamente');
   };
@@ -178,8 +185,8 @@ export const SettingsView = ({
     if (window.confirm('¿Estás seguro de eliminar esta cuenta?')) {
       const updated = accounts.filter((a) => a.id !== accId);
       setAccounts(updated);
-      localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(updated));
-      if (showToast) showToast('Cuenta eliminada');
+      api.deleteAccount(accId).catch((err) => console.error('Error SQLite deleteAccount:', err));
+      if (showToast) showToast('Cuenta eliminada de SQLite');
     }
   };
 
@@ -196,30 +203,34 @@ export const SettingsView = ({
     e.preventDefault();
     if (!editingSub) return;
 
+    let editedSub = null;
     const updated = subscriptions.map((s) => {
       if (s.id === editingSub.id) {
-        return {
+        editedSub = {
           ...s,
           name: subName.trim() || s.name,
           category: subCategory.trim() || s.category,
           amount: parseFloat(subAmount) || 0,
           billingDay: parseInt(subBillingDay, 10) || s.billingDay,
         };
+        return editedSub;
       }
       return s;
     });
 
     setSubscriptions(updated);
-    localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(updated));
+    if (editedSub) {
+      api.updateSubscription(editedSub.id, editedSub).catch((err) => console.error('Error SQLite updateSub:', err));
+    }
     setEditingSub(null);
-    if (showToast) showToast('Suscripción actualizada');
+    if (showToast) showToast('Suscripción actualizada en SQLite');
   };
 
   const handleDeleteSub = (subId) => {
     if (window.confirm('¿Eliminar esta suscripción?')) {
       const updated = subscriptions.filter((s) => s.id !== subId);
       setSubscriptions(updated);
-      localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(updated));
+      api.deleteSubscription(subId).catch((err) => console.error('Error SQLite deleteSub:', err));
       if (showToast) showToast('Suscripción eliminada');
     }
   };
@@ -239,9 +250,10 @@ export const SettingsView = ({
     e.preventDefault();
     if (!editingDebt) return;
 
+    let editedDebt = null;
     const updated = debts.map((d) => {
       if (d.id === editingDebt.id) {
-        return {
+        editedDebt = {
           ...d,
           title: debtTitle.trim() || d.title,
           counterparty: debtCounterparty.trim() || d.counterparty,
@@ -250,21 +262,24 @@ export const SettingsView = ({
           interestRate: parseFloat(debtInterest) || 0,
           dueDate: debtDueDate || d.dueDate,
         };
+        return editedDebt;
       }
       return d;
     });
 
     setDebts(updated);
-    localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(updated));
+    if (editedDebt) {
+      api.updateDebt(editedDebt.id, editedDebt).catch((err) => console.error('Error SQLite updateDebt:', err));
+    }
     setEditingDebt(null);
-    if (showToast) showToast('Deuda actualizada');
+    if (showToast) showToast('Deuda actualizada en SQLite');
   };
 
   const handleDeleteDebt = (debtId) => {
     if (window.confirm('¿Eliminar este registro de deuda?')) {
       const updated = debts.filter((d) => d.id !== debtId);
       setDebts(updated);
-      localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(updated));
+      api.deleteDebt(debtId).catch((err) => console.error('Error SQLite deleteDebt:', err));
       if (showToast) showToast('Deuda eliminada');
     }
   };
@@ -297,71 +312,64 @@ export const SettingsView = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = JSON.parse(event.target.result);
-        if (data.accounts && Array.isArray(data.accounts)) {
-          setAccounts(data.accounts);
-          localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(data.accounts));
-        }
-        if (data.transactions && Array.isArray(data.transactions)) {
-          setTransactions(data.transactions);
-          localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(data.transactions));
-        }
-        if (data.subscriptions && Array.isArray(data.subscriptions)) {
-          setSubscriptions(data.subscriptions);
-          localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(data.subscriptions));
-        }
-        if (data.debts && Array.isArray(data.debts)) {
-          setDebts(data.debts);
-          localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(data.debts));
-        }
-        if (data.currency) {
-          setCurrency(data.currency);
-          localStorage.setItem(`wf_user_${currentUser.id}_currency`, data.currency);
-        }
-        if (showToast) showToast('Respaldo restaurado con éxito');
+        await api.clearUserData(currentUser.id);
+        await api.bulkImport({
+          userId: currentUser.id,
+          accounts: data.accounts || [],
+          transactions: data.transactions || [],
+          subscriptions: data.subscriptions || [],
+          debts: data.debts || [],
+        });
+
+        if (data.accounts && Array.isArray(data.accounts)) setAccounts(data.accounts);
+        if (data.transactions && Array.isArray(data.transactions)) setTransactions(data.transactions);
+        if (data.subscriptions && Array.isArray(data.subscriptions)) setSubscriptions(data.subscriptions);
+        if (data.debts && Array.isArray(data.debts)) setDebts(data.debts);
+        if (data.currency) setCurrency(data.currency);
+        if (data.exchangeRate) setExchangeRate(data.exchangeRate);
+
+        if (showToast) showToast('Respaldo restaurado en la base de datos SQLite');
       } catch (err) {
-        alert('Error al leer el archivo de respaldo: ' + err.message);
+        alert('Error al leer o restaurar el archivo de respaldo: ' + err.message);
       }
     };
     reader.readAsText(file);
   };
 
-  const handleClearAllUserData = () => {
+  const handleClearAllUserData = async () => {
     if (
       window.confirm(
-        `¿Confirmas que deseas BORRAR TODOS los movimientos, cuentas y deudas de ${currentUser.username}? Esta acción dejará tu cuenta en 0.`
+        `¿Confirmas que deseas BORRAR TODOS los movimientos, cuentas y deudas de ${currentUser.username} en SQLite? Esta acción dejará tu cuenta en 0.`
       )
     ) {
       setAccounts([]);
       setTransactions([]);
       setSubscriptions([]);
       setDebts([]);
-      localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify([]));
-      localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify([]));
-      localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify([]));
-      localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify([]));
-      if (showToast) showToast(`Datos de ${currentUser.username} limpiados a 0`);
+      await api.clearUserData(currentUser.id).catch((err) => console.error('Error SQLite clearUserData:', err));
+      if (showToast) showToast(`Datos de ${currentUser.username} limpiados a 0 en SQLite`);
     }
   };
 
   return (
     <div className="space-y-8 pb-12">
       {/* Header Banner */}
-      <div className="liquid-glass-purple p-6 sm:p-8 space-y-4 relative overflow-hidden">
+      <div className="liquid-glass-purple p-4 sm:p-6 lg:p-8 space-y-4 relative overflow-hidden">
         <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-purple-600/20 blur-3xl" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
-              <Settings className="w-6 h-6 animate-spin-slow" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
+              <Settings className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
             </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
                 Ajustes & Panel de Control Total
               </h2>
               <p className="text-xs text-zinc-300">
-                Personaliza y edita cada aspecto de tu sesión: PIN, perfil, divisas, cuentas, deudas y respaldos
+                Personaliza y edita cada aspecto de tu sesión en SQLite: PIN, perfil, divisas, cuentas, deudas y respaldos
               </p>
             </div>
           </div>
@@ -374,7 +382,7 @@ export const SettingsView = ({
         </div>
 
         {/* Settings Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
+        <div className="flex sm:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold overflow-x-auto pb-1 no-scrollbar">
           {[
             { id: 'seguridad', label: 'Seguridad & PIN', icon: KeyRound },
             { id: 'perfil', label: 'Perfil & Cuenta', icon: User },
@@ -390,13 +398,13 @@ export const SettingsView = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap ${
                   isActive
                     ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
                     : 'text-zinc-400 hover:text-white bg-white/[0.03] border border-transparent'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -563,12 +571,11 @@ export const SettingsView = ({
               <label className="block text-zinc-300 font-semibold mb-2">
                 Moneda Activa de Visualización
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setCurrency('USD');
-                    localStorage.setItem(`wf_user_${currentUser.id}_currency`, 'USD');
                   }}
                   className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
                     currency === 'USD'
@@ -584,7 +591,6 @@ export const SettingsView = ({
                   type="button"
                   onClick={() => {
                     setCurrency('COP');
-                    localStorage.setItem(`wf_user_${currentUser.id}_currency`, 'COP');
                   }}
                   className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
                     currency === 'COP'
@@ -839,17 +845,17 @@ export const SettingsView = ({
         </div>
       )}
 
-      {/* ---------------- TAB 7: DATOS, RESPALDO Y RESET ---------------- */}
+      {/* ---------------- TAB 7: DATOS, RESPALDO Y BASE DE DATOS ---------------- */}
       {activeTab === 'datos' && (
         <div className="space-y-6 max-w-2xl mx-auto">
-          {/* Export & Import Card */}
+          {/* Export Backup Card */}
           <div className="liquid-glass p-6 sm:p-7 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Download className="w-4 h-4 text-purple-400" />
-              Copias de Seguridad (Exportar / Importar JSON)
+              Exportar Copia de Seguridad (JSON)
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Descarga un archivo JSON completo con todas tus cuentas, transacciones, suscripciones y deudas para restaurarlo en cualquier momento o trasladarlo de dispositivo.
+              Descarga un respaldo completo con todas las cuentas, transacciones, suscripciones y deudas almacenadas en la base de datos SQLite de tu perfil.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -860,47 +866,23 @@ export const SettingsView = ({
                 <Download className="w-4 h-4 text-purple-400" />
                 <span>Exportar Respaldo JSON</span>
               </button>
-
-              <label className="liquid-pill px-4 py-2.5 text-xs font-bold text-emerald-300 hover:text-white flex items-center gap-2 cursor-pointer border-emerald-500/40">
-                <Upload className="w-4 h-4 text-emerald-400" />
-                <span>Restaurar Respaldo JSON</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportBackup}
-                  className="hidden"
-                />
-              </label>
             </div>
           </div>
 
-          {/* Reset or Purge Card */}
-          <div className="liquid-glass p-6 sm:p-7 space-y-4 border-rose-500/30">
-            <h3 className="text-base font-bold text-rose-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400" />
-              Zona de Limpieza y Reinicio de Sesión
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Opciones avanzadas para reiniciar tus datos o limpiar completamente el historial de esta cuenta.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={() => onResetUserData && onResetUserData(currentUser.id)}
-                className="liquid-pill px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Restaurar a Datos Originales</span>
-              </button>
-
-              <button
-                onClick={handleClearAllUserData}
-                className="liquid-pill px-4 py-2 text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-500/20 border-rose-500/40 flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Borrar Todo y Empezar en Blanco</span>
-              </button>
+          {/* SQLite Database Integrity Status Card */}
+          <div className="liquid-glass-purple p-6 sm:p-7 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                Estado de la Base de Datos SQLite
+              </h3>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                Sincronización Activa
+              </span>
             </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Tus registros financieros de <strong className="text-white">{currentUser.username}</strong> ({accounts.length} cuentas, {transactions.length} movimientos, {subscriptions.length} gastos fijos y {debts.length} deudas) están protegidos y almacenados de forma permanente en <code className="text-purple-200">wallet_flow.db</code>.
+            </p>
           </div>
         </div>
       )}
@@ -908,7 +890,7 @@ export const SettingsView = ({
       {/* ---------------- EDIT ACCOUNT MODAL ---------------- */}
       {editingAccount && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-6 space-y-4 text-xs">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-5 sm:p-6 space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-base font-bold text-white">Editar Cuenta</h3>
               <button onClick={() => setEditingAccount(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">
@@ -993,7 +975,7 @@ export const SettingsView = ({
       {/* ---------------- EDIT SUBSCRIPTION MODAL ---------------- */}
       {editingSub && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-6 space-y-4 text-xs">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-5 sm:p-6 space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-base font-bold text-white">Editar Suscripción</h3>
               <button onClick={() => setEditingSub(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">
@@ -1068,7 +1050,7 @@ export const SettingsView = ({
       {/* ---------------- EDIT DEBT MODAL ---------------- */}
       {editingDebt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-6 space-y-4 text-xs">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-5 sm:p-6 space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-base font-bold text-white">Editar Deuda</h3>
               <button onClick={() => setEditingDebt(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">

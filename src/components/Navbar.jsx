@@ -2,14 +2,11 @@ import React from 'react';
 import {
   LayoutDashboard,
   Wallet,
-  CalendarClock,
-  HandCoins,
   Sparkles,
   Plus,
   ShieldCheck,
   TrendingUp,
   LogOut,
-  User,
   Settings,
   CalendarDays,
   Layers,
@@ -38,13 +35,13 @@ const NAV_ITEMS = [
   {
     id: 'commitments',
     label: 'Fijos, Suscripciones & Deudas',
-    shortLabel: 'Compromisos',
+    shortLabel: 'Fijos',
     icon: Layers,
   },
   {
     id: 'ai-advisor',
     label: 'Smart AI Advisor',
-    shortLabel: 'IA Advisor',
+    shortLabel: 'IA',
     icon: Sparkles,
     badge: 'IA',
   },
@@ -131,9 +128,9 @@ export const Navbar = ({
                     {isActive && (
                       <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-gradient-to-b from-purple-400 to-fuchsia-500 shadow-[0_0_12px_#a855f7]" />
                     )}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className={`p-2 rounded-lg transition-colors ${
+                        className={`p-2 rounded-lg transition-colors shrink-0 ${
                           isActive
                             ? 'bg-purple-500/30 text-purple-200 border border-purple-400/30'
                             : 'bg-white/[0.03] text-zinc-400 group-hover:text-purple-300'
@@ -141,11 +138,11 @@ export const Navbar = ({
                       >
                         <Icon className="w-4 h-4" />
                       </div>
-                      <span>{item.label}</span>
+                      <span className="truncate">{item.label}</span>
                     </div>
 
                     {item.id === 'ai-advisor' && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500/30 to-fuchsia-500/30 text-purple-200 border border-purple-400/40">
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500/30 to-fuchsia-500/30 text-purple-200 border border-purple-400/40 shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse" />
                         {antExpenseAlertCount} alertas
                       </span>
@@ -201,12 +198,12 @@ export const Navbar = ({
                   +12.8%
                 </span>
               </div>
-              <p className="text-xl font-bold tracking-tight text-white">
+              <p className="text-xl font-bold tracking-tight text-white truncate">
                 {formatCurrency(netWorth, currency, exchangeRate)}
               </p>
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 pt-1 border-t border-white/10">
                 <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span>Sincronizado en tiempo real</span>
+                <span>Base de datos SQLite activa</span>
               </div>
             </div>
           </div>
@@ -217,14 +214,14 @@ export const Navbar = ({
       <button
         onClick={onOpenNewTransaction}
         aria-label="Registrar Entrada o Salida"
-        className="lg:hidden fixed right-4 bottom-24 z-40 liquid-button-primary w-14 h-14 rounded-2xl flex items-center justify-center shadow-neon-purple border border-purple-300/40 cursor-pointer"
+        className="lg:hidden fixed right-3.5 bottom-20 z-40 liquid-button-primary w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-neon-purple border border-purple-300/40 cursor-pointer"
       >
-        <Plus className="w-6 h-6 text-white" />
+        <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
       </button>
 
-      {/* MOBILE iOS FLOATING LIQUID GLASS BOTTOM TAB BAR */}
-      <nav className="lg:hidden fixed bottom-3 inset-x-3 z-40">
-        <div className="bg-[#13111C]/85 backdrop-blur-2xl border border-white/15 rounded-3xl px-2 py-2 shadow-[0_20px_50px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] flex items-center justify-around">
+      {/* MOBILE iOS FLOATING LIQUID GLASS BOTTOM TAB BAR (6 Equal Columns — Zero Overflow) */}
+      <nav className="lg:hidden fixed bottom-2 inset-x-2 z-40">
+        <div className="bg-[#110E1B]/85 backdrop-blur-3xl border border-white/20 rounded-3xl px-1.5 py-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_1px_0_0_rgba(255,255,255,0.28)] grid grid-cols-6 gap-0.5 items-center">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -232,23 +229,23 @@ export const Navbar = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-all duration-300 cursor-pointer ${
+                className={`relative flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl transition-all duration-200 cursor-pointer min-w-0 w-full ${
                   isActive
-                    ? 'bg-purple-600/30 text-purple-200 border border-purple-400/35 shadow-[0_0_20px_rgba(168,85,247,0.35)]'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-gradient-to-b from-purple-500/35 to-fuchsia-600/20 text-white border border-purple-400/45 shadow-[0_4px_16px_rgba(168,85,247,0.35),inset_0_1px_0_0_rgba(255,255,255,0.25)]'
+                    : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
                 }`}
               >
                 <div className="relative">
                   <Icon
-                    className={`w-5 h-5 transition-transform duration-200 ${
-                      isActive ? 'scale-110 text-purple-300' : ''
+                    className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${
+                      isActive ? 'scale-110 text-purple-200' : ''
                     }`}
                   />
                   {item.id === 'ai-advisor' && (
-                    <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-fuchsia-400 ring-2 ring-[#13111C]" />
+                    <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-fuchsia-400 ring-2 ring-[#110E1B]" />
                   )}
                 </div>
-                <span className="text-[10px] font-medium mt-1 tracking-tight">
+                <span className="text-[9.5px] sm:text-[10px] font-semibold mt-1 tracking-tight truncate w-full text-center leading-tight">
                   {item.shortLabel}
                 </span>
               </button>

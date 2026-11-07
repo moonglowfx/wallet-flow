@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1035" />
+      <stop offset="50%" stop-color="#120B20" />
+      <stop offset="100%" stop-color="#09080E" />
+    </linearGradient>
+    <linearGradient id="orb" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="50%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#D946EF" />
+    </linearGradient>
+    <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.06" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#bg)" />
+  <circle cx="390" cy="120" r="160" fill="#A855F7" opacity="0.25" />
+  <circle cx="120" cy="400" r="150" fill="#D946EF" opacity="0.2" />
+  <rect x="76" y="76" width="360" height="360" rx="88" fill="url(#orb)" />
+  <rect x="82" y="82" width="348" height="348" rx="82" fill="none" stroke="url(#glass)" stroke-width="6" />
+  <g transform="translate(136, 136) scale(10)" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+  </g>
+</svg>

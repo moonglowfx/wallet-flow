@@ -20,6 +20,7 @@ import { DebtsView } from './DebtsView.jsx';
 import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG } from '../data/mockData.js';
 
 export const CommitmentsView = ({
+  currentUser,
   subscriptions = [],
   setSubscriptions,
   debts = [],
@@ -69,20 +70,20 @@ export const CommitmentsView = ({
   const periodLabel = timeframe === 'weekly' ? 'Semanal' : timeframe === 'quarterly' ? 'Trimestral' : timeframe === 'yearly' ? 'Anual' : 'Mensual';
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 sm:space-y-8 pb-6">
       {/* Unified Banner */}
-      <div className="liquid-glass-purple p-6 sm:p-8 space-y-6 relative overflow-hidden">
+      <div className="liquid-glass-purple p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 relative overflow-hidden">
         <div className="pointer-events-none absolute -top-24 -right-24 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 left-10 w-48 h-48 rounded-full bg-fuchsia-600/15 blur-3xl" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
-              <Layers className="w-6 h-6 animate-pulse" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 relative z-10">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
+              <Layers className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
                   Compromisos: Fijos, Suscripciones & Deudas
                 </h2>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/40">
@@ -96,15 +97,15 @@ export const CommitmentsView = ({
           </div>
 
           {/* Quick Metrics Pill with Real-time Timeframe Synchronization */}
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-black/40 border border-white/10 text-right">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-full sm:w-auto p-3 rounded-2xl bg-black/40 border border-white/10 text-left sm:text-right">
               <span className="text-[10px] uppercase tracking-wider text-purple-300 block font-semibold">
                 Carga {periodLabel} ({TIMEFRAME_CONFIG[timeframe]?.label || 'Este Mes'})
               </span>
-              <span className="text-xl font-black text-rose-300 font-mono">
+              <span className="text-lg sm:text-xl font-black text-rose-300 font-mono block truncate">
                 {formatCurrency(periodCommitment, currency, exchangeRate)}
               </span>
-              <span className="text-[10px] text-zinc-400 block font-normal">
+              <span className="text-[10px] text-zinc-400 block font-normal truncate">
                 Base: {formatCurrency(totalMonthlyCommitment, currency, exchangeRate)} / mes
               </span>
             </div>
@@ -147,29 +148,29 @@ export const CommitmentsView = ({
         </div>
 
         {/* Sub-tab Navigation */}
-        <div className="flex items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
           <button
             onClick={() => setActiveSubTab('suscripciones')}
-            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-2.5 sm:px-4 sm:py-2 rounded-xl transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
               activeSubTab === 'suscripciones'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
                 : 'text-zinc-400 hover:text-white bg-white/[0.03]'
             }`}
           >
-            <CalendarClock className="w-4 h-4" />
-            <span>1. Gastos Fijos & Suscripciones ({subscriptions.length})</span>
+            <CalendarClock className="w-4 h-4 shrink-0" />
+            <span className="truncate">1. Gastos Fijos & Suscripciones ({subscriptions.length})</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('deudas')}
-            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-2.5 sm:px-4 sm:py-2 rounded-xl transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
               activeSubTab === 'deudas'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
                 : 'text-zinc-400 hover:text-white bg-white/[0.03]'
             }`}
           >
-            <HandCoins className="w-4 h-4" />
-            <span>2. Deudas & Líneas de Crédito ({debts.length})</span>
+            <HandCoins className="w-4 h-4 shrink-0" />
+            <span className="truncate">2. Deudas & Líneas de Crédito ({debts.length})</span>
           </button>
         </div>
       </div>
@@ -182,6 +183,7 @@ export const CommitmentsView = ({
           accounts={accounts}
           currency={currency}
           exchangeRate={exchangeRate}
+          currentUser={currentUser}
         />
       )}
 
@@ -193,6 +195,7 @@ export const CommitmentsView = ({
           currency={currency}
           exchangeRate={exchangeRate}
           onLogPaymentTransaction={onLogPaymentTransaction}
+          currentUser={currentUser}
         />
       )}
     </div>

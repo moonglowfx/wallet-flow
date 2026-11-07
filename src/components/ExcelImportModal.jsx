@@ -68,7 +68,7 @@ export const ExcelImportModal = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
+        className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/35 p-5 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative"
       >
         {/* Ambient glow */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 rounded-full bg-emerald-600/15 blur-3xl" />
@@ -120,7 +120,7 @@ export const ExcelImportModal = ({
         )}
 
         {/* Step 1: Download Template */}
-        <div className="mt-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3 text-xs">
+        <div className="mt-4 p-3.5 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div>
             <p className="font-bold text-white">¿No tienes la estructura de Excel?</p>
             <p className="text-zinc-400 text-[11px] mt-0.5">
@@ -129,7 +129,7 @@ export const ExcelImportModal = ({
           </div>
           <button
             onClick={downloadExcelTemplate}
-            className="liquid-pill px-3.5 py-2 text-xs font-semibold text-emerald-300 hover:text-white border-emerald-500/40 hover:bg-emerald-500/20 flex items-center gap-1.5 shrink-0 cursor-pointer"
+            className="liquid-pill px-3.5 py-2 text-xs font-semibold text-emerald-300 hover:text-white border-emerald-500/40 hover:bg-emerald-500/20 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer w-full sm:w-auto"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Descargar Plantilla (.xlsx)</span>

@@ -12,6 +12,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { api } from '../services/api.js';
 
 export const DebtsView = ({
   debts = [],
@@ -20,6 +21,7 @@ export const DebtsView = ({
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onLogPaymentTransaction,
+  currentUser,
 }) => {
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState(null);
   const [showNewDebtModal, setShowNewDebtModal] = useState(false);
@@ -99,6 +101,10 @@ export const DebtsView = ({
       })
     );
 
+    api
+      .addDebtPayment(selectedDebtForPayment.id, newPayment, currentUser?.id || 'munboi')
+      .catch((err) => console.error('Error SQLite addDebtPayment:', err));
+
     // Also trigger global transaction hook to keep accounts updated
     if (onLogPaymentTransaction) {
       onLogPaymentTransaction({
@@ -146,6 +152,9 @@ export const DebtsView = ({
     };
 
     setDebts([createdDebt, ...debts]);
+    api
+      .createDebt(createdDebt, currentUser?.id || 'munboi')
+      .catch((err) => console.error('Error SQLite createDebt:', err));
     setNewTitle('');
     setNewCounterparty('');
     setNewTotal('');
@@ -176,23 +185,23 @@ export const DebtsView = ({
       </div>
 
       {/* Amortization Progress Banner (Liquid Glass) */}
-      <div className="liquid-glass-purple p-6 sm:p-7 space-y-4 relative overflow-hidden">
+      <div className="liquid-glass-purple p-4 sm:p-6 lg:p-7 space-y-4 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <span className="text-xs font-semibold text-purple-200 uppercase tracking-wider block mb-1">
               Estado Consolidado de Amortización
             </span>
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl sm:text-4xl font-black text-white">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+              <span className="text-2xl sm:text-4xl font-black text-white">
                 {formatCurrency(totalRemaining, currency, exchangeRate)}
               </span>
               <span className="text-xs text-rose-300 font-medium">saldo insoluto pendiente</span>
             </div>
           </div>
 
-          <div className="text-right sm:border-l sm:border-white/10 sm:pl-6">
+          <div className="text-left sm:text-right border-t border-white/10 pt-3 sm:border-t-0 sm:pt-0 sm:border-l sm:pl-6">
             <span className="text-xs text-zinc-400 block">Total Liquidado a la fecha</span>
-            <span className="text-2xl font-bold text-emerald-300">
+            <span className="text-xl sm:text-2xl font-bold text-emerald-300">
               {formatCurrency(totalAmortized, currency, exchangeRate)}
             </span>
             <span className="text-[11px] text-zinc-400 block">
@@ -312,21 +321,21 @@ export const DebtsView = ({
 
                 {/* Debt Metadata Grid */}
                 <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Tasa Anual</span>
-                    <span className="font-semibold text-purple-200">
+                  <div className="min-w-0">
+                    <span className="text-zinc-400 block text-[10px] truncate">Tasa Anual</span>
+                    <span className="font-semibold text-purple-200 block truncate">
                       {debt.interestRate > 0 ? `${debt.interestRate}%` : '0% MSI'}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Pago Mínimo</span>
-                    <span className="font-semibold text-white">
+                  <div className="min-w-0">
+                    <span className="text-zinc-400 block text-[10px] truncate">Pago Mínimo</span>
+                    <span className="font-semibold text-white block truncate">
                       {formatCurrency(debt.minimumMonthlyPayment, currency, exchangeRate)}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Vencimiento</span>
-                    <span className="font-semibold text-zinc-300">{debt.dueDate}</span>
+                  <div className="min-w-0">
+                    <span className="text-zinc-400 block text-[10px] truncate">Vencimiento</span>
+                    <span className="font-semibold text-zinc-300 block truncate">{debt.dueDate}</span>
                   </div>
                 </div>
 
@@ -380,7 +389,7 @@ export const DebtsView = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto liquid-glass p-5 sm:p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -518,7 +527,7 @@ export const DebtsView = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md liquid-glass p-6 space-y-4 border-purple-500/40 shadow-2xl relative"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto liquid-glass p-5 sm:p-6 space-y-4 border-purple-500/40 shadow-2xl relative"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
@@ -547,7 +556,7 @@ export const DebtsView = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-300 font-medium mb-1">
                     Acreedor / Institución
@@ -579,7 +588,7 @@ export const DebtsView = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-zinc-300 font-medium">
@@ -635,7 +644,7 @@ export const DebtsView = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-zinc-300 font-medium mb-1">
                     Tasa Anual (%)

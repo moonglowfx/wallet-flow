@@ -200,19 +200,19 @@ export const AIAdvisorView = ({
   return (
     <div className="space-y-8 pb-12">
       {/* AI Advisor Hero Banner with Health Score */}
-      <div className="liquid-glass-purple p-6 sm:p-8 space-y-6 relative overflow-hidden">
+      <div className="liquid-glass-purple p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 relative overflow-hidden">
         {/* Glow Effects */}
         <div className="pointer-events-none absolute -top-24 -right-24 w-80 h-80 rounded-full bg-gradient-to-br from-fuchsia-500/25 to-purple-600/30 blur-3xl animate-pulse" />
         <div className="pointer-events-none absolute bottom-0 left-10 w-56 h-56 rounded-full bg-violet-600/20 blur-3xl" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
-              <Brain className="w-7 h-7 animate-pulse" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 relative z-10">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-neon-purple border border-white/30 shrink-0">
+              <Brain className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
                   Aura AI — Smart Financial Intelligence
                 </h2>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-400/40">
@@ -226,13 +226,13 @@ export const AIAdvisorView = ({
           </div>
 
           {/* Quick Rescan & Aura Score Pill */}
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3">
-              <div className="text-right">
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full lg:w-auto">
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3 flex-1 sm:flex-initial justify-between sm:justify-start">
+              <div className="text-left sm:text-right">
                 <span className="text-[10px] uppercase tracking-wider text-zinc-400 block font-semibold">
                   Score de Salud
                 </span>
-                <span className="text-2xl font-black text-white font-mono">
+                <span className="text-xl sm:text-2xl font-black text-white font-mono">
                   {transactions.length > 0 ? healthScore : '--'}
                   <span className="text-xs text-zinc-400 font-normal">/100</span>
                 </span>
@@ -245,7 +245,7 @@ export const AIAdvisorView = ({
             <button
               onClick={triggerRescan}
               disabled={isScanning}
-              className="liquid-pill px-3.5 py-3 text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-1.5 border-purple-500/40 cursor-pointer"
+              className="liquid-pill px-3.5 py-3 text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-1.5 border-purple-500/40 cursor-pointer shrink-0"
               title="Re-ejecutar auditoría en base a tus movimientos"
             >
               <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin text-fuchsia-400' : ''}`} />
@@ -255,33 +255,33 @@ export const AIAdvisorView = ({
         </div>
 
         {/* Tab Navigation Switcher */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
           <button
             onClick={() => setActiveTab('diagnostico')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
               activeTab === 'diagnostico'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
             }`}
           >
             1. Diagnóstico & Fugas de Capital
           </button>
           <button
             onClick={() => setActiveTab('presupuesto')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
               activeTab === 'presupuesto'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
             }`}
           >
             2. Presupuesto 50/30/20 & Concentración
           </button>
           <button
             onClick={() => setActiveTab('plan')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
               activeTab === 'plan'
                 ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border border-purple-300/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
             }`}
           >
             3. Simulador Predictivo & Plan de Acción
@@ -615,10 +615,10 @@ export const AIAdvisorView = ({
 
                 {/* Slider */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-zinc-400 font-medium">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400 font-medium">
                     <span>10% (Moderado)</span>
                     <span className="text-purple-200 font-bold">Ajuste actual: {antReductionPercent}%</span>
-                    <span>80% (Modo Disciplina Extrema)</span>
+                    <span>80% (Disciplina Extrema)</span>
                   </div>
                   <input
                     type="range"

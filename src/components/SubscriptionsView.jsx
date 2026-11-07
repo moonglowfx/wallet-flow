@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { api } from '../services/api.js';
 
 export const SubscriptionsView = ({
   subscriptions = [],
@@ -18,6 +19,7 @@ export const SubscriptionsView = ({
   accounts = [],
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
+  currentUser,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterMode, setFilterMode] = useState('all'); // all, essential, optional
@@ -46,6 +48,7 @@ export const SubscriptionsView = ({
     setSubscriptions((prev) =>
       prev.map((sub) => (sub.id === id ? { ...sub, active: !sub.active } : sub))
     );
+    api.toggleSubscription(id).catch((err) => console.error('Error SQLite toggleSubscription:', err));
   };
 
   // Compute metrics
@@ -81,6 +84,9 @@ export const SubscriptionsView = ({
     };
 
     setSubscriptions([newSub, ...subscriptions]);
+    api.createSubscription(newSub, currentUser?.id || 'munboi').catch((err) =>
+      console.error('Error SQLite createSubscription:', err)
+    );
     setName('');
     setAmount('');
     setShowAddModal(false);
@@ -178,10 +184,10 @@ export const SubscriptionsView = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         <button
           onClick={() => setFilterMode('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             filterMode === 'all'
               ? 'bg-purple-600/35 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
               : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
@@ -191,7 +197,7 @@ export const SubscriptionsView = ({
         </button>
         <button
           onClick={() => setFilterMode('essential')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             filterMode === 'essential'
               ? 'bg-purple-600/35 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
               : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
@@ -201,7 +207,7 @@ export const SubscriptionsView = ({
         </button>
         <button
           onClick={() => setFilterMode('optional')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             filterMode === 'optional'
               ? 'bg-fuchsia-600/35 text-fuchsia-200 border border-fuchsia-400/40 shadow-liquid-purple'
               : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
@@ -313,7 +319,7 @@ export const SubscriptionsView = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md liquid-glass p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto liquid-glass p-5 sm:p-6 space-y-5 border-purple-500/40 shadow-2xl relative"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">

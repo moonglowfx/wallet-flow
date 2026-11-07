@@ -244,28 +244,28 @@ export const FluidLineChart = ({
     : data[data.length - 1] || { label: 'Hoy', income: 0, expense: 0 };
 
   return (
-    <div className="liquid-glass p-6 space-y-4 relative overflow-hidden">
+    <div className="liquid-glass p-4 sm:p-6 space-y-4 relative overflow-hidden">
       {/* Background glow */}
       <div className="pointer-events-none absolute -top-16 -right-16 w-52 h-52 rounded-full bg-purple-600/15 blur-3xl" />
 
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 relative z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
             <Activity className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-white tracking-tight">
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
               Flujo Comparativo: Ingresos vs. Gastos
             </h3>
-            <p className="text-xs text-zinc-400">
+            <p className="text-[11px] sm:text-xs text-zinc-400 truncate">
               Tendencia temporal ({TIMEFRAME_CONFIG[timeframe]?.label || 'Este Periodo'})
             </p>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-fuchsia-400 shadow-[0_0_8px_#e879f9]" />
             <span className="text-zinc-300 font-medium">Ingresos</span>
@@ -277,13 +277,13 @@ export const FluidLineChart = ({
         </div>
       </div>
 
-      {/* Hover preview tooltip pill */}
+      {/* Hover preview tooltip pill (Responsive on mobile) */}
       {activePoint && (
-        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs">
-          <span className="font-semibold text-purple-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-3 px-3 sm:px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-[11px] sm:text-xs">
+          <span className="font-semibold text-purple-200 truncate">
             Periodo: {activePoint.label}
           </span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-emerald-300 font-medium">
               +{formatCurrency(activePoint.income, currency, exchangeRate)}
             </span>
@@ -298,10 +298,10 @@ export const FluidLineChart = ({
       )}
 
       {/* Chart SVG */}
-      <div className="w-full relative aspect-[16/7] sm:aspect-[16/6]">
+      <div className="w-full relative aspect-[16/9] sm:aspect-[16/6]">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-full overflow-visible"
+          className="w-full h-full"
         >
           <defs>
             <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -379,6 +379,8 @@ export const FluidLineChart = ({
                 key={i}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
+                onTouchStart={() => setHoveredIndex(i)}
+                onClick={() => setHoveredIndex(i)}
                 className="cursor-pointer"
               >
                 {/* Invisible hover trigger column */}
@@ -493,24 +495,24 @@ export const CategoryRingChart = ({
     : categoriesData[0];
 
   return (
-    <div className="liquid-glass p-6 space-y-5 relative overflow-hidden">
+    <div className="liquid-glass p-4 sm:p-6 space-y-4 sm:space-y-5 relative overflow-hidden">
       {/* Background glow */}
       <div className="pointer-events-none absolute -bottom-16 -left-16 w-52 h-52 rounded-full bg-fuchsia-600/15 blur-3xl" />
 
       {/* Header */}
-      <div className="flex items-center justify-between relative z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30">
+      <div className="flex items-center justify-between gap-2 relative z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 rounded-xl bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 shrink-0">
             <PieIcon className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-white tracking-tight">
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
               Distribución por Categorías
             </h3>
-            <p className="text-xs text-zinc-400">Anillo Liquid Glass de egresos</p>
+            <p className="text-[11px] sm:text-xs text-zinc-400 truncate">Anillo Liquid Glass de egresos</p>
           </div>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30">
+        <span className="text-[11px] sm:text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30 shrink-0 truncate max-w-[140px]">
           {formatCurrency(totalExpense, currency, exchangeRate)}
         </span>
       </div>
@@ -525,10 +527,10 @@ export const CategoryRingChart = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6 items-center relative z-10">
           {/* SVG Donut Ring */}
           <div className="md:col-span-5 flex flex-col items-center justify-center relative">
-            <div className="relative w-48 h-48 flex items-center justify-center">
+            <div className="relative w-44 h-44 sm:w-48 sm:h-48 flex items-center justify-center">
               <svg
                 className="w-full h-full -rotate-90 transform"
                 viewBox={`0 0 ${size} ${size}`}
@@ -560,6 +562,8 @@ export const CategoryRingChart = ({
                       fill="transparent"
                       onMouseEnter={() => setSelectedCategory(seg.category)}
                       onMouseLeave={() => setSelectedCategory(null)}
+                      onTouchStart={() => setSelectedCategory(seg.category)}
+                      onClick={() => setSelectedCategory(seg.category)}
                       className="transition-all duration-300 cursor-pointer opacity-90 hover:opacity-100"
                       style={{
                         filter: isSelected ? `drop-shadow(0 0 8px ${seg.color})` : 'none',
@@ -570,14 +574,14 @@ export const CategoryRingChart = ({
               </svg>
 
               {/* Inner Center Label */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 pointer-events-none">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 truncate max-w-[115px]">
                   {activeCategory ? activeCategory.category : 'Total'}
                 </span>
                 <span className="text-lg font-black text-white">
                   {activeCategory ? `${activeCategory.percentage}%` : '100%'}
                 </span>
-                <span className="text-[11px] text-purple-200 font-semibold">
+                <span className="text-[10px] sm:text-[11px] text-purple-200 font-semibold truncate max-w-[115px]">
                   {activeCategory
                     ? formatCurrency(activeCategory.amount, currency, exchangeRate)
                     : formatCurrency(totalExpense, currency, exchangeRate)}
@@ -595,6 +599,7 @@ export const CategoryRingChart = ({
                   key={item.category}
                   onMouseEnter={() => setSelectedCategory(item.category)}
                   onMouseLeave={() => setSelectedCategory(null)}
+                  onClick={() => setSelectedCategory(isHovered ? null : item.category)}
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer flex flex-col gap-1 border ${
                     isHovered
                       ? 'bg-white/[0.08] border-purple-400/40 shadow-sm'
