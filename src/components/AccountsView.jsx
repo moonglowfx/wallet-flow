@@ -18,6 +18,7 @@ import {
   Edit2,
   Trash2,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   formatCurrency,
@@ -49,6 +50,10 @@ export const AccountsView = ({
   setSelectedAccountId,
   showToast,
 }) => {
+  const [internalSelectedAccountId, setInternalSelectedAccountId] = useState(null);
+  const activeAccountId = selectedAccountId !== undefined ? selectedAccountId : internalSelectedAccountId;
+  const setActiveAccountId = setSelectedAccountId || setInternalSelectedAccountId;
+
   const [activeAccountType, setActiveAccountType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [scopeFilter, setScopeFilter] = useState('period'); // 'period' (respects timeframe) or 'all'
@@ -119,7 +124,7 @@ export const AccountsView = ({
   // Filter transactions by selected account, search, and global scope
   const ledgerTransactions = React.useMemo(() => {
     return targetTxs.filter((tx) => {
-      const matchesAccount = selectedAccountId ? tx.accountId === selectedAccountId : true;
+      const matchesAccount = activeAccountId ? tx.accountId === activeAccountId : true;
       const matchesSearch =
         searchQuery === '' ||
         tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -127,20 +132,20 @@ export const AccountsView = ({
         (tx.notes && tx.notes.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesAccount && matchesSearch;
     });
-  }, [targetTxs, selectedAccountId, searchQuery]);
+  }, [targetTxs, activeAccountId, searchQuery]);
 
   // Aggregated totals in active timeframe for the accounts view
   const periodIncomeTotal = React.useMemo(() => {
     return periodTxs
-      .filter((t) => (selectedAccountId ? t.accountId === selectedAccountId : true) && t.type === 'income')
+      .filter((t) => (activeAccountId ? t.accountId === activeAccountId : true) && t.type === 'income')
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  }, [periodTxs, selectedAccountId]);
+  }, [periodTxs, activeAccountId]);
 
   const periodExpenseTotal = React.useMemo(() => {
     return periodTxs
-      .filter((t) => (selectedAccountId ? t.accountId === selectedAccountId : true) && t.type === 'expense')
+      .filter((t) => (activeAccountId ? t.accountId === activeAccountId : true) && t.type === 'expense')
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  }, [periodTxs, selectedAccountId]);
+  }, [periodTxs, activeAccountId]);
 
   const getAccountIcon = (type) => {
     switch (type) {
@@ -164,7 +169,15 @@ export const AccountsView = ({
     }
   };
 
-  const currentSelectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const displayedAccounts = React.useMemo(() => {
+    if (activeAccountId) {
+      const match = accounts.find((a) => a.id === activeAccountId);
+      return match ? [match] : filteredAccounts;
+    }
+    return filteredAccounts;
+  }, [accounts, filteredAccounts, activeAccountId]);
+
+  const currentSelectedAccount = accounts.find((a) => a.id === activeAccountId);
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-6">
@@ -223,8 +236,35 @@ export const AccountsView = ({
         })}
       </div>
 
+      {/* Focused Account Notification Banner */}
+      {activeAccountId && currentSelectedAccount && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-purple-950/70 via-indigo-950/50 to-purple-950/70 border border-purple-500/50 shadow-liquid-purple animate-fade-in backdrop-blur-xl">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-bold text-white truncate flex items-center gap-1.5">
+                <span>Cuenta Seleccionada:</span>
+                <span className="text-purple-300 font-extrabold">{currentSelectedAccount.name}</span>
+              </p>
+              <p className="text-[11px] text-zinc-400 truncate">
+                Las demás cuentas se han ocultado. Mostrando su libro mayor de movimientos exclusivo abajo.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveAccountId(null)}
+            className="liquid-button-primary px-3 sm:px-4 py-1.5 text-xs font-bold shrink-0 flex items-center justify-center gap-1.5 cursor-pointer shadow-neon-purple active:scale-95"
+            title="Deseleccionar y ver todas las cuentas"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Ver todas las cuentas ({accounts.length})</span>
+          </button>
+        </div>
+      )}
+
       {/* Accounts Grid (Cards) */}
-      {filteredAccounts.length === 0 ? (
+      {displayedAccounts.length === 0 ? (
         <div className="liquid-glass p-8 text-center space-y-4 max-w-lg mx-auto">
           <Wallet className="w-10 h-10 text-purple-400 mx-auto" />
           <div>
@@ -242,20 +282,20 @@ export const AccountsView = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAccounts.map((acc) => {
+        <div className={activeAccountId ? 'max-w-xl mx-auto w-full' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
+          {displayedAccounts.map((acc) => {
             const Icon = getAccountIcon(acc.type);
             const badge = getAccountBadge(acc.type);
-            const isSelected = selectedAccountId === acc.id;
+            const isSelected = activeAccountId === acc.id;
             const isNegative = acc.balance < 0;
 
             return (
               <div
                 key={acc.id}
-                onClick={() => setSelectedAccountId(isSelected ? null : acc.id)}
+                onClick={() => setActiveAccountId(isSelected ? null : acc.id)}
                 className={`relative p-5 rounded-2xl backdrop-blur-xl border hover-lift animate-card-sheen transition-all duration-300 cursor-pointer overflow-hidden ${
                   isSelected
-                    ? 'bg-purple-900/30 border-purple-400/60 shadow-liquid-purple ring-1 ring-purple-400/40'
+                    ? 'bg-purple-900/35 border-purple-400/70 shadow-liquid-purple ring-2 ring-purple-400/50 scale-[1.01]'
                     : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/10 hover:border-purple-500/40 shadow-liquid'
                 }`}
               >
@@ -371,8 +411,15 @@ export const AccountsView = ({
                 </div>
 
                 {isSelected && (
-                  <div className="mt-3 pt-2 text-center text-[11px] font-semibold text-purple-300 bg-purple-500/10 rounded-lg py-1 border border-purple-400/20">
-                    Filtrando historial de esta cuenta (clic para limpiar)
+                  <div className="mt-3.5 pt-2.5 border-t border-purple-400/30 flex items-center justify-between text-xs text-purple-200">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      Cuenta Seleccionada
+                    </span>
+                    <span className="text-[11px] font-bold text-purple-300 hover:text-white flex items-center gap-1 bg-purple-500/20 px-2.5 py-1 rounded-lg border border-purple-400/30">
+                      <X className="w-3 h-3" />
+                      Deseleccionar
+                    </span>
                   </div>
                 )}
               </div>
@@ -386,13 +433,24 @@ export const AccountsView = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Libro Mayor de Movimientos
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-1.5 flex-wrap">
+                <span>Libro Mayor</span>
+                {currentSelectedAccount ? (
+                  <span className="text-purple-300 font-extrabold">• {currentSelectedAccount.name}</span>
+                ) : (
+                  <span className="text-zinc-400 font-normal">• Todas las Cuentas</span>
+                )}
               </h3>
               {currentSelectedAccount && (
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 truncate max-w-[180px]">
-                  {currentSelectedAccount.name}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveAccountId(null)}
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 hover:text-white border border-purple-400/30 flex items-center gap-1 cursor-pointer"
+                  title="Deseleccionar y ver movimientos de todas las cuentas"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Ver todas</span>
+                </button>
               )}
               {/* Active Period Synchronized Badge */}
               <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-200 flex items-center gap-1">

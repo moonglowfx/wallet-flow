@@ -80,12 +80,12 @@ export const HeroCard = ({
   };
 
   return (
-    <div className="relative rounded-3xl p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-purple-900/35 via-[#161127]/75 to-[#0C0A14]/90 backdrop-blur-3xl border border-purple-400/35 shadow-[0_28px_70px_-10px_rgba(88,28,135,0.45),inset_0_1px_0_0_rgba(255,255,255,0.28),inset_0_-1px_0_0_rgba(168,85,247,0.15)] overflow-hidden">
+    <div className="relative rounded-3xl p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-purple-900/40 via-[#161127]/80 to-[#0C0A14]/90 backdrop-blur-3xl border border-purple-400/35 shadow-[0_28px_70px_-10px_rgba(88,28,135,0.45),inset_0_1px_0_0_rgba(255,255,255,0.28),inset_0_-1px_0_0_rgba(168,85,247,0.15)] overflow-hidden animate-gradient-flow">
       {/* Top Specular Liquid Glass Edge Highlight */}
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-purple-200/50 to-transparent" />
-      {/* Dynamic Liquid Glow Orbs */}
-      <div className="pointer-events-none absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-br from-purple-500/25 to-fuchsia-600/20 blur-3xl animate-pulse" />
-      <div className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-indigo-600/15 blur-3xl" />
+      {/* Dynamic Moving Liquid Glow Orbs */}
+      <div className="pointer-events-none absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-br from-purple-500/30 to-fuchsia-600/25 blur-3xl animate-float-orb-1" />
+      <div className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-gradient-to-tr from-indigo-600/20 to-purple-800/18 blur-3xl animate-float-orb-2" />
 
       {/* Top Banner Row */}
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-5 sm:mb-6">

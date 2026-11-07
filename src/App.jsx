@@ -454,11 +454,11 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#09080E] text-white flex flex-col font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-clip">
-      {/* Background Liquid Glass Ambient Glows */}
+      {/* Background Liquid Glass Ambient Glows with Organic Floating Movement */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-36 -left-36 w-[28rem] h-[28rem] rounded-full bg-purple-600/20 blur-[130px]" />
-        <div className="absolute top-1/4 -right-36 w-[26rem] h-[26rem] rounded-full bg-fuchsia-600/15 blur-[140px]" />
-        <div className="absolute -bottom-36 left-1/4 w-[30rem] h-[30rem] rounded-full bg-indigo-700/18 blur-[150px]" />
+        <div className="absolute -top-36 -left-36 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-purple-600/25 to-indigo-600/15 blur-[130px] animate-float-orb-1" />
+        <div className="absolute top-1/4 -right-36 w-[30rem] h-[30rem] rounded-full bg-gradient-to-br from-fuchsia-600/20 to-purple-800/15 blur-[140px] animate-float-orb-2" />
+        <div className="absolute -bottom-36 left-1/4 w-[34rem] h-[34rem] rounded-full bg-gradient-to-tr from-indigo-700/22 to-fuchsia-900/18 blur-[150px] animate-float-orb-1" />
       </div>
 
       {/* Main Navigation (Desktop Sidebar & Mobile iOS Tab Bar) */}

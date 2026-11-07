@@ -174,6 +174,11 @@ async function verifyDB() {
     // Verificar integración en componentes
     const accountsCode = fs.readFileSync('src/components/AccountsView.jsx', 'utf-8');
     assert(accountsCode.includes('filterTransactionsByPeriod'), 'AccountsView sincroniza movimientos según el período global');
+    assert(accountsCode.includes('displayedAccounts'), 'AccountsView aisla y enfoca la cuenta seleccionada ocultando las demás');
+    assert(accountsCode.includes('Ver todas las cuentas'), 'AccountsView provee restauración fluida para ver todas las cuentas al deseleccionar');
+
+    const indexCss = fs.readFileSync('src/index.css', 'utf-8');
+    assert(indexCss.includes('gradientShift') && indexCss.includes('animate-float-orb'), 'UX/UI cuenta con degradados animados y orbes fluidos en movimiento');
 
     const commitmentsCode = fs.readFileSync('src/components/CommitmentsView.jsx', 'utf-8');
     assert(commitmentsCode.includes('periodMultiplier'), 'CommitmentsView recalcula compromisos según el período semanal/mensual/anual');

@@ -85,10 +85,12 @@
     @apply backdrop-blur-2xl rounded-2xl transition-all duration-300;
     background: linear-gradient(
       135deg,
-      rgba(126, 34, 206, 0.28) 0%,
-      rgba(76, 29, 149, 0.18) 50%,
-      rgba(192, 38, 211, 0.14) 100%
+      rgba(126, 34, 206, 0.32) 0%,
+      rgba(76, 29, 149, 0.2) 50%,
+      rgba(192, 38, 211, 0.22) 100%
     );
+    background-size: 200% 200%;
+    animation: gradientShift 10s ease-in-out infinite alternate;
     border: 1px solid rgba(192, 132, 252, 0.34);
     box-shadow:
       0 24px 60px -10px rgba(88, 28, 135, 0.42),
@@ -137,6 +139,8 @@
 
   .liquid-button-primary {
     @apply bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl border border-purple-300/40 transition-all duration-200 active:scale-[0.98];
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease-in-out infinite;
     box-shadow:
       0 10px 28px -5px rgba(168, 85, 247, 0.6),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.42),
@@ -332,4 +336,54 @@
 
 .animate-shake {
   animation: shakeHorizontal 0.38s ease-in-out both;
+}
+
+/* FLOWING & MOVING GRADIENT ANIMATIONS */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes floatOrb1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(32px, -24px) scale(1.08);
+  }
+  66% {
+    transform: translate(-24px, 20px) scale(0.94);
+  }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(-28px, 26px) scale(0.95);
+  }
+  66% {
+    transform: translate(22px, -18px) scale(1.07);
+  }
+}
+
+.animate-gradient-flow {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease-in-out infinite;
+}
+
+.animate-float-orb-1 {
+  animation: floatOrb1 14s ease-in-out infinite alternate;
+}
+
+.animate-float-orb-2 {
+  animation: floatOrb2 18s ease-in-out infinite alternate;
 }
