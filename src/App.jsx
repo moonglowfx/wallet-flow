@@ -338,6 +338,7 @@ export function App() {
               accounts={accounts}
               transactions={transactions}
               timeframe={timeframe}
+              setTimeframe={setTimeframe}
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
@@ -360,6 +361,7 @@ export function App() {
               setAccounts={setAccounts}
               transactions={transactions}
               timeframe={timeframe}
+              setTimeframe={setTimeframe}
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}

@@ -28,12 +28,15 @@ import {
 } from '../data/mockData.js';
 import { api } from '../services/api.js';
 
+const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
+
 export const AccountsView = ({
   currentUser,
   accounts = [],
   setAccounts,
   transactions = [],
   timeframe = 'monthly',
+  setTimeframe,
   selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
@@ -47,7 +50,7 @@ export const AccountsView = ({
 }) => {
   const [activeAccountType, setActiveAccountType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [scopeFilter, setScopeFilter] = useState('period'); // 'period' (respects global timeframe) or 'all'
+  const [scopeFilter, setScopeFilter] = useState('period'); // 'period' (respects timeframe) or 'all'
   const [editingAccount, setEditingAccount] = useState(null);
   const [accName, setAccName] = useState('');
   const [accInstitution, setAccInstitution] = useState('');
@@ -400,38 +403,55 @@ export const AccountsView = ({
             </p>
           </div>
 
-          {/* Scope Selector (Period vs All) & Search Bar */}
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <div className="w-full sm:w-auto bg-black/40 p-1 rounded-xl border border-white/10 grid grid-cols-2 sm:flex items-center text-xs">
-              <button
-                type="button"
-                onClick={() => setScopeFilter('period')}
-                className={`px-2.5 py-1.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer text-center ${
-                  scopeFilter === 'period'
-                    ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
+          {/* Timeframe Selector Pills directly inside Libro Mayor de Movimientos */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap w-full lg:w-auto">
+            {setTimeframe && (
+              <div
+                role="tablist"
+                aria-label="Filtro Temporal del Libro Mayor"
+                className="bg-black/50 backdrop-blur-xl p-1 rounded-2xl border border-white/10 grid grid-cols-4 sm:flex items-center gap-1 shadow-inner text-xs"
               >
-                {TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Período'} ({periodTxs.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setScopeFilter('all')}
-                className={`px-2.5 py-1.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer text-center ${
-                  scopeFilter === 'all'
-                    ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                Todo ({transactions.length})
-              </button>
-            </div>
+                {TIMEFRAMES.map((tf) => {
+                  const active = scopeFilter === 'period' && timeframe === tf;
+                  return (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() => {
+                        setScopeFilter('period');
+                        setTimeframe(tf);
+                      }}
+                      className={`px-2 sm:px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all duration-200 cursor-pointer text-center truncate ${
+                        active
+                          ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-liquid-purple border border-purple-400/40'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <span className="sm:hidden">{TIMEFRAME_CONFIG[tf]?.shortLabel || tf}</span>
+                      <span className="hidden sm:inline">{TIMEFRAME_CONFIG[tf]?.label || tf}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-            <div className="relative w-full sm:w-64">
+            <button
+              type="button"
+              onClick={() => setScopeFilter(scopeFilter === 'all' ? 'period' : 'all')}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all border cursor-pointer text-center ${
+                scopeFilter === 'all'
+                  ? 'bg-purple-600/40 text-purple-200 border-purple-400/40 shadow-sm'
+                  : 'bg-black/40 text-zinc-400 hover:text-white border-white/10'
+              }`}
+            >
+              Todo ({transactions.length})
+            </button>
+
+            <div className="relative flex-1 sm:w-56">
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar por concepto o categoría..."
+                placeholder="Buscar movimiento..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="liquid-input pl-9 text-xs"

@@ -93,6 +93,15 @@ npm run build
    - **Output Directory:** `dist`
 6. Haz clic en **Deploy**. ¡Tu app estará viva en producción en menos de 1 minuto con certificado SSL!
 
+### Integración de Turso (SQLite en la Nube) desde Vercel Marketplace
+1. En el Dashboard de tu proyecto en [vercel.com](https://vercel.com), ve a la pestaña **Storage** o **Integrations**.
+2. Busca **Turso** en el Marketplace y presiona **Install / Connect**.
+3. Crea o vincula tu base de datos de Turso.
+4. Vercel inyectará automáticamente las variables de entorno:
+   - `TURSO_DATABASE_URL` (ej. `libsql://wallet-flow-...turso.io`)
+   - `TURSO_AUTH_TOKEN` (tu token de autenticación seguro)
+5. ¡Listo! El backend serverless (`/api`) detecta Turso automáticamente vía `@libsql/client` y sincroniza las tablas de cuentas, transacciones y usuarios de forma persistente.
+
 ### Opción 2: Usar Vercel CLI desde la terminal
 ```bash
 # Instalar CLI de Vercel globalmente (si no lo tienes)

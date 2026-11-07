@@ -54,7 +54,10 @@ export const AIAdvisorView = ({
 }) => {
   const [antReductionPercent, setAntReductionPercent] = useState(40);
   const [isScanning, setIsScanning] = useState(false);
-  const [activeTab, setActiveTab] = useState('diagnostico'); // diagnostico, presupuesto, plan
+  const [activeTab, setActiveTab] = useState('diagnostico'); // diagnostico, presupuesto, pronostico, plan
+  const [copilotQuery, setCopilotQuery] = useState('');
+  const [copilotAnswer, setCopilotAnswer] = useState(null);
+  const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
   const triggerRescan = () => {
     setIsScanning(true);
@@ -270,6 +273,101 @@ export const AIAdvisorView = ({
     monthlyAntSavings * ((Math.pow(1 + 0.10 / 12, 60) - 1) / (0.10 / 12))
   );
 
+  // Behavioral Financial Archetype
+  const archetype = React.useMemo(() => {
+    if (savingsRate >= 30 && creditUtilization <= 20) {
+      return {
+        title: 'Arquitecto Patrimonial Estratégico',
+        badge: 'Equilibrio & Alta Tasa de Ahorro',
+        superpower: 'Capacidad de generar excedentes netos sostenidos',
+        alert: 'Asegurar que la liquidez no quede ociosa frente a la inflación',
+        color: 'border-emerald-500/40 text-emerald-300',
+        icon: '💎',
+      };
+    }
+    if (antRatio >= 22) {
+      return {
+        title: 'Consumidor con Microfugas Hormiga',
+        badge: 'Fuga de Capital Descentralizada',
+        superpower: 'Gran agilidad en transacciones diarias cotidianas',
+        alert: 'Los micro-gastos menores a $15 USD están erosionando tu tasa neta',
+        color: 'border-rose-500/40 text-rose-300',
+        icon: '🐜',
+      };
+    }
+    if (creditUtilization >= 50) {
+      return {
+        title: 'Perfil Apalancado en Crédito',
+        badge: 'Riesgo de Carga Financiera',
+        superpower: 'Capacidad de financiamiento y liquidez inmediata',
+        alert: 'La utilización de crédito excede el 50% del cupo bancario',
+        color: 'border-amber-500/40 text-amber-300',
+        icon: '💳',
+      };
+    }
+    return {
+      title: 'Optimizador Prudente en Expansión',
+      badge: 'Construcción de Hábitos Financieros',
+      superpower: 'Flujo balanceado con control de egresos fijos',
+      alert: 'Incrementar la tasa de ahorro hacia el umbral objetivo del 20%',
+      color: 'border-purple-500/40 text-purple-300',
+      icon: '⚖️',
+    };
+  }, [savingsRate, creditUtilization, antRatio]);
+
+  // Predictive End-of-Month Cashflow Forecast
+  const forecast = React.useMemo(() => {
+    const now = new Date();
+    const daysInMonth = 30;
+    const currentDay = Math.min(30, Math.max(1, now.getDate()));
+    const remainingDays = Math.max(1, daysInMonth - currentDay);
+    const expectedRemainingBurn = dailyBurnRate * remainingDays;
+    const projectedEndCash = liquidCash - expectedRemainingBurn;
+    return {
+      remainingDays,
+      expectedRemainingBurn,
+      projectedEndCash,
+      status: projectedEndCash > liquidCash * 0.4 ? 'Solvente' : projectedEndCash > 0 ? 'Ajustado' : 'Déficit',
+      color: projectedEndCash > liquidCash * 0.4 ? 'text-emerald-300' : projectedEndCash > 0 ? 'text-amber-300' : 'text-rose-300',
+    };
+  }, [dailyBurnRate, liquidCash]);
+
+  // Detected Expense Spikes / Anomalies
+  const anomalies = React.useMemo(() => {
+    if (avgTicketExpense <= 0) return [];
+    return targetTxs
+      .filter((t) => t.type === 'expense' && Number(t.amount) >= avgTicketExpense * 2.8)
+      .slice(0, 4);
+  }, [targetTxs, avgTicketExpense]);
+
+  // Aura Copilot Interactive Q&A Handler
+  const handleCopilotAsk = (promptText) => {
+    const q = (promptText || copilotQuery).trim();
+    if (!q) return;
+    setCopilotQuery(q);
+    setIsCopilotThinking(true);
+    setTimeout(() => {
+      const lower = q.toLowerCase();
+      let ans = '';
+      if (lower.includes('fuga') || lower.includes('hormiga') || lower.includes('pequeñ')) {
+        ans = `🔍 Auditoría de Micro-Fugas: Detectamos ${antTransactions.length} transacciones hormiga por un total de ${formatCurrency(antExpenses, currency, exchangeRate)} (${antRatio}% de tus egresos). Si aplicas una reducción del ${antReductionPercent}%, recuperarías ${formatCurrency(monthlyAntSavings, currency, exchangeRate)} mensuales que proyectados a 5 años representarían ${formatCurrency(fiveYearCompound, currency, exchangeRate)}.`;
+      } else if (lower.includes('100') || lower.includes('gastar') || lower.includes('comprar')) {
+        const canSpend = forecast.projectedEndCash > 150 && savingsRate >= 15;
+        ans = canSpend
+          ? `✅ Veredicto: Aprobado con prudencia. Tu liquidez proyectada al cierre de mes es de ${formatCurrency(forecast.projectedEndCash, currency, exchangeRate)} con una tasa de ahorro saludable del ${savingsRate}%. Un gasto puntual de $100 no compromete tu solvencia operativa.`
+          : `⚠️ Veredicto: Precaución recomendada. Tu liquidez proyectada al cierre es de ${formatCurrency(forecast.projectedEndCash, currency, exchangeRate)} (${forecast.status}). Aura sugiere postergar este gasto hasta el próximo ciclo o ajustar gastos en tu categoría principal (${topCategories[0]?.category || 'gastos varios'}).`;
+      } else if (lower.includes('deuda') || lower.includes('credito') || lower.includes('interes') || lower.includes('tarjeta')) {
+        ans = `💳 Estrategia de Pasivos: Tu saldo en créditos/deudas es de ${formatCurrency(totalDebtsRemaining + totalCreditDebt, currency, exchangeRate)} con una utilización de línea de crédito del ${creditUtilization}%. Recomendamos abonar prioritariamente a la de mayor interés. Reducir la utilización por debajo del 30% impulsará tu salud financiera de inmediato.`;
+      } else if (lower.includes('pronostico') || lower.includes('cierre') || lower.includes('mes') || lower.includes('fin de mes')) {
+        ans = `📊 Pronóstico de Cierre de Mes: Con un ritmo de quema de ${formatCurrency(dailyBurnRate, currency, exchangeRate)}/día, en los ${forecast.remainingDays} días restantes consumirás aproximadamente ${formatCurrency(forecast.expectedRemainingBurn, currency, exchangeRate)}. Tu liquidez proyectada al cierre de mes es de ${formatCurrency(forecast.projectedEndCash, currency, exchangeRate)} (Estado: ${forecast.status}).`;
+      } else {
+        ans = `🧠 Diagnóstico Aura para "${q}": Tu perfil actual es "${archetype.title}" con un Score de Salud de ${healthScore}/100. Tu tasa de ahorro es del ${savingsRate}% con ingresos de ${formatCurrency(totalIncomes, currency, exchangeRate)} frente a egresos de ${formatCurrency(totalExpenses, currency, exchangeRate)}. Tu mayor concentración está en "${topCategories[0]?.category || 'general'}" (${topCategories[0]?.percent || 0}%).`;
+      }
+      setCopilotAnswer(ans);
+      setIsCopilotThinking(false);
+    }, 400);
+  };
+
   return (
     <div className="space-y-8 pb-12">
       {/* AI Advisor Hero Banner with Health Score */}
@@ -391,36 +489,46 @@ export const AIAdvisorView = ({
         </div>
 
         {/* Tab Navigation Switcher */}
-        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
+        <div className="grid grid-cols-2 lg:flex lg:flex-wrap items-center gap-2 pt-3 border-t border-white/10 relative z-10 text-xs font-bold">
           <button
             onClick={() => setActiveTab('diagnostico')}
-            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
+            className={`px-3 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-center ${
               activeTab === 'diagnostico'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02]'
             }`}
           >
-            1. Diagnóstico & Fugas de Capital
+            1. Diagnóstico & Arquetipo
           </button>
           <button
             onClick={() => setActiveTab('presupuesto')}
-            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
+            className={`px-3 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-center ${
               activeTab === 'presupuesto'
                 ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02]'
             }`}
           >
-            2. Presupuesto 50/30/20 & Concentración
+            2. Presupuesto 50/30/20
+          </button>
+          <button
+            onClick={() => setActiveTab('pronostico')}
+            className={`px-3 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-center ${
+              activeTab === 'pronostico'
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border border-purple-300/40 shadow-liquid-purple'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02]'
+            }`}
+          >
+            3. Pronóstico & Anomalías
           </button>
           <button
             onClick={() => setActiveTab('plan')}
-            className={`px-3.5 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-left sm:text-center ${
+            className={`px-3 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-center ${
               activeTab === 'plan'
-                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border border-purple-300/40 shadow-liquid-purple'
-                : 'text-zinc-400 hover:text-white bg-white/[0.02] sm:bg-transparent'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border border-purple-300/40 shadow-liquid-purple'
+                : 'text-zinc-400 hover:text-white bg-white/[0.02]'
             }`}
           >
-            3. Simulador Predictivo & Plan de Acción
+            4. Simulador & Aura Copilot
           </button>
         </div>
       </div>
@@ -502,6 +610,39 @@ export const AIAdvisorView = ({
                       {formatCurrency(netPeriodFlow, currency, exchangeRate)}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Behavioral Financial Archetype Profile */}
+              <div className={`p-4 sm:p-5 rounded-2xl border ${archetype.color} bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-liquid`}>
+                <div className="flex items-start sm:items-center gap-3.5">
+                  <span className="text-3xl sm:text-4xl p-2.5 rounded-2xl bg-white/5 border border-white/10 shrink-0">
+                    {archetype.icon}
+                  </span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-400">
+                        Arquetipo Financiero Detectado
+                      </span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/10 border border-white/20 text-white">
+                        {archetype.badge}
+                      </span>
+                    </div>
+                    <h4 className="text-base sm:text-lg font-black text-white tracking-tight">
+                      {archetype.title}
+                    </h4>
+                    <p className="text-xs text-zinc-300">
+                      <span className="text-emerald-300 font-semibold">Fortaleza:</span> {archetype.superpower}
+                    </p>
+                  </div>
+                </div>
+                <div className="md:text-right shrink-0 max-w-xs pt-2 md:pt-0 border-t md:border-t-0 border-white/10">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300 block">
+                    Punto de Enfoque Algorítmico
+                  </span>
+                  <p className="text-xs text-zinc-300 mt-0.5">
+                    {archetype.alert}
+                  </p>
                 </div>
               </div>
 
@@ -908,7 +1049,91 @@ export const AIAdvisorView = ({
             </div>
           )}
 
-          {/* TAB 3: SIMULADOR PREDICTIVO & PLAN DE ACCIÓN */}
+          {/* TAB 3: PRONÓSTICO DE CIERRE & ANOMALÍAS */}
+          {activeTab === 'pronostico' && (
+            <div className="space-y-6">
+              {/* End of Month Forecast Banner */}
+              <div className="liquid-glass p-6 sm:p-7 space-y-5 border-fuchsia-500/30">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-fuchsia-300 block">
+                      Modelo Predictivo de Liquidez
+                    </span>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2 mt-0.5">
+                      <TrendingUp className="w-5 h-5 text-fuchsia-400" />
+                      Pronóstico Predictivo de Cierre de Mes
+                    </h3>
+                  </div>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full border bg-white/5 ${forecast.color}`}>
+                    Estado: {forecast.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <span className="text-xs text-zinc-400">Días Restantes del Ciclo</span>
+                    <p className="text-2xl font-black text-white font-mono">{forecast.remainingDays} días</p>
+                    <p className="text-[11px] text-zinc-500">Ritmo: {formatCurrency(dailyBurnRate, currency, exchangeRate)} / día</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <span className="text-xs text-zinc-400">Quema Esperada Restante</span>
+                    <p className="text-2xl font-black text-amber-300 font-mono">
+                      -{formatCurrency(forecast.expectedRemainingBurn, currency, exchangeRate)}
+                    </p>
+                    <p className="text-[11px] text-zinc-500">Estimación lineal algorítmica</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <span className="text-xs text-zinc-400">Liquidez Proyectada al Cierre</span>
+                    <p className={`text-2xl font-black font-mono ${forecast.color}`}>
+                      {formatCurrency(forecast.projectedEndCash, currency, exchangeRate)}
+                    </p>
+                    <p className="text-[11px] text-zinc-500">Disponible actual: {formatCurrency(liquidCash, currency, exchangeRate)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Anomalies and Spikes Card */}
+              <div className="liquid-glass p-6 sm:p-7 space-y-4 border-rose-500/30">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-bold text-white flex items-center gap-2">
+                    <AlertOctagon className="w-4 h-4 text-rose-400" />
+                    Detector de Anomalías & Picos de Gasto
+                  </h4>
+                  <span className="text-xs font-mono text-zinc-400">
+                    {anomalies.length} anomalía(s) detectada(s)
+                  </span>
+                </div>
+
+                {anomalies.length === 0 ? (
+                  <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-3">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <p className="text-xs text-zinc-300">
+                      Excelente disciplina: no se detectaron picos desproporcionados ni gastos atípicos en el período seleccionado.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {anomalies.map((ano) => (
+                      <div key={ano.id} className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase tracking-wider text-rose-300 font-bold block">
+                            Pico &gt; 2.8x Promedio
+                          </span>
+                          <p className="text-sm font-bold text-white truncate">{ano.title}</p>
+                          <span className="text-[11px] text-zinc-400">{ano.category} • {ano.date}</span>
+                        </div>
+                        <p className="text-base font-black text-rose-400 font-mono shrink-0">
+                          -{formatCurrency(ano.amount, currency, exchangeRate)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: SIMULADOR PREDICTIVO & PLAN DE ACCIÓN */}
           {activeTab === 'plan' && (
             <div className="space-y-6">
               {/* Interactive Predictive Simulator */}
@@ -1048,6 +1273,82 @@ export const AIAdvisorView = ({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Interactive Aura Copilot Assistant */}
+              <div className="liquid-glass-purple p-6 sm:p-7 space-y-4 border-fuchsia-500/40 relative overflow-hidden">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-fuchsia-500 flex items-center justify-center text-white shadow-neon-purple">
+                    <Sparkles className="w-4 h-4 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-white">Aura Copilot — Consultor Financiero</h4>
+                    <p className="text-[11px] text-zinc-300">Pregúntale cualquier duda sobre tu flujo, compras o estrategia en tiempo real</p>
+                  </div>
+                </div>
+
+                {/* Quick Prompts */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {[
+                    '¿Cuál es mi mayor fuga este período?',
+                    '¿Puedo permitirme gastar $100 hoy?',
+                    '¿Cómo liquidar mis deudas más rápido?',
+                    '¿Pronóstico de cierre de mes?',
+                  ].map((p, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleCopilotAsk(p)}
+                      className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-purple-600/30 border border-white/10 hover:border-purple-400/40 text-[11px] font-medium text-zinc-200 transition-all cursor-pointer active:scale-95"
+                    >
+                      💡 {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Input Bar */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleCopilotAsk();
+                  }}
+                  className="flex gap-2 pt-2"
+                >
+                  <input
+                    type="text"
+                    value={copilotQuery}
+                    onChange={(e) => setCopilotQuery(e.target.value)}
+                    placeholder="Haz una consulta a Aura (ej. ¿debería cancelar suscripciones?)..."
+                    className="liquid-input flex-1 text-xs px-3.5 py-2.5"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isCopilotThinking || !copilotQuery.trim()}
+                    className="liquid-button-primary px-4 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isCopilotThinking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+                    <span>Consultar</span>
+                  </button>
+                </form>
+
+                {/* Response Box */}
+                {(isCopilotThinking || copilotAnswer) && (
+                  <div className="p-4 rounded-xl bg-black/60 border border-fuchsia-500/30 space-y-2 animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-fuchsia-400 animate-ping" />
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-fuchsia-300">
+                        Respuesta Algorítmica Aura
+                      </span>
+                    </div>
+                    {isCopilotThinking ? (
+                      <p className="text-xs text-zinc-400 animate-pulse">Analizando tus movimientos y proyecciones matemáticas...</p>
+                    ) : (
+                      <div className="text-xs text-zinc-200 leading-relaxed space-y-1">
+                        <p>{copilotAnswer}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

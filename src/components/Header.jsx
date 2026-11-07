@@ -187,32 +187,34 @@ export const Header = ({
             </div>
           </div>
 
-          {/* Global Temporal Filter (Esta Semana, Este Mes, Trimestre, Año) */}
-          <div
-            role="tablist"
-            aria-label="Filtro Temporal Global"
-            className="w-full sm:w-auto bg-black/50 backdrop-blur-xl p-1 rounded-2xl border border-white/10 grid grid-cols-4 sm:flex items-center gap-1 shadow-inner"
-          >
-            {TIMEFRAMES.map((tf) => {
-              const active = timeframe === tf;
-              return (
-                <button
-                  key={tf}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setTimeframe(tf)}
-                  className={`px-1.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer text-center whitespace-nowrap truncate ${
-                    active
-                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-[0_2px_15px_rgba(168,85,247,0.5)] border border-purple-400/40'
-                      : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
-                  }`}
-                >
-                  <span className="sm:hidden">{TIMEFRAME_CONFIG[tf]?.shortLabel || tf}</span>
-                  <span className="hidden sm:inline">{TIMEFRAME_CONFIG[tf]?.label || tf}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Global Temporal Filter: only shown on dashboard overview */}
+          {activeTab === 'dashboard' && (
+            <div
+              role="tablist"
+              aria-label="Filtro Temporal Global"
+              className="w-full sm:w-auto bg-black/50 backdrop-blur-xl p-1 rounded-2xl border border-white/10 grid grid-cols-4 sm:flex items-center gap-1 shadow-inner"
+            >
+              {TIMEFRAMES.map((tf) => {
+                const active = timeframe === tf;
+                return (
+                  <button
+                    key={tf}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-1.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer text-center whitespace-nowrap truncate ${
+                      active
+                        ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-[0_2px_15px_rgba(168,85,247,0.5)] border border-purple-400/40'
+                        : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+                    }`}
+                  >
+                    <span className="sm:hidden">{TIMEFRAME_CONFIG[tf]?.shortLabel || tf}</span>
+                    <span className="hidden sm:inline">{TIMEFRAME_CONFIG[tf]?.label || tf}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Desktop Action Buttons */}
           <div className="hidden lg:flex items-center gap-2">
