@@ -370,9 +370,9 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
 
             {/* Action footer: Option to change PIN */}
             <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-zinc-400 relative z-10">
-              <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+              <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Sesión Aislada</span>
+                <span>Este dispositivo se recordará permanentemente</span>
               </span>
 
               <button

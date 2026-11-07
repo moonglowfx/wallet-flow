@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Sparkles,
   Layers,
+  Edit2,
 } from 'lucide-react';
 import { HeroCard } from './HeroCard.jsx';
 import { FluidLineChart, CategoryRingChart } from './Charts.jsx';
@@ -25,6 +26,8 @@ export const DashboardView = ({
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
+  onEditTransaction,
+  onDeleteTransaction,
   onOpenNewAccount,
   onSelectAccount,
   onNavigateTab,
@@ -268,7 +271,8 @@ export const DashboardView = ({
               return (
                 <div
                   key={tx.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-200"
+                  onClick={() => onEditTransaction && onEditTransaction(tx)}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div
@@ -311,7 +315,18 @@ export const DashboardView = ({
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
-                    <span className="text-[11px] text-zinc-500 sm:hidden"> Importe:</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTransaction && onEditTransaction(tx);
+                      }}
+                      className="liquid-pill px-2.5 py-1 text-[11px] font-semibold text-purple-200 hover:text-white flex items-center gap-1 border-purple-500/30 hover:border-purple-400 cursor-pointer"
+                      title="Editar movimiento"
+                    >
+                      <Edit2 className="w-3 h-3 text-purple-400" />
+                      <span>Editar</span>
+                    </button>
                     <div className="text-right">
                       <p
                         className={`text-sm sm:text-base font-bold tracking-tight ${

@@ -29,7 +29,9 @@ export function App() {
 
   // Multi-user authentication state backed by SQLite: Munboi (PIN: 0800) | Tiago (PIN: 5678)
   const [currentUser, setCurrentUser] = useState(() => USERS[0]);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(
+    () => typeof document !== 'undefined' && !document.cookie.includes('wf_device_token=')
+  );
 
   // Currency State persisted in SQLite per user: USD as primary, COP as secondary
   const [currency, setCurrency] = useState('USD');
@@ -56,6 +58,7 @@ export function App() {
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -70,6 +73,9 @@ export function App() {
   const loadUserFromSQLite = useCallback(async (targetUserId) => {
     const state = await api.getState(targetUserId);
     if (state) {
+      if (!targetUserId) {
+        setIsLoginModalOpen(!state.trustedDevice);
+      }
       if (state.user) {
         setCurrentUser((prev) => ({
           ...prev,
@@ -149,17 +155,51 @@ export function App() {
     showToast(`Datos SQLite de ${currentUser.username} restablecidos`);
   };
 
-  // Handle adding a new transaction and update linked account balance in SQLite
-  const handleSaveTransaction = async (newTxData) => {
+  // Handle adding or editing a transaction and updating linked account balances in SQLite
+  const handleSaveTransaction = async (txData) => {
+    if (txData.id) {
+      const prevTx = transactions.find((t) => t.id === txData.id);
+      const updatedTx = {
+        ...prevTx,
+        ...txData,
+        userId: currentUser.id,
+      };
+
+      setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)));
+
+      if (prevTx) {
+        const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
+        const newSigned = updatedTx.type === 'income' ? Number(updatedTx.amount) : -Number(updatedTx.amount);
+        setAccounts((prevAccs) =>
+          prevAccs.map((acc) => {
+            if (prevTx.accountId === updatedTx.accountId && acc.id === updatedTx.accountId) {
+              return { ...acc, balance: Math.round((acc.balance + (newSigned - oldSigned)) * 100) / 100 };
+            }
+            if (acc.id === prevTx.accountId) {
+              return { ...acc, balance: Math.round((acc.balance - oldSigned) * 100) / 100 };
+            }
+            if (acc.id === updatedTx.accountId) {
+              return { ...acc, balance: Math.round((acc.balance + newSigned) * 100) / 100 };
+            }
+            return acc;
+          })
+        );
+      }
+
+      setEditingTransaction(null);
+      await api.updateTransaction(updatedTx.id, updatedTx, currentUser.id);
+      showToast(`Movimiento actualizado: ${updatedTx.title}`);
+      return;
+    }
+
     const newTx = {
       id: `tx-${Date.now()}`,
       userId: currentUser.id,
-      ...newTxData,
+      ...txData,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
 
-    // Live update account balance
     setAccounts((prevAccounts) =>
       prevAccounts.map((acc) => {
         if (acc.id === newTx.accountId) {
@@ -176,6 +216,36 @@ export function App() {
     await api.createTransaction(newTx, currentUser.id);
     showToast(`Movimiento guardado en SQLite: ${newTx.title}`);
   };
+
+  const handleDeleteTransaction = async (txId) => {
+    const prevTx = transactions.find((t) => t.id === txId);
+    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+
+    if (prevTx) {
+      const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
+      setAccounts((prevAccs) =>
+        prevAccs.map((acc) =>
+          acc.id === prevTx.accountId
+            ? { ...acc, balance: Math.round((acc.balance - oldSigned) * 100) / 100 }
+            : acc
+        )
+      );
+    }
+
+    setEditingTransaction(null);
+    await api.deleteTransaction(txId, currentUser.id);
+    showToast('Movimiento eliminado de SQLite');
+  };
+
+  const handleOpenEditTransaction = useCallback((tx) => {
+    setEditingTransaction(tx);
+    setIsTransactionModalOpen(true);
+  }, []);
+
+  const handleOpenNewTransaction = useCallback(() => {
+    setEditingTransaction(null);
+    setIsTransactionModalOpen(true);
+  }, []);
 
   // Handle adding a new account in SQLite
   const handleSaveAccount = async (newAcc) => {
@@ -207,7 +277,7 @@ export function App() {
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+        onOpenNewTransaction={handleOpenNewTransaction}
         netWorth={netWorth}
         antExpenseAlertCount={antAlertCount}
         currency={currency}
@@ -230,7 +300,7 @@ export function App() {
           exchangeRate={exchangeRate}
           currentUser={currentUser}
           onOpenSwitchUser={() => setIsLoginModalOpen(true)}
-          onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+          onOpenNewTransaction={handleOpenNewTransaction}
           onResetDemoData={handleResetDemoData}
           onNavigateAI={() => setActiveTab('ai-advisor')}
         />
@@ -244,7 +314,9 @@ export function App() {
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
-              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenNewTransaction={handleOpenNewTransaction}
+              onEditTransaction={handleOpenEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
               onSelectAccount={(accId) => {
                 setSelectedAccountId(accId);
@@ -256,16 +328,21 @@ export function App() {
 
           {activeTab === 'accounts' && (
             <AccountsView
+              currentUser={currentUser}
               accounts={accounts}
+              setAccounts={setAccounts}
               transactions={transactions}
               timeframe={timeframe}
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
-              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenNewTransaction={handleOpenNewTransaction}
+              onEditTransaction={handleOpenEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
               selectedAccountId={selectedAccountId}
               setSelectedAccountId={setSelectedAccountId}
+              showToast={showToast}
             />
           )}
 
@@ -279,7 +356,9 @@ export function App() {
               availableYears={availableYears}
               currency={currency}
               exchangeRate={exchangeRate}
-              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenNewTransaction={handleOpenNewTransaction}
+              onEditTransaction={handleOpenEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
             />
           )}
 
@@ -354,14 +433,19 @@ export function App() {
         </main>
       </div>
 
-      {/* Quick Movement Registration Modal */}
+      {/* Quick Movement Registration & Edit Modal */}
       <TransactionModal
         isOpen={isTransactionModalOpen}
-        onClose={() => setIsTransactionModalOpen(false)}
+        onClose={() => {
+          setIsTransactionModalOpen(false);
+          setEditingTransaction(null);
+        }}
         accounts={accounts}
         currency={currency}
         exchangeRate={exchangeRate}
         onSaveTransaction={handleSaveTransaction}
+        onDeleteTransaction={handleDeleteTransaction}
+        editingTransaction={editingTransaction}
       />
 
       {/* Create Account Modal */}

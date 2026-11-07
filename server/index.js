@@ -80,15 +80,26 @@ async function fetchUserDebts(userId) {
   }));
 }
 
+function getDeviceTokenFromCookie(req) {
+  const rawCookie = req.headers?.cookie || '';
+  const match = rawCookie.match(/(?:^|;\s*)wf_device_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 // ----------------- FULL STATE SNAPSHOT (SQLite) -----------------
 app.get('/api/state', async (req, res) => {
   try {
-    const [usersRes, stateRes] = await Promise.all([
+    const deviceId = getDeviceTokenFromCookie(req);
+    const [usersRes, stateRes, trustedRes] = await Promise.all([
       db.execute('SELECT * FROM users ORDER BY id ASC'),
       db.execute("SELECT value FROM app_state WHERE key = 'active_user_id'"),
+      deviceId
+        ? db.execute({ sql: 'SELECT userId FROM trusted_devices WHERE deviceId = ?', args: [deviceId] })
+        : Promise.resolve({ rows: [] }),
     ]);
 
-    const activeUserId = req.query.userId || stateRes.rows[0]?.value || 'munboi';
+    const trustedUserId = trustedRes.rows[0]?.userId || null;
+    const activeUserId = req.query.userId || trustedUserId || stateRes.rows[0]?.value || 'munboi';
 
     const [accsRes, txsRes, subsRes, debts] = await Promise.all([
       db.execute({
@@ -116,6 +127,7 @@ app.get('/api/state', async (req, res) => {
 
     res.json({
       activeUserId: currentUser.id,
+      trustedDevice: Boolean(trustedUserId),
       users,
       user: currentUser,
       accounts: accsRes.rows.map(formatAccountRow),
@@ -195,11 +207,41 @@ app.post('/api/session', async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
 
-    await db.execute({
-      sql: `INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES ('active_user_id', ?, CURRENT_TIMESTAMP)`,
-      args: [userId],
-    });
-    res.json({ activeUserId: userId });
+    const existingDeviceId = getDeviceTokenFromCookie(req);
+    const deviceId =
+      existingDeviceId || `wf-dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    await Promise.all([
+      db.execute({
+        sql: `INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES ('active_user_id', ?, CURRENT_TIMESTAMP)`,
+        args: [userId],
+      }),
+      db.execute({
+        sql: `INSERT OR REPLACE INTO trusted_devices (deviceId, userId, userAgent, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+        args: [deviceId, userId, req.headers?.['user-agent'] || 'unknown'],
+      }),
+    ]);
+
+    // Permanent 10-year cookie so this device stays unlocked forever after first PIN login
+    res.setHeader(
+      'Set-Cookie',
+      `wf_device_token=${encodeURIComponent(deviceId)}; Path=/; Max-Age=315360000; SameSite=Lax`
+    );
+
+    res.json({ activeUserId: userId, trustedDevice: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/session/device', async (req, res) => {
+  try {
+    const deviceId = getDeviceTokenFromCookie(req);
+    if (deviceId) {
+      await db.execute({ sql: 'DELETE FROM trusted_devices WHERE deviceId = ?', args: [deviceId] });
+    }
+    res.setHeader('Set-Cookie', 'wf_device_token=; Path=/; Max-Age=0; SameSite=Lax');
+    res.json({ trustedDevice: false });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -340,14 +382,90 @@ app.post('/api/transactions', async (req, res) => {
   }
 });
 
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = req.body;
+    const userId = tx.userId || 'munboi';
+
+    // Fetch previous transaction to reconcile account balance delta
+    const prevRes = await db.execute({
+      sql: 'SELECT * FROM transactions WHERE id = ? AND userId = ?',
+      args: [id, userId],
+    });
+    const prevTx = prevRes.rows[0];
+
+    await db.execute({
+      sql: `UPDATE transactions
+            SET title = ?, amount = ?, type = ?, category = ?, accountId = ?, date = ?, notes = ?, isAntExpense = ?
+            WHERE id = ? AND userId = ?`,
+      args: [
+        tx.title,
+        Number(tx.amount),
+        tx.type,
+        tx.category,
+        tx.accountId,
+        tx.date,
+        tx.notes || null,
+        tx.isAntExpense ? 1 : 0,
+        id,
+        userId,
+      ],
+    });
+
+    if (prevTx) {
+      const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
+      const newSigned = tx.type === 'income' ? Number(tx.amount) : -Number(tx.amount);
+      if (prevTx.accountId === tx.accountId) {
+        const diff = newSigned - oldSigned;
+        await db.execute({
+          sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ?',
+          args: [diff, tx.accountId],
+        });
+      } else {
+        await Promise.all([
+          db.execute({
+            sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ?',
+            args: [oldSigned, prevTx.accountId],
+          }),
+          db.execute({
+            sql: 'UPDATE accounts SET balance = ROUND((balance + ?) * 100) / 100 WHERE id = ?',
+            args: [newSigned, tx.accountId],
+          }),
+        ]);
+      }
+    }
+
+    res.json(tx);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.query.userId || 'munboi';
+
+    const prevRes = await db.execute({
+      sql: 'SELECT * FROM transactions WHERE id = ? AND userId = ?',
+      args: [id, userId],
+    });
+    const prevTx = prevRes.rows[0];
+
     await db.execute({
       sql: 'DELETE FROM transactions WHERE id = ? AND userId = ?',
       args: [id, userId],
     });
+
+    if (prevTx) {
+      const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
+      await db.execute({
+        sql: 'UPDATE accounts SET balance = ROUND((balance - ?) * 100) / 100 WHERE id = ?',
+        args: [oldSigned, prevTx.accountId],
+      });
+    }
+
     res.json({ deleted: id });
   } catch (error) {
     res.status(500).json({ error: error.message });

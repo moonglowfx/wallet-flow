@@ -9,6 +9,7 @@ import {
   DollarSign,
   FileText,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import {
   INCOME_CATEGORIES,
@@ -24,6 +25,8 @@ export const TransactionModal = ({
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onSaveTransaction,
+  onDeleteTransaction,
+  editingTransaction = null,
 }) => {
   const [type, setType] = useState('expense'); // 'income' or 'expense'
   const [title, setTitle] = useState('');
@@ -38,13 +41,41 @@ export const TransactionModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      if ((!accountId || !accounts.some((a) => a.id === accountId)) && accounts.length > 0) {
-        setAccountId(accounts[0].id);
+      if (editingTransaction) {
+        setType(editingTransaction.type || 'expense');
+        setTitle(editingTransaction.title || '');
+        const cur = currency || 'USD';
+        setInputCurrency(cur);
+        const rawAmt = Number(editingTransaction.amount) || 0;
+        setAmount(
+          cur === 'COP'
+            ? String(Math.round(rawAmt * exchangeRate))
+            : String(Math.round(rawAmt * 100) / 100)
+        );
+        setAccountId(editingTransaction.accountId || accounts[0]?.id || '');
+        setCategory(
+          editingTransaction.category ||
+            (editingTransaction.type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0])
+        );
+        setDate(editingTransaction.date || new Date().toISOString().split('T')[0]);
+        setNotes(editingTransaction.notes || '');
+        setIsAntExpense(Boolean(editingTransaction.isAntExpense));
+      } else {
+        setType('expense');
+        setTitle('');
+        setAmount('');
+        setInputCurrency(currency || 'USD');
+        if ((!accountId || !accounts.some((a) => a.id === accountId)) && accounts.length > 0) {
+          setAccountId(accounts[0].id);
+        }
+        setCategory(EXPENSE_CATEGORIES[0]);
+        setDate(new Date().toISOString().split('T')[0]);
+        setNotes('');
+        setIsAntExpense(false);
       }
-      setInputCurrency(currency || 'USD');
       setError('');
     }
-  }, [isOpen, accounts, currency]);
+  }, [isOpen, editingTransaction, accounts, currency, exchangeRate]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -95,6 +126,7 @@ export const TransactionModal = ({
         : Math.round(numericAmount * 100) / 100;
 
     onSaveTransaction({
+      ...(editingTransaction ? { id: editingTransaction.id } : {}),
       title: title.trim(),
       amount: amountInUSD,
       type,
@@ -110,6 +142,14 @@ export const TransactionModal = ({
     setNotes('');
     setIsAntExpense(false);
     onClose();
+  };
+
+  const handleDelete = () => {
+    if (!editingTransaction || !onDeleteTransaction) return;
+    if (window.confirm(`¿Eliminar el movimiento "${editingTransaction.title}"?`)) {
+      onDeleteTransaction(editingTransaction.id);
+      onClose();
+    }
   };
 
   return (
@@ -144,10 +184,12 @@ export const TransactionModal = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight">
-                Registrar Movimiento
+                {editingTransaction ? 'Editar Movimiento' : 'Registrar Movimiento'}
               </h3>
               <p className="text-xs text-zinc-400">
-                Entrada de capital o salida de recursos
+                {editingTransaction
+                  ? 'Actualiza importe, concepto, cuenta, fecha o categoría'
+                  : 'Entrada de capital o salida de recursos'}
               </p>
             </div>
           </div>
@@ -364,20 +406,35 @@ export const TransactionModal = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="liquid-pill px-4 py-2.5 text-zinc-400 hover:text-white cursor-pointer font-semibold"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="liquid-button-primary px-6 py-2.5 font-bold cursor-pointer"
-            >
-              Guardar Movimiento
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-white/10">
+            {editingTransaction && onDeleteTransaction ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="liquid-pill px-3.5 py-2.5 text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/35 flex items-center gap-1.5 cursor-pointer font-semibold"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2.5 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="liquid-pill px-4 py-2.5 text-zinc-400 hover:text-white cursor-pointer font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="liquid-button-primary px-6 py-2.5 font-bold cursor-pointer"
+              >
+                {editingTransaction ? 'Guardar Cambios' : 'Guardar Movimiento'}
+              </button>
+            </div>
           </div>
         </form>
         )}

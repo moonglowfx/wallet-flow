@@ -54,6 +54,12 @@ export const api = {
     });
   },
 
+  async clearDeviceSession() {
+    return await sqliteFetch(`${API_BASE}/session/device`, {
+      method: 'DELETE',
+    });
+  },
+
   // Accounts
   async getAccounts(userId = 'munboi') {
     const data = await sqliteFetch(`${API_BASE}/accounts?userId=${encodeURIComponent(userId)}`);
@@ -70,11 +76,13 @@ export const api = {
     return data || account;
   },
 
-  async updateAccount(account, userId = 'munboi') {
+  async updateAccount(accountOrId, maybeAccount, userId = 'munboi') {
+    const account = typeof accountOrId === 'string' ? { ...maybeAccount, id: accountOrId } : accountOrId;
+    const uid = account?.userId || userId || 'munboi';
     const data = await sqliteFetch(`${API_BASE}/accounts/${encodeURIComponent(account.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...account, userId }),
+      body: JSON.stringify({ ...account, userId: uid }),
     });
     return data || account;
   },
@@ -102,6 +110,17 @@ export const api = {
     return data || transaction;
   },
 
+  async updateTransaction(transactionOrId, maybeTx, userId = 'munboi') {
+    const tx = typeof transactionOrId === 'string' ? { ...maybeTx, id: transactionOrId } : transactionOrId;
+    const uid = tx?.userId || userId || 'munboi';
+    const data = await sqliteFetch(`${API_BASE}/transactions/${encodeURIComponent(tx.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...tx, userId: uid }),
+    });
+    return data || tx;
+  },
+
   async deleteTransaction(transactionId, userId = 'munboi') {
     return await sqliteFetch(
       `${API_BASE}/transactions/${encodeURIComponent(transactionId)}?userId=${encodeURIComponent(userId)}`,
@@ -125,11 +144,13 @@ export const api = {
     return data || subscription;
   },
 
-  async updateSubscription(subscription, userId = 'munboi') {
+  async updateSubscription(subOrId, maybeSub, userId = 'munboi') {
+    const subscription = typeof subOrId === 'string' ? { ...maybeSub, id: subOrId } : subOrId;
+    const uid = subscription?.userId || userId || 'munboi';
     const data = await sqliteFetch(`${API_BASE}/subscriptions/${encodeURIComponent(subscription.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...subscription, userId }),
+      body: JSON.stringify({ ...subscription, userId: uid }),
     });
     return data || subscription;
   },
@@ -164,11 +185,13 @@ export const api = {
     return data || debt;
   },
 
-  async updateDebt(debt, userId = 'munboi') {
+  async updateDebt(debtOrId, maybeDebt, userId = 'munboi') {
+    const debt = typeof debtOrId === 'string' ? { ...maybeDebt, id: debtOrId } : debtOrId;
+    const uid = debt?.userId || userId || 'munboi';
     const data = await sqliteFetch(`${API_BASE}/debts/${encodeURIComponent(debt.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...debt, userId }),
+      body: JSON.stringify({ ...debt, userId: uid }),
     });
     return data || debt;
   },

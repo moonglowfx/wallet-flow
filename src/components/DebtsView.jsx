@@ -10,6 +10,8 @@ import {
   ArrowRight,
   ShieldAlert,
   Clock,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { api } from '../services/api.js';
@@ -25,6 +27,7 @@ export const DebtsView = ({
 }) => {
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState(null);
   const [showNewDebtModal, setShowNewDebtModal] = useState(false);
+  const [editingDebtId, setEditingDebtId] = useState(null);
 
   const defaultLiquidAcc = accounts.find((a) => a.type !== 'credit')?.id || accounts[0]?.id || '';
 
@@ -123,7 +126,41 @@ export const DebtsView = ({
     setSelectedDebtForPayment(null);
   };
 
-  // Handle adding a brand new debt item
+  const openEditDebt = (debt) => {
+    setEditingDebtId(debt.id);
+    setNewTitle(debt.title);
+    setNewCounterparty(debt.counterparty || '');
+    setNewCategory(debt.category || 'Préstamo Personal');
+    setNewDebtCurrency(currency);
+    const mult = currency === 'COP' ? exchangeRate : 1;
+    setNewTotal(String(currency === 'COP' ? Math.round((debt.totalAmount || 0) * mult) : debt.totalAmount));
+    setNewPaid(String(currency === 'COP' ? Math.round((debt.paidAmount || 0) * mult) : (debt.paidAmount || 0)));
+    setNewRate(String(debt.interestRate ?? 0));
+    setNewMinMonthly(
+      String(currency === 'COP' ? Math.round((debt.minimumMonthlyPayment || 0) * mult) : (debt.minimumMonthlyPayment || 0))
+    );
+    setNewDueDate(debt.dueDate || '2027-12-31');
+    setShowNewDebtModal(true);
+  };
+
+  const openNewDebt = () => {
+    setEditingDebtId(null);
+    setNewTitle('');
+    setNewCounterparty('');
+    setNewTotal('');
+    setNewPaid('0');
+    setNewDebtCurrency(currency);
+    setShowNewDebtModal(true);
+  };
+
+  const handleDeleteDebt = (id) => {
+    setDebts((prev) => prev.filter((d) => d.id !== id));
+    api.deleteDebt(id).catch((err) => console.error('Error SQLite deleteDebt:', err));
+    setEditingDebtId(null);
+    setShowNewDebtModal(false);
+  };
+
+  // Handle adding or editing a debt item
   const handleCreateDebt = (e) => {
     e.preventDefault();
     if (!newTitle.trim() || !newTotal) return;
@@ -138,8 +175,9 @@ export const DebtsView = ({
       minMonthlyNum = minMonthlyNum / exchangeRate;
     }
 
-    const createdDebt = {
-      id: `debt-${Date.now()}`,
+    const existing = editingDebtId ? debts.find((d) => d.id === editingDebtId) : null;
+    const debtPayload = {
+      id: editingDebtId || `debt-${Date.now()}`,
       title: newTitle.trim(),
       counterparty: newCounterparty.trim() || 'Entidad Financiera',
       category: newCategory,
@@ -148,16 +186,24 @@ export const DebtsView = ({
       interestRate: parseFloat(newRate) || 0,
       minimumMonthlyPayment: Math.round(minMonthlyNum * 100) / 100,
       dueDate: newDueDate,
-      payments: [],
+      payments: existing?.payments || [],
     };
 
-    setDebts([createdDebt, ...debts]);
-    api
-      .createDebt(createdDebt, currentUser?.id || 'munboi')
-      .catch((err) => console.error('Error SQLite createDebt:', err));
+    if (editingDebtId) {
+      setDebts((prev) => prev.map((d) => (d.id === editingDebtId ? debtPayload : d)));
+      api
+        .updateDebt(debtPayload, currentUser?.id || 'munboi')
+        .catch((err) => console.error('Error SQLite updateDebt:', err));
+    } else {
+      setDebts([debtPayload, ...debts]);
+      api
+        .createDebt(debtPayload, currentUser?.id || 'munboi')
+        .catch((err) => console.error('Error SQLite createDebt:', err));
+    }
     setNewTitle('');
     setNewCounterparty('');
     setNewTotal('');
+    setEditingDebtId(null);
     setShowNewDebtModal(false);
   };
 
@@ -176,7 +222,7 @@ export const DebtsView = ({
         </div>
 
         <button
-          onClick={() => setShowNewDebtModal(true)}
+          onClick={openNewDebt}
           className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
@@ -277,16 +323,26 @@ export const DebtsView = ({
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => setSelectedDebtForPayment(debt)}
-                    disabled={isLiquidated}
-                    className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
-                      isLiquidated ? 'opacity-40 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Ingresar Abono</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEditDebt(debt)}
+                      title="Editar deuda"
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-purple-500/20 text-zinc-400 hover:text-purple-200 border border-white/10 transition-all cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setSelectedDebtForPayment(debt)}
+                      disabled={isLiquidated}
+                      className={`liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
+                        isLiquidated ? 'opacity-40 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Ingresar Abono</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Balances and Progress Bar */}
@@ -531,10 +587,13 @@ export const DebtsView = ({
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
-                Registrar Deuda o Préstamo
+                {editingDebtId ? 'Editar Deuda / Crédito' : 'Registrar Deuda o Préstamo'}
               </h3>
               <button
-                onClick={() => setShowNewDebtModal(false)}
+                onClick={() => {
+                  setEditingDebtId(null);
+                  setShowNewDebtModal(false);
+                }}
                 className="text-zinc-400 hover:text-white p-1 cursor-pointer"
               >
                 ✕
@@ -683,20 +742,37 @@ export const DebtsView = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowNewDebtModal(false)}
-                  className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="liquid-button-primary px-5 py-2 font-semibold cursor-pointer"
-                >
-                  Guardar Deuda
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-3">
+                {editingDebtId ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDebt(editingDebtId)}
+                    className="liquid-pill px-3 py-2 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDebtId(null);
+                      setShowNewDebtModal(false);
+                    }}
+                    className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary px-5 py-2 font-semibold cursor-pointer"
+                  >
+                    {editingDebtId ? 'Guardar Cambios' : 'Guardar Deuda'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

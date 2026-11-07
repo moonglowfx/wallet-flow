@@ -73,6 +73,15 @@ export async function initDatabase() {
       );
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS trusted_devices (
+        deviceId TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        userAgent TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 2. Core Financial Tables with userId column
     await db.execute(`
       CREATE TABLE IF NOT EXISTS accounts (

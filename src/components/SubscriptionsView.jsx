@@ -9,6 +9,8 @@ import {
   Zap,
   DollarSign,
   TrendingUp,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { api } from '../services/api.js';
@@ -22,9 +24,10 @@ export const SubscriptionsView = ({
   currentUser,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingSubId, setEditingSubId] = useState(null);
   const [filterMode, setFilterMode] = useState('all'); // all, essential, optional
 
-  // New subscription form state
+  // New/Edit subscription form state
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Streaming & Media');
   const [amount, setAmount] = useState('');
@@ -32,6 +35,29 @@ export const SubscriptionsView = ({
   const [billingDay, setBillingDay] = useState('5');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [essential, setEssential] = useState(false);
+
+  const openEditSub = (sub) => {
+    setEditingSubId(sub.id);
+    setName(sub.name);
+    setCategory(sub.category || 'Streaming & Media');
+    setSubCurrency(currency);
+    const displayAmt = currency === 'COP' ? Math.round((sub.amount || 0) * exchangeRate) : sub.amount;
+    setAmount(String(displayAmt ?? ''));
+    setBillingDay(String(sub.billingDay || 5));
+    setAccountId(sub.accountId || accounts[0]?.id || '');
+    setEssential(Boolean(sub.essential));
+    setShowAddModal(true);
+  };
+
+  const openNewSub = () => {
+    setEditingSubId(null);
+    setName('');
+    setAmount('');
+    setSubCurrency(currency);
+    setBillingDay('5');
+    setEssential(false);
+    setShowAddModal(true);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -70,25 +96,41 @@ export const SubscriptionsView = ({
 
     const numAmount = parseFloat(amount);
     const finalUSDAmount = subCurrency === 'COP' ? numAmount / exchangeRate : numAmount;
+    const existing = editingSubId ? subscriptions.find((s) => s.id === editingSubId) : null;
 
-    const newSub = {
-      id: `sub-${Date.now()}`,
+    const subPayload = {
+      id: editingSubId || `sub-${Date.now()}`,
       name: name.trim(),
       category,
       amount: Math.round(finalUSDAmount * 100) / 100,
       billingDay: parseInt(billingDay, 10) || 1,
       accountId: accountId || accounts[0]?.id || '',
-      active: true,
+      active: existing ? existing.active : true,
       essential,
-      badgeColor: '#A855F7',
+      badgeColor: existing?.badgeColor || '#A855F7',
     };
 
-    setSubscriptions([newSub, ...subscriptions]);
-    api.createSubscription(newSub, currentUser?.id || 'munboi').catch((err) =>
-      console.error('Error SQLite createSubscription:', err)
-    );
+    if (editingSubId) {
+      setSubscriptions((prev) => prev.map((s) => (s.id === editingSubId ? subPayload : s)));
+      api.updateSubscription(subPayload, currentUser?.id || 'munboi').catch((err) =>
+        console.error('Error SQLite updateSubscription:', err)
+      );
+    } else {
+      setSubscriptions([subPayload, ...subscriptions]);
+      api.createSubscription(subPayload, currentUser?.id || 'munboi').catch((err) =>
+        console.error('Error SQLite createSubscription:', err)
+      );
+    }
     setName('');
     setAmount('');
+    setEditingSubId(null);
+    setShowAddModal(false);
+  };
+
+  const handleDeleteSub = (id) => {
+    setSubscriptions((prev) => prev.filter((s) => s.id !== id));
+    api.deleteSubscription(id).catch((err) => console.error('Error SQLite deleteSubscription:', err));
+    setEditingSubId(null);
     setShowAddModal(false);
   };
 
@@ -113,7 +155,7 @@ export const SubscriptionsView = ({
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={openNewSub}
           className="liquid-button-primary px-4 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
@@ -258,17 +300,27 @@ export const SubscriptionsView = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => toggleActive(sub.id)}
-                    title={sub.active ? 'Pausar cobro' : 'Reactivar cobro'}
-                    className="cursor-pointer transition-transform active:scale-90"
-                  >
-                    {sub.active ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-zinc-500" />
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEditSub(sub)}
+                      title="Editar suscripción"
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-purple-500/20 text-zinc-400 hover:text-purple-200 border border-white/10 transition-all cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleActive(sub.id)}
+                      title={sub.active ? 'Pausar cobro' : 'Reactivar cobro'}
+                      className="cursor-pointer transition-transform active:scale-90"
+                    >
+                      {sub.active ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-zinc-500" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Price and billing day */}
@@ -323,10 +375,13 @@ export const SubscriptionsView = ({
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
-                Registrar Gasto Fijo o Suscripción
+                {editingSubId ? 'Editar Suscripción / Pago Fijo' : 'Registrar Gasto Fijo o Suscripción'}
               </h3>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setEditingSubId(null);
+                  setShowAddModal(false);
+                }}
                 className="text-zinc-400 hover:text-white p-1 cursor-pointer"
               >
                 ✕
@@ -446,20 +501,37 @@ export const SubscriptionsView = ({
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="liquid-button-primary px-5 py-2 font-semibold cursor-pointer"
-                >
-                  Guardar Suscripción
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-4">
+                {editingSubId ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSub(editingSubId)}
+                    className="liquid-pill px-3 py-2 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSubId(null);
+                      setShowAddModal(false);
+                    }}
+                    className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary px-5 py-2 font-semibold cursor-pointer"
+                  >
+                    {editingSubId ? 'Guardar Cambios' : 'Guardar Suscripción'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -15,6 +15,9 @@ import {
   AlertCircle,
   CalendarDays,
   Clock,
+  Edit2,
+  Trash2,
+  X,
 } from 'lucide-react';
 import {
   formatCurrency,
@@ -22,9 +25,12 @@ import {
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
 } from '../data/mockData.js';
+import { api } from '../services/api.js';
 
 export const AccountsView = ({
+  currentUser,
   accounts = [],
+  setAccounts,
   transactions = [],
   timeframe = 'monthly',
   selectedYear = '2026',
@@ -32,12 +38,57 @@ export const AccountsView = ({
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewAccount,
   onOpenNewTransaction,
+  onEditTransaction,
+  onDeleteTransaction,
   selectedAccountId,
   setSelectedAccountId,
+  showToast,
 }) => {
   const [activeAccountType, setActiveAccountType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [scopeFilter, setScopeFilter] = useState('period'); // 'period' (respects global timeframe) or 'all'
+  const [editingAccount, setEditingAccount] = useState(null);
+  const [accName, setAccName] = useState('');
+  const [accInstitution, setAccInstitution] = useState('');
+  const [accBalance, setAccBalance] = useState('');
+  const [accLimit, setAccLimit] = useState('');
+  const [accNumber, setAccNumber] = useState('');
+
+  const openEditAccountModal = (acc, e) => {
+    if (e) e.stopPropagation();
+    setEditingAccount(acc);
+    setAccName(acc.name || '');
+    setAccInstitution(acc.institution || '');
+    setAccBalance((acc.balance || 0).toString());
+    setAccLimit((acc.creditLimit || '').toString());
+    setAccNumber(acc.accountNumber || '');
+  };
+
+  const handleSaveEditedAccount = (e) => {
+    e.preventDefault();
+    if (!editingAccount || !setAccounts) return;
+    let editedObj = null;
+    const updated = accounts.map((a) => {
+      if (a.id === editingAccount.id) {
+        editedObj = {
+          ...a,
+          name: accName.trim() || a.name,
+          institution: accInstitution.trim() || a.institution,
+          balance: parseFloat(accBalance) || 0,
+          creditLimit: a.type === 'credit' ? parseFloat(accLimit) || a.creditLimit : undefined,
+          accountNumber: accNumber.trim() || a.accountNumber,
+        };
+        return editedObj;
+      }
+      return a;
+    });
+    setAccounts(updated);
+    if (editedObj) {
+      api.updateAccount(editedObj.id, editedObj, currentUser?.id || 'munboi');
+    }
+    setEditingAccount(null);
+    if (showToast) showToast('Cuenta actualizada en SQLite');
+  };
 
   // Dynamic transactions filtered in real time by the active global timeframe and year
   const periodTxs = React.useMemo(() => {
@@ -227,11 +278,21 @@ export const AccountsView = ({
                     </div>
                   </div>
 
-                  <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badge.color}`}
-                  >
-                    {badge.label}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.color}`}
+                    >
+                      {badge.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => openEditAccountModal(acc, e)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-purple-500/20 text-zinc-400 hover:text-purple-200 border border-white/10 hover:border-purple-400/40 transition-colors cursor-pointer"
+                      title="Editar cuenta"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main Balance Display */}
@@ -410,7 +471,8 @@ export const AccountsView = ({
               return (
                 <div
                   key={tx.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-150"
+                  onClick={() => onEditTransaction && onEditTransaction(tx)}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-purple-500/30 transition-all duration-150 cursor-pointer group"
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div
@@ -429,7 +491,7 @@ export const AccountsView = ({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-white truncate">
+                        <span className="text-sm font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
                           {tx.title}
                         </span>
                         {tx.isAntExpense && (
@@ -451,8 +513,19 @@ export const AccountsView = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
-                    <span className="text-[11px] text-zinc-500 sm:hidden">Importe:</span>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-white/5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTransaction && onEditTransaction(tx);
+                      }}
+                      className="liquid-pill px-2.5 py-1 text-[11px] font-semibold text-purple-200 hover:text-white flex items-center gap-1 border-purple-500/30 hover:border-purple-400 cursor-pointer"
+                      title="Editar movimiento"
+                    >
+                      <Edit2 className="w-3 h-3 text-purple-400" />
+                      <span>Editar</span>
+                    </button>
                     <div className="text-right">
                       <p
                         className={`text-sm sm:text-base font-bold tracking-tight ${
@@ -476,6 +549,103 @@ export const AccountsView = ({
           </div>
         )}
       </div>
+
+      {/* Inline Account Edit Modal */}
+      {editingAccount && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingAccount(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14121E]/95 backdrop-blur-2xl border border-purple-500/40 p-5 sm:p-6 space-y-4 text-xs shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-base font-bold text-white">Editar Cuenta</h3>
+              <button
+                type="button"
+                onClick={() => setEditingAccount(null)}
+                className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedAccount} className="space-y-3">
+              <div>
+                <label className="block text-zinc-300 mb-1">Nombre de la Cuenta</label>
+                <input
+                  type="text"
+                  required
+                  value={accName}
+                  onChange={(e) => setAccName(e.target.value)}
+                  className="liquid-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1">Institución</label>
+                <input
+                  type="text"
+                  value={accInstitution}
+                  onChange={(e) => setAccInstitution(e.target.value)}
+                  className="liquid-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1">Saldo en USD</label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={accBalance}
+                  onChange={(e) => setAccBalance(e.target.value)}
+                  className="liquid-input text-xs font-bold"
+                />
+              </div>
+
+              {editingAccount.type === 'credit' && (
+                <div>
+                  <label className="block text-zinc-300 mb-1">Límite de Crédito USD</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={accLimit}
+                    onChange={(e) => setAccLimit(e.target.value)}
+                    className="liquid-input text-xs font-bold"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-zinc-300 mb-1">Número de Cuenta / Referencia</label>
+                <input
+                  type="text"
+                  value={accNumber}
+                  onChange={(e) => setAccNumber(e.target.value)}
+                  className="liquid-input text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingAccount(null)}
+                  className="liquid-pill px-4 py-2 text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="liquid-button-primary px-5 py-2 font-bold cursor-pointer">
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
