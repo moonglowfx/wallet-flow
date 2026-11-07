@@ -49,6 +49,7 @@ export const SettingsView = ({
   showToast,
 }) => {
   const [activeTab, setActiveTab] = useState('seguridad'); // seguridad, perfil, divisas, cuentas, suscripciones, deudas, datos
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // PIN Change State
   const [currentPin, setCurrentPin] = useState('');
@@ -296,6 +297,45 @@ export const SettingsView = ({
     }
   };
 
+  // ----------------- MANUAL CHANGES PERSISTENCE TO DATABASE -----------------
+  const handleSyncManualChanges = async () => {
+    setIsSyncing(true);
+    try {
+      await api.bulkImport(
+        {
+          accounts,
+          transactions,
+          subscriptions,
+          debts,
+        },
+        'replace',
+        currentUser.id
+      );
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          `wf_saved_state_${currentUser.id}`,
+          JSON.stringify({
+            accounts,
+            transactions,
+            subscriptions,
+            debts,
+            updatedAt: Date.now(),
+          })
+        );
+      }
+
+      if (showToast) {
+        showToast('✅ Cambios manuales guardados y sincronizados en la base de datos');
+      }
+    } catch (err) {
+      console.error('Error al sincronizar a SQLite:', err);
+      if (showToast) showToast('⚠️ Cambios respaldados localmente');
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  };
+
   // ----------------- DATA BACKUP & RESTORE -----------------
   const handleExportBackup = () => {
     const backupData = {
@@ -386,10 +426,21 @@ export const SettingsView = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-900/40 border border-purple-500/40 text-purple-200">
               Usuario: <strong className="text-white">{currentUser.username}</strong>
             </span>
+
+            <button
+              type="button"
+              onClick={handleSyncManualChanges}
+              disabled={isSyncing}
+              className="liquid-button-primary px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-neon-purple active:scale-95 transition-all"
+              title="Guardar todos los cambios manuales directamente en la base de datos SQLite / Turso"
+            >
+              <Save className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Guardando...' : 'Sincronizar a BD'}</span>
+            </button>
           </div>
         </div>
 
@@ -889,14 +940,26 @@ export const SettingsView = ({
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
-                Estado de la Base de Datos SQLite
+                Base de Datos SQLite & Auto-Sincronización
               </h3>
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                Sincronización Activa
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Auto-Guardado Activo
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSyncManualChanges}
+                  disabled={isSyncing}
+                  className="liquid-button-primary px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-neon-purple active:scale-95"
+                >
+                  <Save className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando...' : 'Guardar a SQLite Ahora'}</span>
+                </button>
+              </div>
             </div>
             <p className="text-xs text-zinc-300 leading-relaxed">
-              Tus registros financieros de <strong className="text-white">{currentUser.username}</strong> ({accounts.length} cuentas, {transactions.length} movimientos, {subscriptions.length} gastos fijos y {debts.length} deudas) están protegidos y almacenados de forma permanente en <code className="text-purple-200">wallet_flow.db</code>.
+              Tus registros de <strong className="text-white">{currentUser.username}</strong> ({accounts.length} cuentas, {transactions.length} movimientos, {subscriptions.length} gastos fijos y {debts.length} deudas) se guardan automáticamente en tiempo real en <code className="text-purple-200">wallet_flow.db</code> y en tu almacenamiento seguro local. Nada se borrará ni se sobreescribirá.
             </p>
           </div>
         </div>

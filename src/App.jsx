@@ -96,8 +96,22 @@ export function App() {
       return;
     }
 
-    // Fallback if running without Node server
+    // Resilient fallback: restore saved manual changes from offline backup before mock
     const uid = targetUserId || 'munboi';
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`wf_saved_state_${uid}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+          if (Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
+          if (Array.isArray(parsed.subscriptions)) setSubscriptions(parsed.subscriptions);
+          if (Array.isArray(parsed.debts)) setDebts(parsed.debts);
+          return;
+        }
+      } catch (_) {}
+    }
+
     const initial = getUserInitialData(uid);
     setAccounts(initial.accounts);
     setTransactions(initial.transactions);
@@ -356,6 +370,50 @@ export function App() {
     }
     setIsLoginModalOpen(true);
   }, []);
+
+  // Automatic Real-Time Persistence: Debounced sync of all manual changes to SQLite & LocalStorage
+  const isInitialSyncDoneRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!isInitialSyncDoneRef.current) {
+      if (accounts.length > 0 || transactions.length > 0) {
+        isInitialSyncDoneRef.current = true;
+      }
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        await api.bulkImport(
+          {
+            accounts,
+            transactions,
+            subscriptions,
+            debts,
+          },
+          'replace',
+          currentUser.id
+        );
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            `wf_saved_state_${currentUser.id}`,
+            JSON.stringify({
+              accounts,
+              transactions,
+              subscriptions,
+              debts,
+              updatedAt: Date.now(),
+            })
+          );
+        }
+      } catch (err) {
+        console.warn('Auto-persisting to SQLite deferred:', err);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [accounts, transactions, subscriptions, debts, currentUser.id]);
 
   const handleOpenEditTransaction = useCallback((tx) => {
     setEditingTransaction(tx);
