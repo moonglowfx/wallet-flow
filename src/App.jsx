@@ -443,54 +443,34 @@ export function App() {
     setIsLoginModalOpen(true);
   }, []);
 
-  // Automatic Real-Time Persistence: Debounced sync of all manual changes to SQLite & LocalStorage
-  const isInitialSyncDoneRef = React.useRef(false);
-
+  // Resilient Local Snapshot: Keep offline manual changes synchronized in localStorage
   useEffect(() => {
-    // Prevent syncing while switching between users to guarantee total isolation
     if (isSwitchingUserRef.current || activeUserRef.current !== currentUser.id) {
       return;
     }
 
-    if (!isInitialSyncDoneRef.current) {
-      if (accounts.length > 0 || transactions.length > 0) {
-        isInitialSyncDoneRef.current = true;
-      }
-      return;
-    }
-
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       try {
-        await api.bulkImport(
-          {
-            accounts,
-            transactions,
-            subscriptions,
-            debts,
-          },
-          'replace',
-          currentUser.id
-        );
-
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && (accounts.length > 0 || transactions.length > 0)) {
           localStorage.setItem(
             `wf_saved_state_${currentUser.id}`,
             JSON.stringify({
+              user: currentUser,
               accounts,
               transactions,
               subscriptions,
               debts,
+              currency,
+              exchangeRate,
               updatedAt: Date.now(),
             })
           );
         }
-      } catch (err) {
-        console.warn('Auto-persisting to SQLite deferred:', err);
-      }
-    }, 600);
+      } catch (_) {}
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [accounts, transactions, subscriptions, debts, currentUser.id]);
+  }, [accounts, transactions, subscriptions, debts, currency, exchangeRate, currentUser]);
 
   const handleOpenEditTransaction = useCallback((tx) => {
     setEditingTransaction(tx);

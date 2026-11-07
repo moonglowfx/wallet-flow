@@ -4,8 +4,9 @@ import { getUserInitialData, syncUsersFromDatabase } from '../data/users.js';
 const API_BASE = '/api';
 
 async function sqliteFetch(url, options = {}) {
+  const timeoutMs = options.timeout || 12000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeoutId);
@@ -13,8 +14,19 @@ async function sqliteFetch(url, options = {}) {
     if (res.ok && ct && ct.includes('application/json')) {
       return await res.json();
     }
-  } catch (_) {}
-  clearTimeout(timeoutId);
+    if (!res.ok) {
+      let errorMsg = `HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) errorMsg = errJson.error;
+      } catch (_) {}
+      console.warn(`sqliteFetch error on ${url}:`, errorMsg);
+      return { ok: false, error: errorMsg, status: res.status };
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.warn(`sqliteFetch network error on ${url}:`, err.message);
+  }
   return null;
 }
 
@@ -235,6 +247,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, mode, userId }),
+      timeout: 40000,
     });
   },
 
@@ -244,6 +257,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
+      timeout: 15000,
     });
   },
 
@@ -252,14 +266,35 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
+      timeout: 20000,
     });
   },
 
-  // Database Backup & Persistence Info
+  // Database Backup, Snapshot & Restore
   async backupDatabase() {
     return await sqliteFetch(`${API_BASE}/database/backup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      timeout: 30000,
+    });
+  },
+
+  async restoreDatabase(snapshotOrUseLatest = true) {
+    const body =
+      typeof snapshotOrUseLatest === 'object' && snapshotOrUseLatest !== null
+        ? { snapshot: snapshotOrUseLatest }
+        : { useLatest: true };
+    return await sqliteFetch(`${API_BASE}/database/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      timeout: 45000,
+    });
+  },
+
+  async getLatestSnapshot() {
+    return await sqliteFetch(`${API_BASE}/database/snapshot/latest`, {
+      timeout: 15000,
     });
   },
 

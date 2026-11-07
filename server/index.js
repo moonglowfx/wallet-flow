@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { db, initDatabase, seedUserData, clearDatabase, getDatabaseConnectionInfo } from './db.js';
 import { createDatabaseBackup } from '../scripts/backup_db.js';
+import { restoreDatabase } from '../scripts/restore_db.js';
 
 export const app = express();
 const PORT = process.env.PORT || 3001;
@@ -960,44 +961,60 @@ app.post('/api/import', async (req, res) => {
     }
 
     for (const acc of accounts) {
-      const accCur = acc.currency === 'COP' ? 'COP' : 'USD';
+      const accCur = (acc.currency || 'USD').toUpperCase();
       const numBal = Number(acc.balance);
+      const finalBal = Number.isFinite(numBal) ? numBal : 0;
+      const numLimit = Number(acc.creditLimit);
+      const finalLimit = Number.isFinite(numLimit) ? numLimit : null;
+      const numCutOff = Number(acc.cutOffDay);
+      const finalCutOff = Number.isFinite(numCutOff) ? numCutOff : null;
+      const numDueDay = Number(acc.paymentDueDay);
+      const finalDueDay = Number.isFinite(numDueDay) ? numDueDay : null;
+      const numYield = Number(acc.yieldRate);
+      const finalYield = Number.isFinite(numYield) ? numYield : null;
+
       statements.push({
         sql: `INSERT OR REPLACE INTO accounts (id, name, institution, type, balance, currency, creditLimit, cutOffDay, paymentDueDay, accountNumber, accentGradient, yieldRate, userId)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          acc.id,
-          acc.name,
+          acc.id || 'acc_' + Math.random().toString(36).substring(2, 9),
+          acc.name || 'Cuenta',
           acc.institution || 'Entidad Financiera',
           acc.type || 'bank',
-          Number.isFinite(numBal) ? numBal : 0,
+          finalBal,
           accCur,
-          acc.creditLimit ?? null,
-          acc.cutOffDay ?? null,
-          acc.paymentDueDay ?? null,
+          finalLimit,
+          finalCutOff,
+          finalDueDay,
           acc.accountNumber || '•••• 0000',
           acc.accentGradient ?? null,
-          acc.yieldRate ?? null,
+          finalYield,
           userId,
         ],
       });
     }
 
+    const firstAccId = accounts[0]?.id || 'acc_1';
+
     for (const tx of transactions) {
-      const txCur = tx.currency === 'COP' ? 'COP' : 'USD';
-      const origAmt = Number.isFinite(Number(tx.originalAmount)) ? Number(tx.originalAmount) : Number(tx.amount);
+      const txCur = (tx.currency || 'USD').toUpperCase();
+      const numTxAmt = Number(tx.amount);
+      const finalTxAmt = Number.isFinite(numTxAmt) ? numTxAmt : 0;
+      const rawOrig = tx.originalAmount !== undefined && tx.originalAmount !== null ? Number(tx.originalAmount) : numTxAmt;
+      const finalOrigAmt = Number.isFinite(rawOrig) ? rawOrig : finalTxAmt;
+
       statements.push({
         sql: `INSERT OR REPLACE INTO transactions (id, title, amount, originalAmount, currency, type, category, accountId, date, notes, isAntExpense, userId)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          tx.id,
-          tx.title,
-          tx.amount,
-          origAmt,
+          tx.id || 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          tx.title || 'Movimiento',
+          finalTxAmt,
+          finalOrigAmt,
           txCur,
           tx.type || 'expense',
           tx.category || 'Otros',
-          tx.accountId,
+          tx.accountId || firstAccId,
           tx.date || new Date().toISOString().split('T')[0],
           tx.notes || null,
           tx.isAntExpense ? 1 : 0,
@@ -1007,18 +1024,23 @@ app.post('/api/import', async (req, res) => {
     }
 
     for (const sub of subscriptions) {
-      const subCur = sub.currency === 'COP' ? 'COP' : 'USD';
+      const subCur = (sub.currency || 'USD').toUpperCase();
+      const numSubAmt = Number(sub.amount);
+      const finalSubAmt = Number.isFinite(numSubAmt) ? numSubAmt : 0;
+      const numBillingDay = Number(sub.billingDay);
+      const finalBillingDay = Number.isFinite(numBillingDay) ? numBillingDay : 1;
+
       statements.push({
         sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId, autoCharge)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          sub.id,
-          sub.name,
+          sub.id || 'sub_' + Math.random().toString(36).substring(2, 9),
+          sub.name || 'Suscripción',
           sub.category || 'Servicios',
-          sub.amount,
+          finalSubAmt,
           subCur,
-          sub.billingDay || 1,
-          sub.accountId,
+          finalBillingDay,
+          sub.accountId || firstAccId,
           sub.active ? 1 : 0,
           sub.essential ? 1 : 0,
           sub.badgeColor || '#A855F7',
@@ -1029,20 +1051,29 @@ app.post('/api/import', async (req, res) => {
     }
 
     for (const debt of debts) {
-      const debtCur = debt.currency === 'COP' ? 'COP' : 'USD';
+      const debtCur = (debt.currency || 'USD').toUpperCase();
+      const numTotal = Number(debt.totalAmount);
+      const finalTotal = Number.isFinite(numTotal) ? numTotal : 0;
+      const numPaid = Number(debt.paidAmount);
+      const finalPaid = Number.isFinite(numPaid) ? numPaid : 0;
+      const numRate = Number(debt.interestRate);
+      const finalRate = Number.isFinite(numRate) ? numRate : 0;
+      const numMin = Number(debt.minimumMonthlyPayment);
+      const finalMin = Number.isFinite(numMin) ? numMin : 0;
+
       statements.push({
         sql: `INSERT OR REPLACE INTO debts (id, title, counterparty, category, totalAmount, paidAmount, currency, interestRate, minimumMonthlyPayment, dueDate, userId)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          debt.id,
-          debt.title,
+          debt.id || 'debt_' + Math.random().toString(36).substring(2, 9),
+          debt.title || 'Deuda',
           debt.counterparty || 'Entidad',
           debt.category || 'Préstamo',
-          debt.totalAmount,
-          debt.paidAmount || 0,
+          finalTotal,
+          finalPaid,
           debtCur,
-          debt.interestRate || 0,
-          debt.minimumMonthlyPayment || 0,
+          finalRate,
+          finalMin,
           debt.dueDate || '2027-12-31',
           userId,
         ],
@@ -1050,16 +1081,19 @@ app.post('/api/import', async (req, res) => {
 
       if (debt.payments && Array.isArray(debt.payments)) {
         for (const p of debt.payments) {
-          const payCur = p.currency === 'COP' ? 'COP' : 'USD';
+          const payCur = (p.currency || debtCur || 'USD').toUpperCase();
+          const numPay = Number(p.amount);
+          const finalPay = Number.isFinite(numPay) ? numPay : 0;
+
           statements.push({
             sql: `INSERT OR REPLACE INTO debt_payments (id, debtId, amount, currency, date, note, accountId, userId)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
-              p.id,
+              p.id || 'pay_' + Math.random().toString(36).substring(2, 9),
               debt.id,
-              p.amount,
+              finalPay,
               payCur,
-              p.date,
+              p.date || new Date().toISOString().split('T')[0],
               p.note || 'Abono',
               p.accountId || null,
               userId,
@@ -1069,9 +1103,19 @@ app.post('/api/import', async (req, res) => {
       }
     }
 
+    // Execute in safe batch chunks of 75 to avoid payload or statement limits
     if (statements.length > 0) {
-      await db.batch(statements);
+      const CHUNK_SIZE = 75;
+      for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
+        const chunk = statements.slice(i, i + CHUNK_SIZE);
+        await db.batch(chunk);
+      }
     }
+
+    await db.execute({
+      sql: "INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES ('db_initialized', 'true', CURRENT_TIMESTAMP)",
+      args: [],
+    });
 
     res.json({
       success: true,
@@ -1135,6 +1179,38 @@ app.get('/api/database/info', async (_req, res) => {
         users: usersRes.rows[0]?.c || 0,
       },
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/database/snapshot/latest', async (_req, res) => {
+  try {
+    const snapshotPath = path.resolve(__dirname, '../backups/wallet_flow_snapshot_latest.json');
+    if (fs.existsSync(snapshotPath)) {
+      const raw = fs.readFileSync(snapshotPath, 'utf-8');
+      res.json(JSON.parse(raw));
+    } else {
+      res.status(404).json({ error: 'No se encontró un snapshot previo en el servidor.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/database/restore', async (req, res) => {
+  try {
+    const { snapshot, useLatest } = req.body || {};
+    if (useLatest) {
+      const result = await restoreDatabase();
+      return res.json(result);
+    }
+    if (snapshot) {
+      const result = await restoreDatabase(snapshot);
+      return res.json(result);
+    }
+    const result = await restoreDatabase();
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

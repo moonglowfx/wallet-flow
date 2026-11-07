@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Settings,
   Shield,
@@ -25,6 +25,16 @@ import {
   Building2,
   X,
   ShieldCheck,
+  Eye,
+  FileText,
+  Check,
+  Database,
+  HelpCircle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  FolderOpen,
+  HardDrive,
+  Search,
 } from 'lucide-react';
 import { getUserPin, setUserPin, setUserProfile } from '../data/users.js';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
@@ -89,6 +99,17 @@ export const SettingsView = ({
   const [debtPaid, setDebtPaid] = useState('');
   const [debtInterest, setDebtInterest] = useState('');
   const [debtDueDate, setDebtDueDate] = useState('');
+
+  // Import Manual Changes & Persistence State
+  const fileInputRef = useRef(null);
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState(null);
+  const [importMode, setImportMode] = useState('replace'); // 'replace' | 'merge'
+  const [isApplyingImport, setIsApplyingImport] = useState(false);
+  const [breakdownActiveTab, setBreakdownActiveTab] = useState('cuentas'); // 'cuentas', 'transacciones', 'suscripciones', 'deudas'
+  const [txSearchTerm, setTxSearchTerm] = useState('');
+  const [dbLiveInfo, setDbLiveInfo] = useState(null);
+  const [isLoadingLiveInfo, setIsLoadingLiveInfo] = useState(false);
 
   // ----------------- PIN CHANGE HANDLER -----------------
   const handleUpdatePin = (e) => {
@@ -343,7 +364,25 @@ export const SettingsView = ({
     }
   };
 
-  // ----------------- DATA BACKUP & RESTORE -----------------
+  // ----------------- LIVE DATABASE INTEGRITY & INFO -----------------
+  const fetchLiveDbInfo = async () => {
+    setIsLoadingLiveInfo(true);
+    try {
+      const info = await api.getDatabaseInfo();
+      if (info) setDbLiveInfo(info);
+    } catch (_) {
+    } finally {
+      setIsLoadingLiveInfo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'datos') {
+      fetchLiveDbInfo();
+    }
+  }, [activeTab]);
+
+  // ----------------- DATA BACKUP, BREAKDOWN & PERSISTENCE -----------------
   const handleExportBackup = () => {
     const backupData = {
       user: currentUser,
@@ -366,36 +405,214 @@ export const SettingsView = ({
     if (showToast) showToast('Respaldo descargado exitosamente');
   };
 
-  const handleImportBackup = (e) => {
+  const prepareAndOpenBreakdown = (rawJson, sourceLabel) => {
+    if (!rawJson || typeof rawJson !== 'object') {
+      alert('El contenido no es un objeto JSON válido');
+      return;
+    }
+
+    // Support both direct structure and server snapshot structure { timestamp, data: { ... } }
+    const container =
+      rawJson.data && typeof rawJson.data === 'object' && (rawJson.data.accounts || rawJson.data.transactions)
+        ? rawJson.data
+        : rawJson;
+
+    let parsedAccounts = Array.isArray(container.accounts) ? [...container.accounts] : [];
+    let parsedTxs = Array.isArray(container.transactions) ? [...container.transactions] : [];
+    let parsedSubs = Array.isArray(container.subscriptions) ? [...container.subscriptions] : [];
+    let parsedDebts = Array.isArray(container.debts) ? [...container.debts] : [];
+
+    // Filter by user if multi-user snapshot
+    if (currentUser?.id) {
+      const userAccounts = parsedAccounts.filter((a) => !a.userId || a.userId === currentUser.id);
+      if (userAccounts.length > 0) {
+        parsedAccounts = userAccounts;
+        parsedTxs = parsedTxs.filter((t) => !t.userId || t.userId === currentUser.id);
+        parsedSubs = parsedSubs.filter((s) => !s.userId || s.userId === currentUser.id);
+        parsedDebts = parsedDebts.filter((d) => !d.userId || d.userId === currentUser.id);
+      }
+    }
+
+    if (
+      parsedAccounts.length === 0 &&
+      parsedTxs.length === 0 &&
+      parsedSubs.length === 0 &&
+      parsedDebts.length === 0
+    ) {
+      alert('El archivo o respaldo seleccionado no contiene cuentas, transacciones, suscripciones o deudas para importar.');
+      return;
+    }
+
+    const detectedCurrency =
+      container.currency ||
+      rawJson.currency ||
+      (container.user && container.user.currency) ||
+      currentUser.currency ||
+      currency ||
+      'USD';
+
+    const detectedRate = Number(
+      container.exchangeRate ||
+      rawJson.exchangeRate ||
+      (container.user && container.user.exchangeRate) ||
+      exchangeRate ||
+      DEFAULT_USD_COP_RATE
+    );
+
+    const normalizedData = {
+      sourceName: sourceLabel,
+      rawUser: container.user || rawJson.user || null,
+      timestamp: rawJson.timestamp || rawJson.exportDate || rawJson.updatedAt || new Date().toISOString(),
+      accounts: parsedAccounts,
+      transactions: parsedTxs,
+      subscriptions: parsedSubs,
+      debts: parsedDebts,
+      currency: detectedCurrency,
+      exchangeRate: detectedRate,
+    };
+
+    setPendingImportData(normalizedData);
+    setTxSearchTerm('');
+    setBreakdownActiveTab('cuentas');
+    setIsBreakdownModalOpen(true);
+  };
+
+  const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
-        const data = JSON.parse(event.target.result);
-        await api.clearUserData(currentUser.id);
-        await api.bulkImport({
-          userId: currentUser.id,
-          accounts: data.accounts || [],
-          transactions: data.transactions || [],
-          subscriptions: data.subscriptions || [],
-          debts: data.debts || [],
-        });
-
-        if (data.accounts && Array.isArray(data.accounts)) setAccounts(data.accounts);
-        if (data.transactions && Array.isArray(data.transactions)) setTransactions(data.transactions);
-        if (data.subscriptions && Array.isArray(data.subscriptions)) setSubscriptions(data.subscriptions);
-        if (data.debts && Array.isArray(data.debts)) setDebts(data.debts);
-        if (data.currency) setCurrency(data.currency);
-        if (data.exchangeRate) setExchangeRate(data.exchangeRate);
-
-        if (showToast) showToast('Respaldo restaurado en la base de datos SQLite');
+        const rawJson = JSON.parse(event.target.result);
+        prepareAndOpenBreakdown(rawJson, `Archivo: ${file.name}`);
       } catch (err) {
-        alert('Error al leer o restaurar el archivo de respaldo: ' + err.message);
+        alert('Error al leer o procesar el archivo JSON: ' + err.message);
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleLoadFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem(`wf_saved_state_${currentUser.id}`);
+      if (!saved) {
+        if (showToast) showToast('No se encontró un respaldo local guardado en este navegador.');
+        else alert(`No se encontró un respaldo local guardado en este navegador para ${currentUser.username}.`);
+        return;
+      }
+      const rawJson = JSON.parse(saved);
+      prepareAndOpenBreakdown(rawJson, `Respaldo Local (${currentUser.username})`);
+    } catch (err) {
+      alert('Error al leer el respaldo local: ' + err.message);
+    }
+  };
+
+  const handleLoadLatestServerSnapshot = async () => {
+    try {
+      const snapshot = await api.getLatestSnapshot();
+      if (!snapshot || snapshot.error) {
+        alert(snapshot?.error || 'No se encontró un snapshot previo en el servidor.');
+        return;
+      }
+      prepareAndOpenBreakdown(snapshot, 'Snapshot del Servidor (Turso / SQLite)');
+    } catch (err) {
+      alert('Error al cargar snapshot del servidor: ' + err.message);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImportData) return;
+    setIsApplyingImport(true);
+
+    try {
+      let finalAccounts = pendingImportData.accounts;
+      let finalTransactions = pendingImportData.transactions;
+      let finalSubscriptions = pendingImportData.subscriptions;
+      let finalDebts = pendingImportData.debts;
+
+      if (importMode === 'merge') {
+        const existingAccMap = new Map(accounts.map((a) => [a.id, a]));
+        pendingImportData.accounts.forEach((a) => existingAccMap.set(a.id, a));
+        finalAccounts = Array.from(existingAccMap.values());
+
+        const existingTxMap = new Map(transactions.map((t) => [t.id, t]));
+        pendingImportData.transactions.forEach((t) => existingTxMap.set(t.id, t));
+        finalTransactions = Array.from(existingTxMap.values());
+
+        const existingSubMap = new Map(subscriptions.map((s) => [s.id, s]));
+        pendingImportData.subscriptions.forEach((s) => existingSubMap.set(s.id, s));
+        finalSubscriptions = Array.from(existingSubMap.values());
+
+        const existingDebtMap = new Map(debts.map((d) => [d.id, d]));
+        pendingImportData.debts.forEach((d) => existingDebtMap.set(d.id, d));
+        finalDebts = Array.from(existingDebtMap.values());
+      }
+
+      await api.bulkImport(
+        {
+          accounts: finalAccounts,
+          transactions: finalTransactions,
+          subscriptions: finalSubscriptions,
+          debts: finalDebts,
+        },
+        importMode,
+        currentUser.id
+      );
+
+      setAccounts(finalAccounts);
+      setTransactions(finalTransactions);
+      setSubscriptions(finalSubscriptions);
+      setDebts(finalDebts);
+
+      if (pendingImportData.currency && setCurrency) {
+        setCurrency(pendingImportData.currency);
+      }
+      if (pendingImportData.exchangeRate && setExchangeRate) {
+        setExchangeRate(pendingImportData.exchangeRate);
+      }
+
+      if (pendingImportData.currency || pendingImportData.exchangeRate) {
+        api
+          .updateUser(currentUser.id, {
+            currency: pendingImportData.currency,
+            exchangeRate: pendingImportData.exchangeRate,
+          })
+          .catch(() => {});
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          `wf_saved_state_${currentUser.id}`,
+          JSON.stringify({
+            user: currentUser,
+            accounts: finalAccounts,
+            transactions: finalTransactions,
+            subscriptions: finalSubscriptions,
+            debts: finalDebts,
+            currency: pendingImportData.currency,
+            exchangeRate: pendingImportData.exchangeRate,
+            updatedAt: Date.now(),
+          })
+        );
+      }
+
+      setIsBreakdownModalOpen(false);
+      setPendingImportData(null);
+      fetchLiveDbInfo();
+
+      if (showToast) {
+        showToast(
+          `✅ Persistencia exitosa: ${finalAccounts.length} cuentas y ${finalTransactions.length} movimientos guardados`
+        );
+      }
+    } catch (err) {
+      console.error('Error importando cambios a SQLite:', err);
+      alert('Error al persistir cambios manuales en la base de datos: ' + err.message);
+    } finally {
+      setIsApplyingImport(false);
+    }
   };
 
   const handleClearAllUserData = async () => {
@@ -409,12 +626,102 @@ export const SettingsView = ({
       setSubscriptions([]);
       setDebts([]);
       await api.clearUserData(currentUser.id).catch((err) => console.error('Error SQLite clearUserData:', err));
+      fetchLiveDbInfo();
       if (showToast) showToast(`Datos de ${currentUser.username} limpiados a 0 en SQLite`);
     }
   };
 
+  // Metrics for Breakdown Modal
+  const breakdownMetrics = useMemo(() => {
+    if (!pendingImportData) return null;
+    const { accounts: bAccs, transactions: bTxs, subscriptions: bSubs, debts: bDebts, exchangeRate: bRate } = pendingImportData;
+
+    const totalBalanceUSD = bAccs.reduce((sum, a) => {
+      const bal = Number(a.balance) || 0;
+      return sum + (a.currency === 'COP' ? bal / bRate : bal);
+    }, 0);
+
+    const totalIncomeUSD = bTxs
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => {
+        const amt = Number(t.amount) || 0;
+        return sum + (t.currency === 'COP' ? amt / bRate : amt);
+      }, 0);
+
+    const totalExpenseUSD = bTxs
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => {
+        const amt = Number(t.amount) || 0;
+        return sum + (t.currency === 'COP' ? amt / bRate : amt);
+      }, 0);
+
+    const antExpensesCount = bTxs.filter((t) => t.isAntExpense).length;
+
+    const sortedDates = bTxs
+      .map((t) => t.date)
+      .filter(Boolean)
+      .sort();
+    const minDate = sortedDates[0] || 'N/A';
+    const maxDate = sortedDates[sortedDates.length - 1] || 'N/A';
+
+    const monthlySubsUSD = bSubs.reduce((sum, s) => {
+      const amt = Number(s.amount) || 0;
+      return sum + (s.currency === 'COP' ? amt / bRate : amt);
+    }, 0);
+
+    const activeSubsCount = bSubs.filter((s) => s.active !== 0 && s.active !== false).length;
+
+    const totalDebtsUSD = bDebts.reduce((sum, d) => {
+      const amt = Number(d.totalAmount) || 0;
+      return sum + (d.currency === 'COP' ? amt / bRate : amt);
+    }, 0);
+
+    const remainingDebtsUSD = bDebts.reduce((sum, d) => {
+      const tot = Number(d.totalAmount) || 0;
+      const paid = Number(d.paidAmount) || 0;
+      const rem = Math.max(0, tot - paid);
+      return sum + (d.currency === 'COP' ? rem / bRate : rem);
+    }, 0);
+
+    return {
+      totalBalanceUSD,
+      totalIncomeUSD,
+      totalExpenseUSD,
+      antExpensesCount,
+      minDate,
+      maxDate,
+      monthlySubsUSD,
+      activeSubsCount,
+      totalDebtsUSD,
+      remainingDebtsUSD,
+    };
+  }, [pendingImportData]);
+
+  // Filtered transactions for Modal search
+  const filteredBreakdownTxs = useMemo(() => {
+    if (!pendingImportData || !pendingImportData.transactions) return [];
+    if (!txSearchTerm.trim()) return pendingImportData.transactions;
+    const term = txSearchTerm.toLowerCase();
+    return pendingImportData.transactions.filter(
+      (t) =>
+        (t.title && t.title.toLowerCase().includes(term)) ||
+        (t.category && t.category.toLowerCase().includes(term)) ||
+        (t.notes && t.notes.toLowerCase().includes(term)) ||
+        (t.date && t.date.includes(term))
+    );
+  }, [pendingImportData, txSearchTerm]);
+
   return (
     <div className="space-y-8 pb-12">
+      {/* Hidden file input for importing manual changes & JSON backups */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".json,application/json"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* Header Banner */}
       <div className="liquid-glass-purple p-4 sm:p-6 lg:p-8 space-y-4 relative overflow-hidden">
         <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-purple-600/20 blur-3xl" />
@@ -437,6 +744,19 @@ export const SettingsView = ({
             <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-900/40 border border-purple-500/40 text-purple-200">
               Usuario: <strong className="text-white">{currentUser.username}</strong>
             </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('datos');
+                fileInputRef.current?.click();
+              }}
+              className="liquid-pill px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer border-purple-500/40 text-purple-200 hover:text-white hover:bg-purple-600/30 transition-all active:scale-95"
+              title="Importar archivo JSON de cambios manuales o respaldo"
+            >
+              <Upload className="w-3.5 h-3.5 text-purple-400" />
+              <span>Importar Cambios</span>
+            </button>
 
             <button
               type="button"
@@ -918,27 +1238,95 @@ export const SettingsView = ({
         </div>
       )}
 
-      {/* ---------------- TAB 7: DATOS, RESPALDO Y BASE DE DATOS ---------------- */}
+      {/* ---------------- TAB 7: DATOS, RESPALDO Y PERSISTENCIA SQLITE / TURSO ---------------- */}
       {activeTab === 'datos' && (
-        <div className="space-y-6 max-w-2xl mx-auto">
-          {/* Export Backup Card */}
+        <div className="space-y-6 max-w-3xl mx-auto">
+          {/* Card 1: Importar Cambios Manuales & Respaldos con Desglose */}
+          <div className="liquid-glass-purple p-6 sm:p-7 space-y-4 border border-purple-500/40 relative overflow-hidden">
+            <div className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-purple-500/20 blur-2xl" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-purple-300 shrink-0">
+                  <Upload className="w-5 h-5 text-purple-300" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Importar Cambios Manuales & Respaldos
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                      Desglose Completo
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-300">
+                    Carga un archivo JSON de cambios, restaura desde el navegador o recupera el último snapshot del servidor
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed relative z-10">
+              Al seleccionar una fuente, se abrirá el <strong>Modal de Desglose Completo</strong> para revisar cada cuenta, transacción, suscripción y deuda antes de persistirla en la base de datos de <strong>{currentUser.username}</strong>.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 relative z-10">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="liquid-button-primary p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer shadow-neon-purple active:scale-95 transition-all"
+              >
+                <FolderOpen className="w-5 h-5 text-white" />
+                <span className="text-xs font-bold text-white">Subir Archivo JSON</span>
+                <span className="text-[10px] text-purple-200 opacity-80">Respaldos externos o manuales</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLoadFromLocalStorage}
+                className="liquid-glass p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer border-purple-500/30 hover:border-purple-400/60 active:scale-95 transition-all text-purple-200 hover:text-white"
+              >
+                <HardDrive className="w-5 h-5 text-indigo-400" />
+                <span className="text-xs font-bold text-white">Respaldo Local</span>
+                <span className="text-[10px] text-zinc-400">Guardado en este navegador</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLoadLatestServerSnapshot}
+                className="liquid-glass p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer border-purple-500/30 hover:border-purple-400/60 active:scale-95 transition-all text-purple-200 hover:text-white"
+              >
+                <Database className="w-5 h-5 text-emerald-400" />
+                <span className="text-xs font-bold text-white">Snapshot Servidor</span>
+                <span className="text-[10px] text-zinc-400">Turso Cloud / SQLite</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Exportar Respaldos y Snapshots */}
           <div className="liquid-glass p-6 sm:p-7 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Download className="w-4 h-4 text-purple-400" />
-              Exportar Copia de Seguridad (JSON)
+              Exportar Copia de Seguridad & Snapshots
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Descarga un respaldo completo con todas las cuentas, transacciones, suscripciones y deudas almacenadas en la base de datos SQLite de tu perfil.
+              Descarga una copia completa de tus registros bancarios en formato JSON para guardar en tu disco o genera un snapshot binario seguro en el backend.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                onClick={handleExportBackup}
+                className="liquid-button-primary px-4 py-2.5 text-xs font-bold flex items-center gap-2 cursor-pointer shadow-neon-purple active:scale-95"
+              >
+                <Download className="w-4 h-4" />
+                <span>Descargar Respaldo JSON ({currentUser.username})</span>
+              </button>
+
               <button
                 type="button"
                 onClick={async () => {
                   try {
                     const res = await api.backupDatabase();
                     if (res && res.success) {
-                      if (showToast) showToast('Backup de base de datos generado con éxito');
+                      if (showToast) showToast('Backup binario y JSON de Turso/SQLite creado');
+                      fetchLiveDbInfo();
                     } else {
                       handleExportBackup();
                     }
@@ -946,33 +1334,32 @@ export const SettingsView = ({
                     handleExportBackup();
                   }
                 }}
-                className="liquid-button-primary px-4 py-2.5 text-xs font-bold flex items-center gap-2 cursor-pointer shadow-neon-purple active:scale-95"
+                className="liquid-pill px-4 py-2.5 text-xs font-bold text-purple-200 hover:text-white flex items-center gap-2 cursor-pointer border-purple-500/40 active:scale-95"
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Generar Backup SQLite / Turso</span>
-              </button>
-              <button
-                onClick={handleExportBackup}
-                className="liquid-pill px-4 py-2.5 text-xs font-bold text-purple-200 hover:text-white flex items-center gap-2 cursor-pointer border-purple-500/40"
-              >
-                <Download className="w-4 h-4 text-purple-400" />
-                <span>Descargar Respaldo JSON</span>
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <span>Generar Snapshot SQLite / Turso</span>
               </button>
             </div>
           </div>
 
-          {/* SQLite Database Integrity Status Card */}
-          <div className="liquid-glass-purple p-6 sm:p-7 space-y-3">
+          {/* Card 3: Estado de Persistencia e Integridad en Tiempo Real */}
+          <div className="liquid-glass p-6 sm:p-7 space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
-                Base de Datos SQLite & Auto-Sincronización
+                Persistencia Garantizada & Estado de Base de Datos
               </h3>
+
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Auto-Guardado Activo
-                </span>
+                <button
+                  type="button"
+                  onClick={fetchLiveDbInfo}
+                  disabled={isLoadingLiveInfo}
+                  className="liquid-pill p-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                  title="Actualizar estado de conexión"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLiveInfo ? 'animate-spin text-purple-400' : ''}`} />
+                </button>
                 <button
                   type="button"
                   onClick={handleSyncManualChanges}
@@ -980,13 +1367,64 @@ export const SettingsView = ({
                   className="liquid-button-primary px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-neon-purple active:scale-95"
                 >
                   <Save className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando...' : 'Guardar a SQLite Ahora'}</span>
+                  <span>{isSyncing ? 'Guardando...' : 'Sincronizar a BD Ahora'}</span>
                 </button>
               </div>
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Tus registros de <strong className="text-white">{currentUser.username}</strong> ({accounts.length} cuentas, {transactions.length} movimientos, {subscriptions.length} gastos fijos y {debts.length} deudas) se guardan automáticamente en tiempo real en <code className="text-purple-200">wallet_flow.db</code> y en tu almacenamiento seguro local. Nada se borrará ni se sobreescribirá.
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <span className="text-[10px] text-zinc-400 block font-semibold">Cuentas Registradas</span>
+                <span className="text-lg font-black text-white">{accounts.length}</span>
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <span className="text-[10px] text-zinc-400 block font-semibold">Transacciones Reales</span>
+                <span className="text-lg font-black text-emerald-400">{transactions.length}</span>
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <span className="text-[10px] text-zinc-400 block font-semibold">Suscripciones Fijas</span>
+                <span className="text-lg font-black text-purple-300">{subscriptions.length}</span>
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <span className="text-[10px] text-zinc-400 block font-semibold">Deudas Activas</span>
+                <span className="text-lg font-black text-amber-300">{debts.length}</span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-zinc-400 border-t border-white/10 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>
+                  Conexión activa:{' '}
+                  <strong className="text-white">
+                    {dbLiveInfo?.isRemoteTurso ? 'Turso Cloud (libSQL)' : 'SQLite Persistente Local'}
+                  </strong>
+                </span>
+              </div>
+              <span className="text-zinc-500 font-mono text-[10px]">
+                {dbLiveInfo?.clientUrl || 'wallet_flow.db'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Zona de Mantenimiento / Limpieza */}
+          <div className="liquid-glass p-6 border border-rose-500/20 space-y-3">
+            <h3 className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400" />
+              Zona de Mantenimiento & Reinicio de Sesión
+            </h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Si deseas vaciar completamente la sesión de <strong>{currentUser.username}</strong> en SQLite para comenzar de cero, puedes hacerlo aquí. Ten en cuenta que los datos de otros usuarios permanecen intactos.
             </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleClearAllUserData}
+                className="liquid-pill px-4 py-2 text-xs font-bold text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/40 cursor-pointer transition-all"
+              >
+                Limpiar datos de {currentUser.username} a 0 en SQLite
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1231,6 +1669,448 @@ export const SettingsView = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- MODAL DE DESGLOSE COMPLETO DE CAMBIOS MANUALES ---------------- */}
+      {isBreakdownModalOpen && pendingImportData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-[#12101C]/95 backdrop-blur-2xl border border-purple-500/40 shadow-neon-purple overflow-hidden text-xs">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-600/40 border border-purple-400/40 flex items-center justify-center text-purple-300 shrink-0">
+                  <Layers className="w-5 h-5 text-purple-200" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    Desglose Completo de Cambios Manuales & Respaldo
+                  </h3>
+                  <span className="text-[11px] text-zinc-300 block truncate max-w-md">
+                    Origen: <strong className="text-purple-300">{pendingImportData.sourceName}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBreakdownModalOpen(false);
+                  setPendingImportData(null);
+                }}
+                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 custom-scrollbar">
+              {/* Metadata Banner */}
+              <div className="bg-black/30 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-600/30 text-purple-200 border border-purple-500/30 font-semibold">
+                    Destino: <strong className="text-white">{currentUser.username}</strong>
+                  </span>
+                  {pendingImportData.rawUser?.username && (
+                    <span className="px-2.5 py-1 rounded-lg bg-white/5 text-zinc-300 border border-white/10">
+                      Usuario en archivo: <strong className="text-white">{pendingImportData.rawUser.username}</strong>
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 text-zinc-300 border border-white/10">
+                    Moneda:{' '}
+                    <strong className="text-white">
+                      {pendingImportData.currency} (1 USD = ${pendingImportData.exchangeRate.toLocaleString('es-CO')}{' '}
+                      COP)
+                    </strong>
+                  </span>
+                </div>
+
+                <span className="text-zinc-400">
+                  Fecha: {new Date(pendingImportData.timestamp).toLocaleString('es-CO')}
+                </span>
+              </div>
+
+              {/* KPI Summary Grid */}
+              {breakdownMetrics && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="liquid-glass p-3 sm:p-4 space-y-1 border-purple-500/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-400 font-semibold uppercase">Cuentas</span>
+                      <Wallet className="w-3.5 h-3.5 text-purple-400" />
+                    </div>
+                    <span className="text-lg font-black text-white block">
+                      {pendingImportData.accounts.length}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block truncate">
+                      Bal:{' '}
+                      <strong className="text-purple-200">
+                        {formatCurrency(
+                          breakdownMetrics.totalBalanceUSD,
+                          pendingImportData.currency,
+                          pendingImportData.exchangeRate
+                        )}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div className="liquid-glass p-3 sm:p-4 space-y-1 border-emerald-500/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-400 font-semibold uppercase">Transacciones</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-lg font-black text-emerald-400 block">
+                      {pendingImportData.transactions.length}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block truncate">
+                      +{formatCurrency(breakdownMetrics.totalIncomeUSD, pendingImportData.currency, pendingImportData.exchangeRate)} / -{formatCurrency(breakdownMetrics.totalExpenseUSD, pendingImportData.currency, pendingImportData.exchangeRate)}
+                    </span>
+                  </div>
+
+                  <div className="liquid-glass p-3 sm:p-4 space-y-1 border-indigo-500/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-400 font-semibold uppercase">Suscripciones</span>
+                      <CalendarClock className="w-3.5 h-3.5 text-indigo-400" />
+                    </div>
+                    <span className="text-lg font-black text-indigo-300 block">
+                      {pendingImportData.subscriptions.length}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block truncate">
+                      {formatCurrency(breakdownMetrics.monthlySubsUSD, pendingImportData.currency, pendingImportData.exchangeRate)}/mes ({breakdownMetrics.activeSubsCount} activas)
+                    </span>
+                  </div>
+
+                  <div className="liquid-glass p-3 sm:p-4 space-y-1 border-amber-500/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-400 font-semibold uppercase">Deudas</span>
+                      <HandCoins className="w-3.5 h-3.5 text-amber-400" />
+                    </div>
+                    <span className="text-lg font-black text-amber-300 block">
+                      {pendingImportData.debts.length}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block truncate">
+                      Pendiente: {formatCurrency(breakdownMetrics.remainingDebtsUSD, pendingImportData.currency, pendingImportData.exchangeRate)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-Tabs for Deep Inspection */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'cuentas', label: `Cuentas (${pendingImportData.accounts.length})`, icon: Wallet },
+                    { id: 'transacciones', label: `Transacciones (${pendingImportData.transactions.length})`, icon: ArrowUpRight },
+                    { id: 'suscripciones', label: `Suscripciones (${pendingImportData.subscriptions.length})`, icon: CalendarClock },
+                    { id: 'deudas', label: `Deudas (${pendingImportData.debts.length})`, icon: HandCoins },
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = breakdownActiveTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setBreakdownActiveTab(tab.id)}
+                        className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition-all ${
+                          isActive
+                            ? 'bg-purple-600/40 text-purple-200 border border-purple-400/40 shadow-liquid-purple'
+                            : 'text-zinc-400 hover:text-white bg-white/[0.03] border border-transparent'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-Tab 1: Detalle de Cuentas */}
+                {breakdownActiveTab === 'cuentas' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                    {pendingImportData.accounts.length === 0 ? (
+                      <p className="text-xs text-zinc-400 p-4 text-center col-span-2">No hay cuentas en este respaldo.</p>
+                    ) : (
+                      pendingImportData.accounts.map((acc, idx) => (
+                        <div
+                          key={acc.id || idx}
+                          className="bg-black/30 border border-white/10 rounded-2xl p-3.5 space-y-2 hover:border-purple-500/40 transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-xs font-bold text-white">{acc.name}</h4>
+                              <span className="text-[10px] text-zinc-400 block">{acc.institution || 'Entidad'}</span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {acc.type || 'bank'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
+                            <span className="text-zinc-500 font-mono text-[10px]">{acc.accountNumber || '•••• 0000'}</span>
+                            <span className="font-mono font-bold text-emerald-400">
+                              {formatCurrency(
+                                acc.balance || 0,
+                                acc.currency || pendingImportData.currency,
+                                pendingImportData.exchangeRate
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-Tab 2: Detalle de Transacciones con Buscador */}
+                {breakdownActiveTab === 'transacciones' && (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por título, categoría o notas en este respaldo..."
+                        value={txSearchTerm}
+                        onChange={(e) => setTxSearchTerm(e.target.value)}
+                        className="liquid-input pl-9 text-xs py-1.5"
+                      />
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                      {filteredBreakdownTxs.length === 0 ? (
+                        <p className="text-xs text-zinc-400 p-4 text-center">No se encontraron movimientos coincidentes.</p>
+                      ) : (
+                        filteredBreakdownTxs.map((tx, idx) => {
+                          const isIncome = tx.type === 'income';
+                          return (
+                            <div
+                              key={tx.id || idx}
+                              className="bg-black/25 border border-white/5 hover:border-white/15 rounded-xl p-2.5 flex items-center justify-between gap-3 transition-all"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
+                                    isIncome ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                  }`}
+                                >
+                                  {isIncome ? '+' : '-'}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <h5 className="text-xs font-semibold text-white truncate">{tx.title}</h5>
+                                    {tx.isAntExpense ? (
+                                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
+                                        🐜 Hormiga
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <span className="text-[10px] text-zinc-400 block truncate">
+                                    {tx.date} • {tx.category || 'Varios'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <span
+                                className={`font-mono text-xs font-bold shrink-0 ${
+                                  isIncome ? 'text-emerald-400' : 'text-rose-400'
+                                }`}
+                              >
+                                {isIncome ? '+' : '-'}
+                                {formatCurrency(
+                                  tx.amount || 0,
+                                  tx.currency || pendingImportData.currency,
+                                  pendingImportData.exchangeRate
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Tab 3: Detalle de Suscripciones */}
+                {breakdownActiveTab === 'suscripciones' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                    {pendingImportData.subscriptions.length === 0 ? (
+                      <p className="text-xs text-zinc-400 p-4 text-center col-span-2">No hay suscripciones en este respaldo.</p>
+                    ) : (
+                      pendingImportData.subscriptions.map((sub, idx) => (
+                        <div
+                          key={sub.id || idx}
+                          className="bg-black/30 border border-white/10 rounded-2xl p-3.5 space-y-2 hover:border-purple-500/40 transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-xs font-bold text-white">{sub.name}</h4>
+                              <span className="text-[10px] text-zinc-400 block">{sub.category || 'Servicios'}</span>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                sub.active !== 0 && sub.active !== false
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-zinc-700 text-zinc-400'
+                              }`}
+                            >
+                              {sub.active !== 0 && sub.active !== false ? 'Activa' : 'Pausada'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
+                            <span className="text-zinc-400 text-[10px]">Día {sub.billingDay || 1} de cada mes</span>
+                            <span className="font-mono font-bold text-purple-300">
+                              {formatCurrency(
+                                sub.amount || 0,
+                                sub.currency || pendingImportData.currency,
+                                pendingImportData.exchangeRate
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-Tab 4: Detalle de Deudas */}
+                {breakdownActiveTab === 'deudas' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                    {pendingImportData.debts.length === 0 ? (
+                      <p className="text-xs text-zinc-400 p-4 text-center col-span-2">No hay deudas en este respaldo.</p>
+                    ) : (
+                      pendingImportData.debts.map((d, idx) => {
+                        const tot = Number(d.totalAmount) || 0;
+                        const paid = Number(d.paidAmount) || 0;
+                        const rem = Math.max(0, tot - paid);
+                        return (
+                          <div
+                            key={d.id || idx}
+                            className="bg-black/30 border border-white/10 rounded-2xl p-3.5 space-y-2 hover:border-purple-500/40 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="text-xs font-bold text-white">{d.title}</h4>
+                                <span className="text-[10px] text-zinc-400 block">{d.counterparty || 'Entidad'}</span>
+                              </div>
+                              <span className="font-mono text-xs font-bold text-amber-300">
+                                Saldo: {formatCurrency(rem, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-white/5">
+                              <span>Total: {formatCurrency(tot, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}</span>
+                              <span>Vence: {d.dueDate || 'N/A'}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Mode Selector */}
+              <div className="bg-black/40 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+                <span className="text-xs font-bold text-white block">Selecciona el Modo de Persistencia:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition-all ${
+                      importMode === 'replace'
+                        ? 'bg-purple-600/25 border-purple-400 text-white shadow-liquid-purple'
+                        : 'bg-white/[0.02] border-white/10 text-zinc-300 hover:border-white/20'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="replace"
+                      checked={importMode === 'replace'}
+                      onChange={() => setImportMode('replace')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <strong className="text-xs font-bold block text-purple-200">
+                        Reemplazo Total (Recomendado)
+                      </strong>
+                      <span className="text-[10px] text-zinc-400 block leading-tight mt-0.5">
+                        Sustituye completamente la sesión de {currentUser.username} en SQLite/Turso. Garantiza que no
+                        queden registros obsoletos o huérfanos.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition-all ${
+                      importMode === 'merge'
+                        ? 'bg-purple-600/25 border-purple-400 text-white shadow-liquid-purple'
+                        : 'bg-white/[0.02] border-white/10 text-zinc-300 hover:border-white/20'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="merge"
+                      checked={importMode === 'merge'}
+                      onChange={() => setImportMode('merge')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <strong className="text-xs font-bold block text-purple-200">
+                        Fusión Progresiva (Merge)
+                      </strong>
+                      <span className="text-[10px] text-zinc-400 block leading-tight mt-0.5">
+                        Combina las cuentas y movimientos entrantes con los que ya tienes guardados en la base de datos
+                        sin duplicar identificadores.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 bg-black/40">
+              <span className="text-[11px] text-zinc-400">
+                Se persistirán en SQLite/Turso:{' '}
+                <strong className="text-white">
+                  {pendingImportData.accounts.length} cuentas, {pendingImportData.transactions.length} movimientos
+                </strong>
+              </span>
+
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  disabled={isApplyingImport}
+                  onClick={() => {
+                    setIsBreakdownModalOpen(false);
+                    setPendingImportData(null);
+                  }}
+                  className="liquid-pill px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isApplyingImport}
+                  onClick={handleConfirmImport}
+                  className="liquid-button-primary px-5 py-2 text-xs font-bold flex items-center gap-2 cursor-pointer shadow-neon-purple active:scale-95"
+                >
+                  {isApplyingImport ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>Persistiendo a BD...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 text-white" />
+                      <span>Confirmar e Importar a Base de Datos</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

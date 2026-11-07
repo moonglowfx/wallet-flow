@@ -8,22 +8,31 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const backupsDir = path.join(rootDir, 'backups');
 
-export async function restoreDatabase(jsonSnapshotPath = null) {
-  const targetPath = jsonSnapshotPath || path.join(backupsDir, 'wallet_flow_snapshot_latest.json');
+export async function restoreDatabase(snapshotOrPath = null) {
+  let snapshot;
+  let sourceDesc = '';
 
-  if (!fs.existsSync(targetPath)) {
-    throw new Error(`No se encontró el archivo de snapshot para restaurar: ${targetPath}`);
+  if (snapshotOrPath && typeof snapshotOrPath === 'object') {
+    snapshot = snapshotOrPath;
+    sourceDesc = 'Objeto JSON en memoria';
+  } else {
+    const targetPath = snapshotOrPath || path.join(backupsDir, 'wallet_flow_snapshot_latest.json');
+    if (!fs.existsSync(targetPath)) {
+      throw new Error(`No se encontró el archivo de snapshot para restaurar: ${targetPath}`);
+    }
+    const raw = fs.readFileSync(targetPath, 'utf-8');
+    snapshot = JSON.parse(raw);
+    sourceDesc = targetPath;
   }
 
-  const raw = fs.readFileSync(targetPath, 'utf-8');
-  const snapshot = JSON.parse(raw);
-  const data = snapshot.data;
+  // Handle both { data: { accounts, ... } } and direct { accounts, ... }
+  const data = snapshot.data || snapshot;
 
-  if (!data || !Array.isArray(data.users) || !Array.isArray(data.accounts)) {
+  if (!data || (!Array.isArray(data.accounts) && !Array.isArray(data.transactions))) {
     throw new Error('El archivo de snapshot no contiene una estructura válida de datos.');
   }
 
-  console.log(`⏳ Restaurando datos desde: ${targetPath}`);
+  console.log(`⏳ Restaurando datos desde: ${sourceDesc}`);
 
   // Create tables IF NOT EXISTS first
   await db.execute(`
