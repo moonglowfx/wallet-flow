@@ -53,6 +53,9 @@ export const Header = ({
   activeTab,
   timeframe,
   setTimeframe,
+  selectedYear = '2026',
+  setSelectedYear,
+  availableYears = ['2026', '2025', '2024', 'all'],
   currency = 'USD',
   setCurrency,
   exchangeRate = DEFAULT_USD_COP_RATE,
@@ -91,9 +94,12 @@ export const Header = ({
                   <span className="text-[10px] text-zinc-400 font-normal">({currentUser?.role || 'Personal'})</span>
                 </button>
 
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-300">
-                  <Calendar className="w-3 h-3" />
-                  {TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Mensual'}
+                {/* Active Period & Year Pill Badge */}
+                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-300">
+                  <Calendar className="w-3 h-3 text-purple-400" />
+                  <span>{TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Mensual'}</span>
+                  <span className="text-zinc-500">•</span>
+                  <span className="font-bold text-white">{selectedYear === 'all' ? 'Histórico' : selectedYear}</span>
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300">
                   <Coins className="w-3 h-3" />
@@ -133,8 +139,8 @@ export const Header = ({
           </div>
         </div>
 
-        {/* Right: Currency Toggle + Global Timeframe Selector + Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5">
+        {/* Right: Currency Toggle + Year Selector + Global Timeframe Selector + Action Buttons */}
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
           {/* Dual Currency Switcher: USD (Principal) vs COP (Secundaria) */}
           <div className="bg-black/50 backdrop-blur-xl p-1 rounded-2xl border border-white/10 flex items-center shadow-inner">
             <button
@@ -161,7 +167,27 @@ export const Header = ({
             </button>
           </div>
 
-          {/* Global Temporal Filter */}
+          {/* Year Picker Dropdown */}
+          <div className="bg-black/50 backdrop-blur-xl p-1 rounded-2xl border border-white/10 flex items-center shadow-inner">
+            <span className="text-[11px] font-bold text-purple-300 pl-2 pr-0.5 flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-purple-400" />
+              <span className="hidden sm:inline">Año:</span>
+            </span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear && setSelectedYear(e.target.value)}
+              className="bg-transparent text-xs font-bold text-white py-1 px-2 cursor-pointer focus:outline-none border-none pr-2"
+              title="Escoger Año para análisis en todas las secciones"
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr} className="bg-[#14121E] text-white font-medium">
+                  {yr === 'all' ? 'Todos' : yr}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Global Temporal Filter (Esta Semana, Este Mes, Trimestre, Año) */}
           <div
             role="tablist"
             aria-label="Filtro Temporal Global"
@@ -175,7 +201,7 @@ export const Header = ({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setTimeframe(tf)}
-                  className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                     active
                       ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-[0_2px_15px_rgba(168,85,247,0.5)] border border-purple-400/40'
                       : 'text-zinc-400 hover:text-zinc-200'

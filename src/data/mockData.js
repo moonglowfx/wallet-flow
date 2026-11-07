@@ -8419,3 +8419,61 @@ export const formatSecondaryCurrency = (
   const targetCurrency = activeCurrency === 'USD' ? 'COP' : 'USD';
   return formatCurrency(valueInUSD, targetCurrency, rate, true);
 };
+
+/**
+ * Filtro universal y ultra-rápido de movimientos por período y año.
+ * Se aplica en tiempo real de forma sincronizada en todas las secciones de la app.
+ */
+export function filterTransactionsByPeriod(transactions = [], timeframe = 'monthly', selectedYear = '2026') {
+  if (!transactions || transactions.length === 0) return [];
+
+  // Filtrado base por año (o todos los años si es 'all')
+  let baseTxs = transactions;
+  if (selectedYear && selectedYear !== 'all') {
+    const yrStr = String(selectedYear);
+    baseTxs = transactions.filter((t) => t.date && t.date.startsWith(yrStr));
+  }
+
+  if (baseTxs.length === 0) return [];
+
+  if (timeframe === 'yearly') {
+    return baseTxs;
+  }
+
+  // Hallar fecha más reciente en este lote sin crear arrays ni objetos pesados
+  let latestDateStr = baseTxs[0]?.date || '';
+  for (let i = 1; i < baseTxs.length; i++) {
+    if (baseTxs[i].date && baseTxs[i].date > latestDateStr) {
+      latestDateStr = baseTxs[i].date;
+    }
+  }
+
+  if (!latestDateStr) return baseTxs;
+
+  const [yStr, mStr, dStr] = latestDateStr.split('-');
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const d = parseInt(dStr, 10);
+  const refDate = new Date(y, m - 1, d);
+
+  if (timeframe === 'monthly') {
+    const refMonthPrefix = `${yStr}-${mStr}`;
+    return baseTxs.filter((t) => t.date && t.date.startsWith(refMonthPrefix));
+  }
+
+  if (timeframe === 'weekly') {
+    const wStart = new Date(refDate);
+    wStart.setDate(wStart.getDate() - 7);
+    const wStartStr = `${wStart.getFullYear()}-${String(wStart.getMonth() + 1).padStart(2, '0')}-${String(wStart.getDate()).padStart(2, '0')}`;
+    return baseTxs.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
+  }
+
+  if (timeframe === 'quarterly') {
+    const qStart = new Date(refDate);
+    qStart.setDate(qStart.getDate() - 90);
+    const qStartStr = `${qStart.getFullYear()}-${String(qStart.getMonth() + 1).padStart(2, '0')}-${String(qStart.getDate()).padStart(2, '0')}`;
+    return baseTxs.filter((t) => t.date && t.date >= qStartStr && t.date <= latestDateStr);
+  }
+
+  return baseTxs;
+}

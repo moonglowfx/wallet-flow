@@ -21,6 +21,10 @@ import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 export const MonthlyExpensesView = ({
   transactions = [],
   accounts = [],
+  timeframe = 'monthly',
+  selectedYear = '2026',
+  setSelectedYear,
+  availableYears = ['2026', '2025', '2024', 'all'],
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
@@ -30,11 +34,19 @@ export const MonthlyExpensesView = ({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAccountId, setSelectedAccountId] = useState('all');
 
-  // Group all movements (both expenses and incomes) by month (YYYY-MM) in reverse chronological order
+  // Transactions filtered by selectedYear (or all years)
+  const scopedTransactions = useMemo(() => {
+    if (selectedYear && selectedYear !== 'all') {
+      return transactions.filter((t) => t.date && t.date.startsWith(String(selectedYear)));
+    }
+    return transactions;
+  }, [transactions, selectedYear]);
+
+  // Group movements (both expenses and incomes) by month (YYYY-MM) in reverse chronological order
   const monthGroups = useMemo(() => {
     const groups = {};
 
-    transactions.forEach((t) => {
+    scopedTransactions.forEach((t) => {
       if (!t.date) return;
       const monthKey = t.date.slice(0, 7); // e.g. "2026-11"
       if (!groups[monthKey]) {
@@ -67,13 +79,20 @@ export const MonthlyExpensesView = ({
     // Sort month keys descending (newest month first)
     const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
     return sortedKeys.map((k) => groups[k]);
-  }, [transactions]);
+  }, [scopedTransactions]);
 
-  // Active selected month (defaults to newest month available, e.g. 2026-11)
+  // Active selected month (defaults to newest month available in the active scope)
   const [activeMonthKey, setActiveMonthKey] = useState(() => {
     if (monthGroups.length > 0) return monthGroups[0].monthKey;
     return '2026-11';
   });
+
+  // Keep activeMonthKey aligned whenever selectedYear or monthGroups change
+  React.useEffect(() => {
+    if (monthGroups.length > 0 && !monthGroups.some((g) => g.monthKey === activeMonthKey)) {
+      setActiveMonthKey(monthGroups[0].monthKey);
+    }
+  }, [monthGroups, activeMonthKey]);
 
   const activeIndex = useMemo(() => {
     return monthGroups.findIndex((g) => g.monthKey === activeMonthKey);
@@ -192,6 +211,22 @@ export const MonthlyExpensesView = ({
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+
+            {/* Direct Year Filter Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear && setSelectedYear(e.target.value)}
+                className="liquid-input font-bold text-xs sm:text-sm py-2 pl-2.5 pr-6 cursor-pointer bg-[#14121E] border-purple-500/40 text-purple-200"
+                title="Filtrar Año Fiscal"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr === 'all' ? 'Todos' : yr}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Right: Movement Type Filter Pills: Todos, Gastos, Ingresos */}

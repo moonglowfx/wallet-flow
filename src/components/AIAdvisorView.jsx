@@ -25,14 +25,22 @@ import {
   Activity,
   AlertOctagon,
   Percent,
+  Calendar,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import {
+  formatCurrency,
+  DEFAULT_USD_COP_RATE,
+  TIMEFRAME_CONFIG,
+  filterTransactionsByPeriod,
+} from '../data/mockData.js';
 
 export const AIAdvisorView = ({
   accounts = [],
   transactions = [],
   subscriptions = [],
   debts = [],
+  timeframe = 'monthly',
+  selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
@@ -48,8 +56,14 @@ export const AIAdvisorView = ({
     }, 800);
   };
 
-  // ----------------- DYNAMIC CALCULATIONS -----------------
-  const totalIncomes = transactions
+  // ----------------- DYNAMIC CALCULATIONS FILTERED BY ACTIVE TIMEFRAME & YEAR -----------------
+  const activePeriodTxs = React.useMemo(() => {
+    return filterTransactionsByPeriod(transactions, timeframe, selectedYear);
+  }, [transactions, timeframe, selectedYear]);
+
+  const targetTxs = activePeriodTxs.length > 0 ? activePeriodTxs : transactions;
+
+  const totalIncomes = targetTxs
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 

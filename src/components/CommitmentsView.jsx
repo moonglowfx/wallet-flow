@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { SubscriptionsView } from './SubscriptionsView.jsx';
 import { DebtsView } from './DebtsView.jsx';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG } from '../data/mockData.js';
 
 export const CommitmentsView = ({
   subscriptions = [],
@@ -25,6 +25,8 @@ export const CommitmentsView = ({
   debts = [],
   setDebts,
   accounts = [],
+  timeframe = 'monthly',
+  selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onLogPaymentTransaction,
@@ -48,6 +50,23 @@ export const CommitmentsView = ({
   }, 0);
 
   const totalMonthlyCommitment = totalMonthlySubs + totalMonthlyDebtPayments;
+
+  // Real-time synchronization with active global timeframe
+  const periodMultiplier = React.useMemo(() => {
+    switch (timeframe) {
+      case 'weekly':
+        return 1 / 4.33;
+      case 'quarterly':
+        return 3;
+      case 'yearly':
+        return 12;
+      default:
+        return 1;
+    }
+  }, [timeframe]);
+
+  const periodCommitment = totalMonthlyCommitment * periodMultiplier;
+  const periodLabel = timeframe === 'weekly' ? 'Semanal' : timeframe === 'quarterly' ? 'Trimestral' : timeframe === 'yearly' ? 'Anual' : 'Mensual';
 
   return (
     <div className="space-y-8 pb-12">
@@ -76,14 +95,17 @@ export const CommitmentsView = ({
             </div>
           </div>
 
-          {/* Quick Metrics Pill */}
+          {/* Quick Metrics Pill with Real-time Timeframe Synchronization */}
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-black/40 border border-white/10 text-right">
-              <span className="text-[10px] uppercase tracking-wider text-zinc-400 block font-semibold">
-                Carga Mensual Total
+              <span className="text-[10px] uppercase tracking-wider text-purple-300 block font-semibold">
+                Carga {periodLabel} ({TIMEFRAME_CONFIG[timeframe]?.label || 'Este Mes'})
               </span>
               <span className="text-xl font-black text-rose-300 font-mono">
-                {formatCurrency(totalMonthlyCommitment, currency, exchangeRate)}
+                {formatCurrency(periodCommitment, currency, exchangeRate)}
+              </span>
+              <span className="text-[10px] text-zinc-400 block font-normal">
+                Base: {formatCurrency(totalMonthlyCommitment, currency, exchangeRate)} / mes
               </span>
             </div>
           </div>

@@ -12,12 +12,18 @@ import {
 } from 'lucide-react';
 import { HeroCard } from './HeroCard.jsx';
 import { FluidLineChart, CategoryRingChart } from './Charts.jsx';
-import { formatCurrency, TIMEFRAME_CONFIG, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import {
+  formatCurrency,
+  TIMEFRAME_CONFIG,
+  DEFAULT_USD_COP_RATE,
+  filterTransactionsByPeriod,
+} from '../data/mockData.js';
 
 export const DashboardView = ({
   accounts = [],
   transactions = [],
   timeframe = 'monthly',
+  selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewTransaction,
@@ -29,51 +35,10 @@ export const DashboardView = ({
 
   const tfData = TIMEFRAME_CONFIG[timeframe] || TIMEFRAME_CONFIG.monthly;
 
-  // Reference date: latest transaction date (e.g. 2026-11-05), or fallback to today
-  const latestDate = useMemo(() => {
-    if (!transactions || transactions.length === 0) return new Date();
-    let maxDateStr = transactions[0]?.date || '';
-    for (let i = 1; i < transactions.length; i++) {
-      if (transactions[i].date && transactions[i].date > maxDateStr) {
-        maxDateStr = transactions[i].date;
-      }
-    }
-    const d = new Date(maxDateStr);
-    return isNaN(d.getTime()) ? new Date() : d;
-  }, [transactions]);
-
-  // Real filtered transactions strictly according to the active timeframe
+  // Real filtered transactions strictly according to the active timeframe & selected year
   const activePeriodTxs = useMemo(() => {
-    if (!transactions || transactions.length === 0) return [];
-    const ref = new Date(latestDate);
-    const refYear = ref.getFullYear();
-    const refMonthStr = `${refYear}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
-    const refStr = `${refYear}-${String(ref.getMonth() + 1).padStart(2, '0')}-${String(ref.getDate()).padStart(2, '0')}`;
-
-    if (timeframe === 'weekly') {
-      const weekStart = new Date(ref);
-      weekStart.setDate(weekStart.getDate() - 7);
-      const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
-      return transactions.filter((t) => t.date && t.date >= weekStartStr && t.date <= refStr);
-    }
-
-    if (timeframe === 'monthly') {
-      return transactions.filter((t) => t.date && t.date.startsWith(refMonthStr));
-    }
-
-    if (timeframe === 'quarterly') {
-      const qStart = new Date(ref);
-      qStart.setDate(qStart.getDate() - 90);
-      const qStartStr = `${qStart.getFullYear()}-${String(qStart.getMonth() + 1).padStart(2, '0')}-${String(qStart.getDate()).padStart(2, '0')}`;
-      return transactions.filter((t) => t.date && t.date >= qStartStr && t.date <= refStr);
-    }
-
-    if (timeframe === 'yearly') {
-      return transactions.filter((t) => t.date && t.date.startsWith(String(refYear)));
-    }
-
-    return transactions;
-  }, [transactions, timeframe, latestDate]);
+    return filterTransactionsByPeriod(transactions, timeframe, selectedYear);
+  }, [transactions, timeframe, selectedYear]);
 
   // Exact real income and expense sums without artificial multipliers
   const periodIncomes = activePeriodTxs
@@ -197,6 +162,7 @@ export const DashboardView = ({
         <div className="lg:col-span-7">
           <FluidLineChart
             timeframe={timeframe}
+            selectedYear={selectedYear}
             transactions={transactions}
             currency={currency}
             exchangeRate={exchangeRate}
@@ -204,7 +170,7 @@ export const DashboardView = ({
         </div>
         <div className="lg:col-span-5">
           <CategoryRingChart
-            transactions={transactions}
+            transactions={activePeriodTxs}
             currency={currency}
             exchangeRate={exchangeRate}
           />

@@ -14,6 +14,7 @@ import {
 
 export const FluidLineChart = ({
   timeframe = 'monthly',
+  selectedYear = '2026',
   transactions = [],
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
@@ -56,21 +57,28 @@ export const FluidLineChart = ({
     }
 
     try {
+      // Filter transactions by selectedYear if not 'all'
+      const yearFilteredTxs = selectedYear && selectedYear !== 'all'
+        ? transactions.filter((t) => t.date && t.date.startsWith(String(selectedYear)))
+        : transactions;
+
+      const baseList = yearFilteredTxs.length > 0 ? yearFilteredTxs : transactions;
+
       // Find latest date in transactions without expensive date sorting
-      let latestDateStr = transactions[0]?.date || '2026-11-05';
-      for (let i = 1; i < transactions.length; i++) {
-        if (transactions[i].date && transactions[i].date > latestDateStr) {
-          latestDateStr = transactions[i].date;
+      let latestDateStr = baseList[0]?.date || '2026-11-05';
+      for (let i = 1; i < baseList.length; i++) {
+        if (baseList[i].date && baseList[i].date > latestDateStr) {
+          latestDateStr = baseList[i].date;
         }
       }
       const refDate = new Date(latestDateStr);
-      const currentYear = refDate.getFullYear();
+      const activeYear = selectedYear && selectedYear !== 'all' ? selectedYear : String(refDate.getFullYear());
 
       if (timeframe === 'weekly') {
         const wStart = new Date(refDate);
         wStart.setDate(wStart.getDate() - 7);
         const wStartStr = wStart.toISOString().slice(0, 10);
-        const wTxs = transactions.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
+        const wTxs = baseList.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
 
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         const dayBuckets = dayNames.map((label) => ({ label, income: 0, expense: 0 }));
@@ -88,7 +96,7 @@ export const FluidLineChart = ({
 
       if (timeframe === 'monthly') {
         const latestMonth = latestDateStr.slice(0, 7); // e.g. 2026-11
-        const monthTxs = transactions.filter((t) => t.date && t.date.startsWith(latestMonth));
+        const monthTxs = baseList.filter((t) => t.date && t.date.startsWith(latestMonth));
 
         const weeks = [
           { label: 'Día 1-7', income: 0, expense: 0 },
@@ -109,11 +117,9 @@ export const FluidLineChart = ({
       if (timeframe === 'quarterly') {
         const qStart = new Date(refDate);
         qStart.setDate(qStart.getDate() - 90);
+        const qStartStr = qStart.toISOString().slice(0, 10);
 
-        const qTxs = transactions.filter((t) => {
-          const d = new Date(t.date);
-          return d >= qStart && d <= refDate;
-        });
+        const qTxs = baseList.filter((t) => t.date && t.date >= qStartStr && t.date <= latestDateStr);
 
         const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         const m3 = refDate.getMonth();
@@ -138,15 +144,32 @@ export const FluidLineChart = ({
       }
 
       if (timeframe === 'yearly') {
+        if (selectedYear === 'all') {
+          const yearBuckets = [
+            { label: '2024', income: 0, expense: 0, yr: '2024' },
+            { label: '2025', income: 0, expense: 0, yr: '2025' },
+            { label: '2026', income: 0, expense: 0, yr: '2026' },
+          ];
+          transactions.forEach((t) => {
+            const yr = t.date?.slice(0, 4);
+            const b = yearBuckets.find((item) => item.yr === yr);
+            if (b) {
+              if (t.type === 'income') b.income += Number(t.amount) || 0;
+              else b.expense += Number(t.amount) || 0;
+            }
+          });
+          return yearBuckets.map(({ label, income, expense }) => ({ label, income, expense }));
+        }
+
         const quarters = [
           { label: 'Q1 (Ene-Mar)', income: 0, expense: 0 },
           { label: 'Q2 (Abr-Jun)', income: 0, expense: 0 },
           { label: 'Q3 (Jul-Sep)', income: 0, expense: 0 },
-          { label: 'Q4 (Oct-Nov)', income: 0, expense: 0 },
+          { label: 'Q4 (Oct-Dic)', income: 0, expense: 0 },
         ];
 
         transactions.forEach((t) => {
-          if (t.date && t.date.startsWith(String(currentYear))) {
+          if (t.date && t.date.startsWith(String(activeYear))) {
             const m = parseInt(t.date.slice(5, 7), 10);
             const q = Math.min(3, Math.floor((m - 1) / 3));
             if (t.type === 'income') quarters[q].income += Number(t.amount) || 0;
@@ -158,7 +181,7 @@ export const FluidLineChart = ({
     } catch (_) {}
 
     return fallbackSeries[timeframe] || fallbackSeries.monthly;
-  }, [timeframe, transactions]);
+  }, [timeframe, selectedYear, transactions]);
 
   const maxVal = Math.max(
     ...data.map((d) => Math.max(d.income || 0, d.expense || 0)),

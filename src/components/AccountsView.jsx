@@ -14,12 +14,21 @@ import {
   Calendar,
   AlertCircle,
   FileSpreadsheet,
+  CalendarDays,
+  Clock,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import {
+  formatCurrency,
+  DEFAULT_USD_COP_RATE,
+  TIMEFRAME_CONFIG,
+  filterTransactionsByPeriod,
+} from '../data/mockData.js';
 
 export const AccountsView = ({
   accounts = [],
   transactions = [],
+  timeframe = 'monthly',
+  selectedYear = '2026',
   currency = 'USD',
   exchangeRate = DEFAULT_USD_COP_RATE,
   onOpenNewAccount,
@@ -30,6 +39,14 @@ export const AccountsView = ({
 }) => {
   const [activeAccountType, setActiveAccountType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scopeFilter, setScopeFilter] = useState('period'); // 'period' (respects global timeframe) or 'all'
+
+  // Dynamic transactions filtered in real time by the active global timeframe and year
+  const periodTxs = React.useMemo(() => {
+    return filterTransactionsByPeriod(transactions, timeframe, selectedYear);
+  }, [transactions, timeframe, selectedYear]);
+
+  const targetTxs = scopeFilter === 'period' ? periodTxs : transactions;
 
   // Filter accounts by type tab
   const filteredAccounts = accounts.filter((acc) => {
@@ -37,15 +54,31 @@ export const AccountsView = ({
     return acc.type === activeAccountType;
   });
 
-  // Filter transactions by selected account, search, etc.
-  const ledgerTransactions = transactions.filter((tx) => {
-    const matchesAccount = selectedAccountId ? tx.accountId === selectedAccountId : true;
-    const matchesSearch =
-      tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (tx.notes && tx.notes.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesAccount && matchesSearch;
-  });
+  // Filter transactions by selected account, search, and global scope
+  const ledgerTransactions = React.useMemo(() => {
+    return targetTxs.filter((tx) => {
+      const matchesAccount = selectedAccountId ? tx.accountId === selectedAccountId : true;
+      const matchesSearch =
+        searchQuery === '' ||
+        tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (tx.notes && tx.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesAccount && matchesSearch;
+    });
+  }, [targetTxs, selectedAccountId, searchQuery]);
+
+  // Aggregated totals in active timeframe for the accounts view
+  const periodIncomeTotal = React.useMemo(() => {
+    return periodTxs
+      .filter((t) => (selectedAccountId ? t.accountId === selectedAccountId : true) && t.type === 'income')
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  }, [periodTxs, selectedAccountId]);
+
+  const periodExpenseTotal = React.useMemo(() => {
+    return periodTxs
+      .filter((t) => (selectedAccountId ? t.accountId === selectedAccountId : true) && t.type === 'expense')
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  }, [periodTxs, selectedAccountId]);
 
   const getAccountIcon = (type) => {
     switch (type) {
@@ -281,11 +314,11 @@ export const AccountsView = ({
         </div>
       )}
 
-      {/* Transactions Ledger Panel */}
+      {/* Transactions Ledger Panel with Real-Time Period Synchronization */}
       <div className="liquid-glass p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-bold text-white tracking-tight">
                 Libro Mayor de Movimientos
               </h3>
@@ -294,22 +327,72 @@ export const AccountsView = ({
                   {currentSelectedAccount.name}
                 </span>
               )}
+              {/* Active Period Synchronized Badge */}
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-500/30 text-purple-200 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-purple-400" />
+                <span>{TIMEFRAME_CONFIG[timeframe]?.label || 'Este Mes'}</span>
+                <span>•</span>
+                <span className="text-white font-bold">{selectedYear === 'all' ? 'Histórico' : selectedYear}</span>
+              </span>
             </div>
-            <p className="text-xs text-zinc-400">
-              {ledgerTransactions.length} transacciones vinculadas obligatoriamente a una cuenta y categoría
+            <p className="text-xs text-zinc-400 mt-1">
+              Mostrando {ledgerTransactions.length} movimientos {scopeFilter === 'period' ? 'en el período seleccionado' : 'en todo el historial'}
             </p>
           </div>
 
-          {/* Search bar */}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar por concepto o categoría..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="liquid-input pl-9 text-xs"
-            />
+          {/* Scope Selector (Period vs All) & Search Bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="bg-black/40 p-1 rounded-xl border border-white/10 flex items-center text-xs">
+              <button
+                type="button"
+                onClick={() => setScopeFilter('period')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  scopeFilter === 'period'
+                    ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                {TIMEFRAME_CONFIG[timeframe]?.shortLabel || 'Período'} ({periodTxs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setScopeFilter('all')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  scopeFilter === 'all'
+                    ? 'bg-purple-600/50 text-white shadow-sm border border-purple-400/40'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Todo ({transactions.length})
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar por concepto o categoría..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="liquid-input pl-9 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Period Summary Metric Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 pt-1 text-xs">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+            <span className="text-zinc-400 text-[11px]">Entradas en este período:</span>
+            <span className="font-bold text-emerald-400 font-mono">
+              +{formatCurrency(periodIncomeTotal, currency, exchangeRate)}
+            </span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
+            <span className="text-zinc-400 text-[11px]">Salidas en este período:</span>
+            <span className="font-bold text-rose-400 font-mono">
+              -{formatCurrency(periodExpenseTotal, currency, exchangeRate)}
+            </span>
           </div>
         </div>
 

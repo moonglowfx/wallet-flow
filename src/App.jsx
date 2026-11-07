@@ -80,6 +80,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
+  const [selectedYear, setSelectedYear] = useState('2026');
 
   // Multi-user authentication state: Munboi (PIN: 1234) | Tiago (PIN: 5678)
   const [currentUser, setCurrentUser] = useState(() => {
@@ -188,6 +189,19 @@ export function App() {
     }
     return getUserInitialData(currentUser.id).debts;
   });
+
+  // Dynamically compute available fiscal years from transactions (newest to oldest)
+  const availableYears = React.useMemo(() => {
+    const yrSet = new Set();
+    transactions.forEach((t) => {
+      if (t.date && t.date.length >= 4) {
+        yrSet.add(t.date.slice(0, 4));
+      }
+    });
+    const sorted = Array.from(yrSet).sort((a, b) => b.localeCompare(a));
+    if (sorted.length === 0) return ['2026', 'all'];
+    return [...sorted, 'all'];
+  }, [transactions]);
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -527,6 +541,9 @@ export function App() {
           activeTab={activeTab}
           timeframe={timeframe}
           setTimeframe={setTimeframe}
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+          availableYears={availableYears}
           currency={currency}
           setCurrency={setCurrency}
           exchangeRate={exchangeRate}
@@ -544,6 +561,7 @@ export function App() {
               accounts={accounts}
               transactions={transactions}
               timeframe={timeframe}
+              selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
@@ -560,6 +578,8 @@ export function App() {
             <AccountsView
               accounts={accounts}
               transactions={transactions}
+              timeframe={timeframe}
+              selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
               onOpenNewAccount={() => setIsAccountModalOpen(true)}
@@ -574,6 +594,10 @@ export function App() {
             <MonthlyExpensesView
               transactions={transactions}
               accounts={accounts}
+              timeframe={timeframe}
+              selectedYear={selectedYear}
+              setSelectedYear={setSelectedYear}
+              availableYears={availableYears}
               currency={currency}
               exchangeRate={exchangeRate}
               onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
@@ -587,6 +611,8 @@ export function App() {
               debts={debts}
               setDebts={setDebts}
               accounts={accounts}
+              timeframe={timeframe}
+              selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
               onLogPaymentTransaction={handleSaveTransaction}
@@ -601,6 +627,8 @@ export function App() {
                 transactions={transactions}
                 subscriptions={subscriptions}
                 debts={debts}
+                timeframe={timeframe}
+                selectedYear={selectedYear}
                 currency={currency}
                 exchangeRate={exchangeRate}
                 onOpenNewTransaction={() => setIsTransactionModalOpen(true)}

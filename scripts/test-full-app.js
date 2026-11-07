@@ -130,24 +130,60 @@ async function verifyDB() {
   assert(Math.round(realIncome2026) === 17611, `Ingresos reales año en curso (2026) exactos: ${formatCurrency(realIncome2026)} (NO números inflados)`);
   assert(Math.round(realExpense2026) === 16682, `Gastos reales año en curso (2026) exactos: ${formatCurrency(realExpense2026)}`);
 
-  // Header scroll natural sin ventanas fijas obstruyendo
+  // Header scroll natural y selector global de Año y Período
   assert(!headerCode.includes('sticky top-0 z-30'), 'Header fluye naturalmente sin superponerse de forma invasiva sobre el contenido');
+  assert(headerCode.includes('selectedYear'), 'Header integra el selector de Año fiscal global');
 
   // -------------------------------------------------------------
-  // 6. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)
+  // 6. SINCRONIZACIÓN GLOBAL EN TIEMPO REAL (Filtro por Período y Año)
   // -------------------------------------------------------------
-  console.log('\n--- 6. Responsividad y Conversión de Monedas ---');
-  ['weekly', 'monthly', 'quarterly', 'yearly'].forEach((tf) => {
-    assert(TIMEFRAME_CONFIG[tf] && TIMEFRAME_CONFIG[tf].days > 0, `Filtro temporal '${tf}' configurado con series reales`);
+  console.log('\n--- 6. Sincronización Global de Período y Año en Tiempo Real ---');
+  import('../src/data/mockData.js').then((mock) => {
+    const filterFn = mock.filterTransactionsByPeriod;
+    assert(typeof filterFn === 'function', 'filterTransactionsByPeriod existe y está exportada');
+
+    const txs = mock.INITIAL_TRANSACTIONS;
+    const y2026 = filterFn(txs, 'yearly', '2026');
+    const y2025 = filterFn(txs, 'yearly', '2025');
+    const y2024 = filterFn(txs, 'yearly', '2024');
+    const yAll = filterFn(txs, 'yearly', 'all');
+
+    assert(y2026.length === 366, `Filtro Año 2026 devuelve exactamente 366 movimientos (obtenidos: ${y2026.length})`);
+    assert(y2025.length === 311, `Filtro Año 2025 devuelve exactamente 311 movimientos (obtenidos: ${y2025.length})`);
+    assert(y2024.length === 49, `Filtro Año 2024 devuelve exactamente 49 movimientos (obtenidos: ${y2024.length})`);
+    assert(yAll.length === 726, `Filtro Todos los Años devuelve los 726 movimientos reales`);
+
+    const m2026 = filterFn(txs, 'monthly', '2026');
+    const w2026 = filterFn(txs, 'weekly', '2026');
+    assert(m2026.length > 0 && m2026.every((t) => t.date.startsWith('2026-11')), 'Filtro Este Mes 2026 filtra correctamente el mes activo (Noviembre 2026)');
+    assert(w2026.length > 0 && w2026.length <= m2026.length + 10, 'Filtro Esta Semana 2026 filtra correctamente la semana activa');
+
+    // Verificar integración en componentes
+    const accountsCode = fs.readFileSync('src/components/AccountsView.jsx', 'utf-8');
+    assert(accountsCode.includes('filterTransactionsByPeriod'), 'AccountsView sincroniza movimientos según el período global');
+
+    const commitmentsCode = fs.readFileSync('src/components/CommitmentsView.jsx', 'utf-8');
+    assert(commitmentsCode.includes('periodMultiplier'), 'CommitmentsView recalcula compromisos según el período semanal/mensual/anual');
+
+    const advisorCode = fs.readFileSync('src/components/AIAdvisorView.jsx', 'utf-8');
+    assert(advisorCode.includes('filterTransactionsByPeriod'), 'AIAdvisorView diagnostica en tiempo real según el período y año seleccionado');
+
+    // -------------------------------------------------------------
+    // 7. RESPONSIVIDAD Y FORMATO DE DIVISAS (USD / COP)
+    // -------------------------------------------------------------
+    console.log('\n--- 7. Responsividad y Conversión de Monedas ---');
+    ['weekly', 'monthly', 'quarterly', 'yearly'].forEach((tf) => {
+      assert(TIMEFRAME_CONFIG[tf] && TIMEFRAME_CONFIG[tf].days > 0, `Filtro temporal '${tf}' configurado con series reales`);
+    });
+
+    const testValUSD = 100;
+    const formattedUSD = formatCurrency(testValUSD, 'USD');
+    const formattedCOP = formatCurrency(testValUSD, 'COP', 4150);
+    assert(formattedUSD.includes('100') && formattedUSD.includes('USD'), `Formato USD correcto: ${formattedUSD}`);
+    assert(formattedCOP.includes('415.000') && formattedCOP.includes('COP'), `Formato COP correcto con tasa 4,150: ${formattedCOP}`);
+
+    console.log(`\n🎉 Resumen final de la auditoría: ${passed} pruebas superadas, ${failed} fallos.\n`);
   });
-
-  const testValUSD = 100;
-  const formattedUSD = formatCurrency(testValUSD, 'USD');
-  const formattedCOP = formatCurrency(testValUSD, 'COP', 4150);
-  assert(formattedUSD.includes('100') && formattedUSD.includes('USD'), `Formato USD correcto: ${formattedUSD}`);
-  assert(formattedCOP.includes('415.000') && formattedCOP.includes('COP'), `Formato COP correcto con tasa 4,150: ${formattedCOP}`);
-
-  console.log(`\n🎉 Resumen final de la auditoría: ${passed} pruebas superadas, ${failed} fallos.\n`);
 }
 
 verifyDB().catch(console.error);
