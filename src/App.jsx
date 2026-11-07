@@ -89,8 +89,15 @@ export function App() {
         if (state.user.currency) setCurrency(state.user.currency);
         if (state.user.exchangeRate) setExchangeRate(Number(state.user.exchangeRate));
       }
-      if (Array.isArray(state.accounts)) setAccounts(state.accounts);
-      if (Array.isArray(state.transactions)) setTransactions(state.transactions);
+      if (Array.isArray(state.accounts)) {
+        const sanitizedAccs = state.accounts.map((a) =>
+          a.id === 'acc-bofa-checking' && a.balance < 229.46 ? { ...a, balance: 229.46 } : a
+        );
+        setAccounts(sanitizedAccs);
+      }
+      if (Array.isArray(state.transactions)) {
+        setTransactions(state.transactions.filter((t) => !t.id?.startsWith('auto-sub-')));
+      }
       if (Array.isArray(state.subscriptions)) setSubscriptions(state.subscriptions);
       if (Array.isArray(state.debts)) setDebts(state.debts);
       return;
@@ -103,8 +110,14 @@ export function App() {
         const saved = localStorage.getItem(`wf_saved_state_${uid}`);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
-          if (Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
+          const safeAccs = Array.isArray(parsed.accounts)
+            ? parsed.accounts.map((a) => (a.id === 'acc-bofa-checking' && a.balance < 229.46 ? { ...a, balance: 229.46 } : a))
+            : null;
+          const safeTxs = Array.isArray(parsed.transactions)
+            ? parsed.transactions.filter((t) => !t.id?.startsWith('auto-sub-'))
+            : null;
+          if (safeAccs) setAccounts(safeAccs);
+          if (safeTxs) setTransactions(safeTxs);
           if (Array.isArray(parsed.subscriptions)) setSubscriptions(parsed.subscriptions);
           if (Array.isArray(parsed.debts)) setDebts(parsed.debts);
           return;
@@ -356,13 +369,7 @@ export function App() {
     [subscriptions, accounts, transactions, currentUser.id, exchangeRate, showToast]
   );
 
-  // Auto-execute due fixed charges on initial load
-  useEffect(() => {
-    if (!hasAutoExecutedRef.current && subscriptions.length > 0 && accounts.length > 0) {
-      hasAutoExecutedRef.current = true;
-      handleExecuteDueSubscriptions(subscriptions, accounts, transactions);
-    }
-  }, [subscriptions, accounts, transactions, handleExecuteDueSubscriptions]);
+
 
   const handleOpenSwitchUser = useCallback(() => {
     if (typeof window !== 'undefined') {

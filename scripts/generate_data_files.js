@@ -107,7 +107,7 @@ const accounts = [
     name: 'Bank of America Checking',
     institution: 'Bank of America',
     type: 'bank',
-    balance: 240.46,
+    balance: 229.46,
     accountNumber: '•••• 4821',
     accentGradient: 'from-blue-600/40 via-indigo-900/40 to-slate-900/70',
     yieldRate: 0.01,

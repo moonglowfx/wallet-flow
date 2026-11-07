@@ -70,7 +70,7 @@ const munboiNet = munboiData.accounts.reduce(
   (s, a) => s + (a.currency === 'COP' ? a.balance / 3200 : a.balance),
   0
 );
-assert(Math.round(munboiNet * 100) === 3377, `Capital neto de Munboi calculado exactamente: ${formatCurrency(munboiNet)}`);
+assert(Math.round(munboiNet * 100) === 2277, `Capital neto de Munboi calculado exactamente: ${formatCurrency(munboiNet)}`);
 
 // -------------------------------------------------------------
 // 3. VERIFICACIÓN DE SQLite MULTI-TENANT
@@ -165,8 +165,11 @@ async function verifyDB() {
 
     const m2026 = filterFn(txs, 'monthly', '2026');
     const w2026 = filterFn(txs, 'weekly', '2026');
+    const wExpenses = w2026.filter((t) => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+    const mExpenses = m2026.filter((t) => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
     assert(m2026.length > 0 && m2026.every((t) => t.date.startsWith('2026-11')), 'Filtro Este Mes 2026 filtra correctamente el mes activo (Noviembre 2026)');
-    assert(w2026.length > 0 && w2026.length <= m2026.length + 10, 'Filtro Esta Semana 2026 filtra correctamente la semana activa');
+    assert(w2026.length > 0 && w2026.length <= m2026.length, 'Filtro Esta Semana 2026 filtra correctamente la semana activa como subconjunto mensual');
+    assert(wExpenses <= mExpenses, `Gastos semanales ($${wExpenses.toFixed(2)}) son coherentes y menores a mensuales ($${mExpenses.toFixed(2)})`);
 
     // Verificar integración en componentes
     const accountsCode = fs.readFileSync('src/components/AccountsView.jsx', 'utf-8');

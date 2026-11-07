@@ -7,7 +7,7 @@ export const INITIAL_ACCOUNTS = [
     "institution": "Bank of America",
     "type": "bank",
     "currency": "USD",
-    "balance": 240.46,
+    "balance": 229.46,
     "accountNumber": "•••• 4821",
     "accentGradient": "from-blue-600/40 via-indigo-900/40 to-slate-900/70",
     "yieldRate": 0.01
@@ -8523,9 +8523,14 @@ export function filterTransactionsByPeriod(transactions = [], timeframe = 'month
   }
 
   if (timeframe === 'weekly') {
-    const wStart = new Date(refDate);
-    wStart.setDate(wStart.getDate() - 7);
-    const wStartStr = `${wStart.getFullYear()}-${String(wStart.getMonth() + 1).padStart(2, '0')}-${String(wStart.getDate()).padStart(2, '0')}`;
+    const day = refDate.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    const monday = new Date(refDate);
+    monday.setDate(refDate.getDate() - diffToMonday);
+    const monthStart = new Date(y, m - 1, 1);
+    const effectiveStart = monday < monthStart ? monthStart : monday;
+    const pad = (n) => String(n).padStart(2, '0');
+    const wStartStr = `${effectiveStart.getFullYear()}-${pad(effectiveStart.getMonth() + 1)}-${pad(effectiveStart.getDate())}`;
     return baseTxs.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
   }
 

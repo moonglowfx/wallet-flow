@@ -75,18 +75,30 @@ export const FluidLineChart = ({
       const activeYear = selectedYear && selectedYear !== 'all' ? selectedYear : String(refDate.getFullYear());
 
       if (timeframe === 'weekly') {
-        const wStart = new Date(refDate);
-        wStart.setDate(wStart.getDate() - 7);
-        const wStartStr = wStart.toISOString().slice(0, 10);
+        const parts = latestDateStr.split('-');
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        const refD = new Date(y, m - 1, d);
+        const day = refD.getDay();
+        const diffToMonday = day === 0 ? 6 : day - 1;
+        const monday = new Date(refD);
+        monday.setDate(refD.getDate() - diffToMonday);
+        const monthStart = new Date(y, m - 1, 1);
+        const effectiveStart = monday < monthStart ? monthStart : monday;
+        const pad = (n) => String(n).padStart(2, '0');
+        const wStartStr = `${effectiveStart.getFullYear()}-${pad(effectiveStart.getMonth() + 1)}-${pad(effectiveStart.getDate())}`;
         const wTxs = baseList.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
 
-        const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         const dayBuckets = dayNames.map((label) => ({ label, income: 0, expense: 0 }));
 
         wTxs.forEach((t) => {
-          const d = new Date(t.date);
-          if (!isNaN(d.getTime())) {
-            const dayIdx = d.getDay();
+          const partsT = t.date.split('-');
+          const dt = new Date(parseInt(partsT[0], 10), parseInt(partsT[1], 10) - 1, parseInt(partsT[2], 10));
+          if (!isNaN(dt.getTime())) {
+            const rawDay = dt.getDay();
+            const dayIdx = rawDay === 0 ? 6 : rawDay - 1;
             if (t.type === 'income') dayBuckets[dayIdx].income += Number(t.amount) || 0;
             else dayBuckets[dayIdx].expense += Number(t.amount) || 0;
           }
