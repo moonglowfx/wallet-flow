@@ -431,13 +431,13 @@ export const SubscriptionsView = ({
                     </div>
                   </div>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     required
                     placeholder={subCurrency === 'USD' ? 'ej. 19.99' : 'ej. 80000'}
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
                 <div>
@@ -445,13 +445,13 @@ export const SubscriptionsView = ({
                     Día de Cobro (1 - 31)
                   </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="31"
+                    type="tel"
+                    inputMode="numeric"
                     required
+                    placeholder="1"
                     value={billingDay}
-                    onChange={(e) => setBillingDay(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
               </div>

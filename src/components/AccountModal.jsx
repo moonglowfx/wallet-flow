@@ -53,13 +53,11 @@ export const AccountModal = ({
       return;
     }
 
-    let rawBalance = parseFloat(balance) || 0;
-    let rawCreditLimit = parseFloat(creditLimit) || 15000;
-
-    if (accountCurrency === 'COP') {
-      rawBalance = rawBalance / exchangeRate;
-      rawCreditLimit = rawCreditLimit / exchangeRate;
-    }
+    const parsedBalance = balance === '' || balance === null ? 0 : parseFloat(balance);
+    const rawBalance = Number.isFinite(parsedBalance) ? parsedBalance : 0;
+    const defaultLimit = accountCurrency === 'COP' ? 15000000 : 15000;
+    const parsedLimit = parseFloat(creditLimit);
+    const rawCreditLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : defaultLimit;
 
     // For credit accounts, user usually inputs positive debt, but system tracks as negative balance
     const finalBalance = type === 'credit' ? -Math.abs(rawBalance) : Math.abs(rawBalance);
@@ -69,8 +67,14 @@ export const AccountModal = ({
       name: name.trim(),
       institution: institution.trim() || (type === 'cash' ? 'Billetera Líquida' : 'Entidad Financiera'),
       type,
-      balance: Math.round(finalBalance * 100) / 100,
-      creditLimit: type === 'credit' ? Math.round(rawCreditLimit * 100) / 100 : undefined,
+      currency: accountCurrency,
+      balance: accountCurrency === 'COP' ? Math.round(finalBalance) : Math.round(finalBalance * 100) / 100,
+      creditLimit:
+        type === 'credit'
+          ? accountCurrency === 'COP'
+            ? Math.round(rawCreditLimit)
+            : Math.round(rawCreditLimit * 100) / 100
+          : undefined,
       accountNumber: accountNumber.trim() || (type === 'cash' ? 'CASH' : `•••• ${Math.floor(1000 + Math.random() * 9000)}`),
       accentGradient:
         type === 'credit'
@@ -223,7 +227,7 @@ export const AccountModal = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-zinc-300 font-medium">
-                  {type === 'credit' ? 'Saldo Deudor Actual' : 'Saldo Inicial *'}
+                  {type === 'credit' ? 'Saldo Deudor Actual (0 por defecto)' : 'Saldo Inicial (0 por defecto)'}
                 </label>
                 <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
                   <button
@@ -251,17 +255,20 @@ export const AccountModal = ({
                 </div>
               </div>
               <input
-                type="number"
-                step="any"
-                required
-                placeholder={accountCurrency === 'COP' ? 'ej. 5,000,000' : '0.00'}
+                type="tel"
+                inputMode="decimal"
+                placeholder={accountCurrency === 'COP' ? '0 (ej. 5000000)' : '0.00'}
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                className="liquid-input text-xs font-bold"
+                onChange={(e) => setBalance(e.target.value.replace(/[^0-9.]/g, ''))}
+                className="liquid-input text-xs font-bold font-mono"
               />
-              {type === 'credit' && (
+              {type === 'credit' ? (
                 <p className="text-[10px] text-zinc-400 mt-1">
-                  Ingresa lo que adeudas actualmente ({accountCurrency})
+                  Si lo dejas vacío se tomará en 0 ({accountCurrency})
+                </p>
+              ) : (
+                <p className="text-[10px] text-zinc-400 mt-1">
+                  Si no ingresas saldo inicial se tomará por defecto en 0 ({accountCurrency})
                 </p>
               )}
             </div>
@@ -272,12 +279,12 @@ export const AccountModal = ({
                   Límite de Crédito ({accountCurrency})
                 </label>
                 <input
-                  type="number"
-                  step="any"
-                  placeholder={accountCurrency === 'COP' ? 'ej. 15,000,000' : 'ej. 3,500'}
+                  type="tel"
+                  inputMode="decimal"
+                  placeholder={accountCurrency === 'COP' ? 'ej. 15000000' : 'ej. 3500'}
                   value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
-                  className="liquid-input text-xs font-bold"
+                  onChange={(e) => setCreditLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="liquid-input text-xs font-bold font-mono"
                 />
               </div>
             ) : type === 'cash' ? (

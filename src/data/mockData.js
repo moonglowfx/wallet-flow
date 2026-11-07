@@ -6,6 +6,7 @@ export const INITIAL_ACCOUNTS = [
     "name": "Bank of America Checking",
     "institution": "Bank of America",
     "type": "bank",
+    "currency": "USD",
     "balance": 240.46,
     "accountNumber": "•••• 4821",
     "accentGradient": "from-blue-600/40 via-indigo-900/40 to-slate-900/70",
@@ -16,6 +17,7 @@ export const INITIAL_ACCOUNTS = [
     "name": "BOFA Travel Rewards",
     "institution": "Bank of America",
     "type": "credit",
+    "currency": "USD",
     "balance": -239.42,
     "creditLimit": 1000,
     "cutOffDay": 15,
@@ -28,7 +30,8 @@ export const INITIAL_ACCOUNTS = [
     "name": "Bancolombia Ahorros",
     "institution": "Bancolombia",
     "type": "bank",
-    "balance": 7.98,
+    "currency": "COP",
+    "balance": 25536,
     "accountNumber": "•••• 3310",
     "accentGradient": "from-amber-500/40 via-yellow-600/30 to-zinc-950/70",
     "yieldRate": 10.5
@@ -38,6 +41,7 @@ export const INITIAL_ACCOUNTS = [
     "name": "BOFA Advantage Savings",
     "institution": "Bank of America",
     "type": "bank",
+    "currency": "USD",
     "balance": 24.75,
     "accountNumber": "•••• 5590",
     "accentGradient": "from-purple-600/40 via-indigo-700/30 to-slate-900/60",
@@ -48,6 +52,7 @@ export const INITIAL_ACCOUNTS = [
     "name": "Efectivo / Billetera Líquida",
     "institution": "Efectivo Personal",
     "type": "cash",
+    "currency": "USD",
     "balance": 0,
     "accountNumber": "CASH",
     "accentGradient": "from-emerald-600/35 via-purple-900/25 to-zinc-950/70"
@@ -8376,20 +8381,20 @@ export const EXPENSE_CATEGORIES = [
   'Otros',
 ];
 
-export const DEFAULT_USD_COP_RATE = 4150; // Tasa de cambio base: 1 USD = 4,150 COP
+export const DEFAULT_USD_COP_RATE = 3200; // Tasa de cambio base predeterminada: 1 USD = 3,200 COP
 
-export const formatCurrency = (
-  valueInUSD,
-  currency = 'USD',
-  rate = DEFAULT_USD_COP_RATE,
-  showCode = true
-) => {
-  const num = Number(valueInUSD) || 0;
+/**
+ * Formatea un monto que ya está expresado en su moneda nativa (USD o COP)
+ * SIN hacer doble cambio de moneda para evitar variaciones por redondeo.
+ */
+export const formatNativeCurrency = (value, currency = 'USD', showCode = true) => {
+  const num = Number(value) || 0;
   const isNegative = num < 0;
   const absVal = Math.abs(num);
+  const cur = (currency || 'USD').toUpperCase();
 
-  if (currency === 'COP') {
-    const copVal = Math.round(absVal * rate);
+  if (cur === 'COP') {
+    const copVal = Math.round(absVal);
     const formatted = new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -8400,7 +8405,6 @@ export const formatCurrency = (
     return showCode ? `${result} COP` : result;
   }
 
-  // Moneda Principal: USD
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -8411,13 +8415,70 @@ export const formatCurrency = (
   return showCode ? `${result} USD` : result;
 };
 
-export const formatSecondaryCurrency = (
-  valueInUSD,
-  activeCurrency = 'USD',
-  rate = DEFAULT_USD_COP_RATE
+/**
+ * Convierte un monto desde su moneda de origen (fromCurrency) hacia la moneda destino (toCurrency)
+ * aplicando una única operación limpia cuando las monedas son distintas, y cero conversión si son iguales.
+ */
+export const convertAmount = (amount, fromCurrency = 'USD', toCurrency = 'USD', rate = DEFAULT_USD_COP_RATE) => {
+  const num = Number(amount) || 0;
+  const from = (fromCurrency || 'USD').toUpperCase();
+  const to = (toCurrency || 'USD').toUpperCase();
+  const safeRate = Number(rate) > 0 ? Number(rate) : DEFAULT_USD_COP_RATE;
+
+  if (from === to) return num;
+  if (from === 'USD' && to === 'COP') return Math.round(num * safeRate);
+  if (from === 'COP' && to === 'USD') return Math.round((num / safeRate) * 100) / 100;
+  return num;
+};
+
+/**
+ * Formatea una cuenta o movimiento respetando su moneda nativa si coincide con la vista,
+ * o evitando el doble cambio de moneda (nunca hace COP -> USD -> COP).
+ */
+export const formatAccountBalance = (
+  balance,
+  accountCurrency = 'USD',
+  displayCurrency = null,
+  rate = DEFAULT_USD_COP_RATE,
+  showCode = true
 ) => {
+  const nativeCur = (accountCurrency || 'USD').toUpperCase();
+  // Si no se fuerza moneda de visualización, mostramos en la moneda nativa de la cuenta (Pesos o Dólares separados)
+  if (!displayCurrency || displayCurrency.toUpperCase() === nativeCur) {
+    return formatNativeCurrency(balance, nativeCur, showCode);
+  }
+  const converted = convertAmount(balance, nativeCur, displayCurrency, rate);
+  return formatNativeCurrency(converted, displayCurrency, showCode);
+};
+
+export const formatCurrency = (
+  valueInUSD,
+  currency = 'USD',
+  rate = DEFAULT_USD_COP_RATE,
+  showCode = true,
+  sourceCurrency = 'USD'
+) => {
+  const srcCur = (sourceCurrency || 'USD').toUpperCase();
+  const targetCur = (currency || 'USD').toUpperCase();
+
+  // Si la fuente ya está en la misma moneda que se desea mostrar, NO hacemos ningún cambio de moneda
+  if (srcCur === targetCur) {
+    return formatNativeCurrency(valueInUSD, targetCur, showCode);
+  }
+
+  const converted = convertAmount(valueInUSD, srcCur, targetCur, rate);
+  return formatNativeCurrency(converted, targetCur, showCode);
+};
+
+export const formatSecondaryCurrency = (
+  value,
+  activeCurrency = 'USD',
+  rate = DEFAULT_USD_COP_RATE,
+  sourceCurrency = null
+) => {
+  const srcCur = (sourceCurrency || activeCurrency || 'USD').toUpperCase();
   const targetCurrency = activeCurrency === 'USD' ? 'COP' : 'USD';
-  return formatCurrency(valueInUSD, targetCurrency, rate, true);
+  return formatCurrency(value, targetCurrency, rate, true, srcCur);
 };
 
 /**

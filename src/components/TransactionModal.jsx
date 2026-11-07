@@ -14,7 +14,7 @@ import {
 import {
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
-  formatCurrency,
+  formatNativeCurrency,
   DEFAULT_USD_COP_RATE,
 } from '../data/mockData.js';
 
@@ -44,13 +44,15 @@ export const TransactionModal = ({
       if (editingTransaction) {
         setType(editingTransaction.type || 'expense');
         setTitle(editingTransaction.title || '');
-        const cur = currency || 'USD';
-        setInputCurrency(cur);
-        const rawAmt = Number(editingTransaction.amount) || 0;
+        const txCur = editingTransaction.currency || 'USD';
+        setInputCurrency(txCur);
+        const origAmt = Number.isFinite(Number(editingTransaction.originalAmount))
+          ? Number(editingTransaction.originalAmount)
+          : Number(editingTransaction.amount) || 0;
         setAmount(
-          cur === 'COP'
-            ? String(Math.round(rawAmt * exchangeRate))
-            : String(Math.round(rawAmt * 100) / 100)
+          txCur === 'COP'
+            ? String(Math.round(origAmt))
+            : String(Math.round(origAmt * 100) / 100)
         );
         setAccountId(editingTransaction.accountId || accounts[0]?.id || '');
         setCategory(
@@ -64,9 +66,12 @@ export const TransactionModal = ({
         setType('expense');
         setTitle('');
         setAmount('');
-        setInputCurrency(currency || 'USD');
-        if ((!accountId || !accounts.some((a) => a.id === accountId)) && accounts.length > 0) {
-          setAccountId(accounts[0].id);
+        const targetAcc = accounts.find((a) => a.id === accountId) || accounts[0];
+        if (targetAcc) {
+          setAccountId(targetAcc.id);
+          setInputCurrency(targetAcc.currency || currency || 'USD');
+        } else {
+          setInputCurrency(currency || 'USD');
         }
         setCategory(EXPENSE_CATEGORIES[0]);
         setDate(new Date().toISOString().split('T')[0]);
@@ -129,6 +134,8 @@ export const TransactionModal = ({
       ...(editingTransaction ? { id: editingTransaction.id } : {}),
       title: title.trim(),
       amount: amountInUSD,
+      originalAmount: numericAmount,
+      currency: inputCurrency,
       type,
       category,
       accountId,
@@ -291,14 +298,14 @@ export const TransactionModal = ({
                 {inputCurrency === 'COP' ? 'COP $' : '$'}
               </span>
               <input
-                type="number"
-                step="any"
+                type="tel"
+                inputMode="decimal"
                 required
                 autoFocus
-                placeholder={inputCurrency === 'COP' ? '50,000' : '25.00'}
+                placeholder={inputCurrency === 'COP' ? '50000' : '25.00'}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={`w-full bg-black/60 backdrop-blur-md border border-white/15 focus:border-purple-500/70 focus:ring-2 focus:ring-purple-500/20 rounded-2xl ${inputCurrency === 'COP' ? 'pl-16' : 'pl-9'} pr-4 py-3 text-xl font-black text-white placeholder-zinc-600 outline-none transition-all`}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                className={`w-full bg-black/60 backdrop-blur-md border border-white/15 focus:border-purple-500/70 focus:ring-2 focus:ring-purple-500/20 rounded-2xl ${inputCurrency === 'COP' ? 'pl-16' : 'pl-9'} pr-4 py-3 text-xl font-black text-white placeholder-zinc-600 outline-none transition-all font-mono`}
               />
             </div>
           </div>
@@ -327,13 +334,22 @@ export const TransactionModal = ({
               </label>
               <select
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onChange={(e) => {
+                  const newAccId = e.target.value;
+                  setAccountId(newAccId);
+                  if (!editingTransaction) {
+                    const selAcc = accounts.find((a) => a.id === newAccId);
+                    if (selAcc?.currency) {
+                      setInputCurrency(selAcc.currency);
+                    }
+                  }
+                }}
                 required
                 className="liquid-input text-xs bg-[#161324]"
               >
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name} ({formatCurrency(acc.balance, currency, exchangeRate)})
+                    {acc.name} ({acc.currency === 'COP' ? 'COP' : 'USD'} {acc.balance.toLocaleString('es-CO')})
                   </option>
                 ))}
               </select>

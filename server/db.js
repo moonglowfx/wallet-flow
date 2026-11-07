@@ -10,8 +10,17 @@ import {
 
 dotenv.config();
 
-const url = process.env.DATABASE_URL || 'file:wallet_flow.db';
-const authToken = process.env.DATABASE_AUTH_TOKEN || undefined;
+const defaultLocalUrl = process.env.VERCEL ? 'file:/tmp/wallet_flow.db' : 'file:wallet_flow.db';
+const url =
+  process.env.TURSO_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  process.env.LIBSQL_CLIENT_URL ||
+  defaultLocalUrl;
+const authToken =
+  process.env.TURSO_AUTH_TOKEN ||
+  process.env.DATABASE_AUTH_TOKEN ||
+  process.env.LIBSQL_CLIENT_AUTH_TOKEN ||
+  undefined;
 
 export const db = createClient({
   url,
@@ -60,7 +69,7 @@ export async function initDatabase() {
         avatarGradient TEXT,
         description TEXT,
         currency TEXT DEFAULT 'USD',
-        exchangeRate REAL DEFAULT 4150,
+        exchangeRate REAL DEFAULT 3200,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -73,23 +82,15 @@ export async function initDatabase() {
       );
     `);
 
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS trusted_devices (
-        deviceId TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        userAgent TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 2. Core Financial Tables with userId column
+    // 2. Core Financial Tables with userId and native currency columns
     await db.execute(`
       CREATE TABLE IF NOT EXISTS accounts (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         institution TEXT NOT NULL,
         type TEXT NOT NULL,
-        balance REAL NOT NULL,
+        currency TEXT DEFAULT 'USD',
+        balance REAL NOT NULL DEFAULT 0,
         creditLimit REAL,
         cutOffDay INTEGER,
         paymentDueDay INTEGER,
@@ -106,6 +107,8 @@ export async function initDatabase() {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         amount REAL NOT NULL,
+        currency TEXT DEFAULT 'USD',
+        originalAmount REAL,
         type TEXT NOT NULL,
         category TEXT NOT NULL,
         accountId TEXT NOT NULL,
@@ -124,6 +127,7 @@ export async function initDatabase() {
         name TEXT NOT NULL,
         category TEXT NOT NULL,
         amount REAL NOT NULL,
+        currency TEXT DEFAULT 'USD',
         billingDay INTEGER NOT NULL,
         accountId TEXT NOT NULL,
         active INTEGER DEFAULT 1,
@@ -141,6 +145,7 @@ export async function initDatabase() {
         title TEXT NOT NULL,
         counterparty TEXT NOT NULL,
         category TEXT NOT NULL,
+        currency TEXT DEFAULT 'USD',
         totalAmount REAL NOT NULL,
         paidAmount REAL NOT NULL,
         interestRate REAL DEFAULT 0,
@@ -156,6 +161,7 @@ export async function initDatabase() {
         id TEXT PRIMARY KEY,
         debtId TEXT NOT NULL,
         amount REAL NOT NULL,
+        currency TEXT DEFAULT 'USD',
         date TEXT NOT NULL,
         note TEXT,
         accountId TEXT,
@@ -165,13 +171,26 @@ export async function initDatabase() {
       );
     `);
 
-    // Ensure userId column exists for older DB files
+    // Ensure userId and currency columns exist for older DB files without losing data
     const tables = ['accounts', 'transactions', 'subscriptions', 'debts', 'debt_payments'];
     for (const t of tables) {
       try {
         await db.execute(`ALTER TABLE ${t} ADD COLUMN userId TEXT DEFAULT 'munboi'`);
       } catch (_) {}
+      try {
+        await db.execute(`ALTER TABLE ${t} ADD COLUMN currency TEXT DEFAULT 'USD'`);
+      } catch (_) {}
     }
+    try {
+      await db.execute(`ALTER TABLE transactions ADD COLUMN originalAmount REAL`);
+    } catch (_) {}
+
+    // Remove any obsolete extra users that are not 'munboi' or 'tiago'
+    await db.execute("DELETE FROM users WHERE id NOT IN ('munboi', 'tiago')");
+    // Update default exchangeRate to 3200 if it was still on old default 4150
+    await db.execute("UPDATE users SET exchangeRate = 3200 WHERE exchangeRate = 4150 OR exchangeRate IS NULL");
+    // Ensure Bancolombia account has native COP currency & exact COP balance if still on legacy USD 7.98
+    await db.execute("UPDATE accounts SET currency = 'COP', balance = 25536 WHERE id = 'acc-bancolombia' AND balance = 7.98");
 
     // Create indexes for fast queries by userId and date
     await db.execute('CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(userId)');
@@ -272,14 +291,15 @@ export async function seedUserData(userId = 'munboi') {
 
   for (const acc of INITIAL_ACCOUNTS) {
     statements.push({
-      sql: `INSERT OR REPLACE INTO accounts (id, name, institution, type, balance, creditLimit, cutOffDay, paymentDueDay, accountNumber, accentGradient, yieldRate, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO accounts (id, name, institution, type, currency, balance, creditLimit, cutOffDay, paymentDueDay, accountNumber, accentGradient, yieldRate, userId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         acc.id,
         acc.name,
         acc.institution,
         acc.type,
-        acc.balance,
+        acc.currency || 'USD',
+        acc.balance ?? 0,
         acc.creditLimit ?? null,
         acc.cutOffDay ?? null,
         acc.paymentDueDay ?? null,
@@ -293,12 +313,14 @@ export async function seedUserData(userId = 'munboi') {
 
   for (const tx of INITIAL_TRANSACTIONS) {
     statements.push({
-      sql: `INSERT OR REPLACE INTO transactions (id, title, amount, type, category, accountId, date, notes, isAntExpense, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO transactions (id, title, amount, currency, originalAmount, type, category, accountId, date, notes, isAntExpense, userId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         tx.id,
         tx.title,
         tx.amount,
+        tx.currency || 'USD',
+        tx.originalAmount ?? tx.amount,
         tx.type,
         tx.category,
         tx.accountId,
@@ -312,13 +334,14 @@ export async function seedUserData(userId = 'munboi') {
 
   for (const sub of INITIAL_SUBSCRIPTIONS) {
     statements.push({
-      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, billingDay, accountId, active, essential, badgeColor, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         sub.id,
         sub.name,
         sub.category,
         sub.amount,
+        sub.currency || 'USD',
         sub.billingDay,
         sub.accountId,
         sub.active ? 1 : 0,
@@ -331,13 +354,14 @@ export async function seedUserData(userId = 'munboi') {
 
   for (const debt of INITIAL_DEBTS) {
     statements.push({
-      sql: `INSERT OR REPLACE INTO debts (id, title, counterparty, category, totalAmount, paidAmount, interestRate, minimumMonthlyPayment, dueDate, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO debts (id, title, counterparty, category, currency, totalAmount, paidAmount, interestRate, minimumMonthlyPayment, dueDate, userId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         debt.id,
         debt.title,
         debt.counterparty,
         debt.category,
+        debt.currency || 'USD',
         debt.totalAmount,
         debt.paidAmount || 0,
         debt.interestRate || 0,
@@ -350,12 +374,13 @@ export async function seedUserData(userId = 'munboi') {
     if (Array.isArray(debt.payments)) {
       for (const p of debt.payments) {
         statements.push({
-          sql: `INSERT OR REPLACE INTO debt_payments (id, debtId, amount, date, note, accountId, userId)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          sql: `INSERT OR REPLACE INTO debt_payments (id, debtId, amount, currency, date, note, accountId, userId)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             p.id,
             debt.id,
             p.amount,
+            p.currency || 'USD',
             p.date,
             p.note || 'Abono',
             p.accountId || null,

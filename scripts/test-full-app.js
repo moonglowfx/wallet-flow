@@ -65,8 +65,11 @@ assert(tiagoData.transactions.length === 0, `Tiago inicia completamente en blanc
 assert(munboiData.accounts.length === 5, `Munboi cuenta con sus 5 cuentas: total ${munboiData.accounts.length}`);
 assert(tiagoData.accounts.length === 0, `Tiago inicia sin cuentas (0 cuentas)`);
 
-// Validar balances de Munboi
-const munboiNet = munboiData.accounts.reduce((s, a) => s + a.balance, 0);
+// Validar balances de Munboi normalizados sin doble conversión
+const munboiNet = munboiData.accounts.reduce(
+  (s, a) => s + (a.currency === 'COP' ? a.balance / 3200 : a.balance),
+  0
+);
 assert(Math.round(munboiNet * 100) === 3377, `Capital neto de Munboi calculado exactamente: ${formatCurrency(munboiNet)}`);
 
 // -------------------------------------------------------------
@@ -104,10 +107,17 @@ async function verifyDB() {
   assert(monthlyCode.includes('monthGroups'), 'MonthlyExpensesView agrupa y ordena movimientos por mes');
   assert(monthlyCode.includes('formatMonthName'), 'MonthlyExpensesView muestra los meses en orden');
 
-  // AccountModal sin tasa de rendimiento anual
+  // AccountModal sin tasa de rendimiento anual, saldo 0 por defecto y type="tel"
   const accountModalCode = fs.readFileSync('src/components/AccountModal.jsx', 'utf-8');
   assert(accountModalCode.includes('Crear cuenta nueva'), 'AccountModal tiene como título exacto "Crear cuenta nueva"');
   assert(!accountModalCode.includes('Tasa de Rendimiento Anual'), 'AccountModal NO incluye tasa de rendimiento anual');
+  assert(accountModalCode.includes('type="tel"'), 'AccountModal usa type="tel" para inputs numéricos');
+  assert(accountModalCode.includes('0 por defecto'), 'AccountModal toma 0 por defecto si no se ingresa saldo');
+
+  // iOS Safari Header Safe-Area y Blur Reducido
+  const headerCode = fs.readFileSync('src/components/Header.jsx', 'utf-8');
+  assert(headerCode.includes('pt-safe-top'), 'Header incluye padding-top safe-area para iOS Safari');
+  assert(headerCode.includes('ios-crisp-header'), 'Header usa clase ios-crisp-header sin blur borroso en el notch/isla');
 
   // AI Advisor sin datos ajenos
   const aiAdvisorCode = fs.readFileSync('src/components/AIAdvisorView.jsx', 'utf-8');
@@ -182,9 +192,9 @@ async function verifyDB() {
 
     const testValUSD = 100;
     const formattedUSD = formatCurrency(testValUSD, 'USD');
-    const formattedCOP = formatCurrency(testValUSD, 'COP', 4150);
+    const formattedCOP3200 = formatCurrency(testValUSD, 'COP', 3200);
     assert(formattedUSD.includes('100') && formattedUSD.includes('USD'), `Formato USD correcto: ${formattedUSD}`);
-    assert(formattedCOP.includes('415.000') && formattedCOP.includes('COP'), `Formato COP correcto con tasa 4,150: ${formattedCOP}`);
+    assert(formattedCOP3200.includes('320.000') && formattedCOP3200.includes('COP'), `Formato COP correcto con tasa 3,200: ${formattedCOP3200}`);
 
     console.log(`\n🎉 Resumen final de la auditoría: ${passed} pruebas superadas, ${failed} fallos.\n`);
   });

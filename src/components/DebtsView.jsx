@@ -509,8 +509,8 @@ export const DebtsView = ({
                   </div>
                 </div>
                 <input
-                  type="number"
-                  step="any"
+                  type="tel"
+                  inputMode="decimal"
                   required
                   placeholder={
                     paymentCurrency === 'COP'
@@ -518,8 +518,8 @@ export const DebtsView = ({
                       : `ej. ${selectedDebtForPayment.minimumMonthlyPayment || 100}`
                   }
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="liquid-input text-xs text-lg font-bold"
+                  onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="liquid-input text-xs text-lg font-bold font-mono"
                 />
               </div>
 
@@ -681,13 +681,13 @@ export const DebtsView = ({
                     </div>
                   </div>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     required
                     placeholder={newDebtCurrency === 'COP' ? 'ej. 20000000' : 'ej. 5000'}
                     value={newTotal}
-                    onChange={(e) => setNewTotal(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setNewTotal(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
                 <div>
@@ -695,12 +695,12 @@ export const DebtsView = ({
                     Ya Amortizado ({newDebtCurrency})
                   </label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     placeholder="0 si es nueva"
                     value={newPaid}
-                    onChange={(e) => setNewPaid(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setNewPaid(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
               </div>
@@ -711,11 +711,11 @@ export const DebtsView = ({
                     Tasa Anual (%)
                   </label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     value={newRate}
-                    onChange={(e) => setNewRate(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setNewRate(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
                 <div>
@@ -723,12 +723,12 @@ export const DebtsView = ({
                     Pago Mínimo ({newDebtCurrency})
                   </label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     placeholder={newDebtCurrency === 'COP' ? 'ej. 500000' : 'ej. 150'}
                     value={newMinMonthly}
-                    onChange={(e) => setNewMinMonthly(e.target.value)}
-                    className="liquid-input text-xs"
+                    onChange={(e) => setNewMinMonthly(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-mono"
                   />
                 </div>
                 <div>

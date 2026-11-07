@@ -65,7 +65,7 @@ export const Header = ({
   const info = TAB_TITLES[activeTab] || TAB_TITLES.dashboard;
 
   return (
-    <header className="pt-3 pb-3 px-3.5 sm:px-6 lg:px-8 bg-[#09080E]/80 backdrop-blur-2xl border-b border-white/[0.1] transition-all relative z-20">
+    <header className="pt-safe-top pb-3 px-3.5 sm:px-6 lg:px-8 ios-crisp-header border-b border-white/[0.1] transition-all relative z-20">
       <div className="max-w-7xl mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         {/* Left: Mobile Brand + Current View Title + User Badge */}
         <div className="flex items-start sm:items-center justify-between gap-2 min-w-0">

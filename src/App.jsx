@@ -30,7 +30,7 @@ export function App() {
   // Multi-user authentication state backed by SQLite: Munboi (PIN: 0800) | Tiago (PIN: 5678)
   const [currentUser, setCurrentUser] = useState(() => USERS[0]);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(
-    () => typeof document !== 'undefined' && !document.cookie.includes('wf_device_token=')
+    () => typeof document !== 'undefined' && !document.cookie.includes('wf_account_id=')
   );
 
   // Currency State persisted in SQLite per user: USD as primary, COP as secondary
@@ -74,7 +74,8 @@ export function App() {
     const state = await api.getState(targetUserId);
     if (state) {
       if (!targetUserId) {
-        setIsLoginModalOpen(!state.trustedDevice);
+        const isAuthed = state.authenticatedAccount || Boolean(state.user);
+        setIsLoginModalOpen(!isAuthed);
       }
       if (state.user) {
         setCurrentUser((prev) => ({
@@ -155,6 +156,22 @@ export function App() {
     showToast(`Datos SQLite de ${currentUser.username} restablecidos`);
   };
 
+  const calcDelta = (acc, tx) => {
+    if (!acc || !tx) return 0;
+    const isInc = tx.type === 'income';
+    const txCur = tx.currency || 'USD';
+    const accCur = acc.currency || 'USD';
+    const orig = Number.isFinite(Number(tx.originalAmount)) ? Number(tx.originalAmount) : Number(tx.amount) || 0;
+    const usd = Number(tx.amount) || 0;
+    let mag = 0;
+    if (accCur === 'COP') {
+      mag = txCur === 'COP' ? orig : usd * (exchangeRate || DEFAULT_USD_COP_RATE);
+    } else {
+      mag = usd;
+    }
+    return isInc ? mag : -mag;
+  };
+
   // Handle adding or editing a transaction and updating linked account balances in SQLite
   const handleSaveTransaction = async (txData) => {
     if (txData.id) {
@@ -168,18 +185,22 @@ export function App() {
       setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)));
 
       if (prevTx) {
-        const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
-        const newSigned = updatedTx.type === 'income' ? Number(updatedTx.amount) : -Number(updatedTx.amount);
         setAccounts((prevAccs) =>
           prevAccs.map((acc) => {
+            const oldDelta = calcDelta(acc, prevTx);
+            const newDelta = calcDelta(acc, updatedTx);
             if (prevTx.accountId === updatedTx.accountId && acc.id === updatedTx.accountId) {
-              return { ...acc, balance: Math.round((acc.balance + (newSigned - oldSigned)) * 100) / 100 };
+              const diff = newDelta - oldDelta;
+              const nextBal = acc.balance + diff;
+              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
             }
             if (acc.id === prevTx.accountId) {
-              return { ...acc, balance: Math.round((acc.balance - oldSigned) * 100) / 100 };
+              const nextBal = acc.balance - oldDelta;
+              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
             }
             if (acc.id === updatedTx.accountId) {
-              return { ...acc, balance: Math.round((acc.balance + newSigned) * 100) / 100 };
+              const nextBal = acc.balance + newDelta;
+              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
             }
             return acc;
           })
@@ -203,10 +224,11 @@ export function App() {
     setAccounts((prevAccounts) =>
       prevAccounts.map((acc) => {
         if (acc.id === newTx.accountId) {
-          const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
+          const delta = calcDelta(acc, newTx);
+          const nextBal = acc.balance + delta;
           return {
             ...acc,
-            balance: Math.round((acc.balance + delta) * 100) / 100,
+            balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100,
           };
         }
         return acc;
@@ -222,13 +244,15 @@ export function App() {
     setTransactions((prev) => prev.filter((t) => t.id !== txId));
 
     if (prevTx) {
-      const oldSigned = prevTx.type === 'income' ? Number(prevTx.amount) : -Number(prevTx.amount);
       setAccounts((prevAccs) =>
-        prevAccs.map((acc) =>
-          acc.id === prevTx.accountId
-            ? { ...acc, balance: Math.round((acc.balance - oldSigned) * 100) / 100 }
-            : acc
-        )
+        prevAccs.map((acc) => {
+          if (acc.id === prevTx.accountId) {
+            const delta = calcDelta(acc, prevTx);
+            const nextBal = acc.balance - delta;
+            return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
+          }
+          return acc;
+        })
       );
     }
 
@@ -258,8 +282,11 @@ export function App() {
     showToast(`Cuenta guardada en SQLite: ${userAccount.name}`);
   };
 
-  // Calculate Net Worth: sum of all account balances in USD base
-  const netWorth = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+  // Calculate Net Worth: sum of all account balances normalized to USD without double-conversion
+  const netWorth = accounts.reduce((sum, a) => {
+    const b = Number(a.balance) || 0;
+    return sum + (a.currency === 'COP' ? b / (exchangeRate || DEFAULT_USD_COP_RATE) : b);
+  }, 0);
 
   // Ant expenses count for alert badges
   const antAlertCount = transactions.filter((t) => t.isAntExpense).length;

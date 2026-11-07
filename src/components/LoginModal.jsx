@@ -241,6 +241,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="4 dígitos"
@@ -256,6 +257,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="Nuevo PIN"
@@ -271,6 +273,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="Confirmar PIN"

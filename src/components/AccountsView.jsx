@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import {
   formatCurrency,
+  formatNativeCurrency,
   DEFAULT_USD_COP_RATE,
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
@@ -50,6 +51,7 @@ export const AccountsView = ({
   const [editingAccount, setEditingAccount] = useState(null);
   const [accName, setAccName] = useState('');
   const [accInstitution, setAccInstitution] = useState('');
+  const [accCurrency, setAccCurrency] = useState('USD');
   const [accBalance, setAccBalance] = useState('');
   const [accLimit, setAccLimit] = useState('');
   const [accNumber, setAccNumber] = useState('');
@@ -59,6 +61,7 @@ export const AccountsView = ({
     setEditingAccount(acc);
     setAccName(acc.name || '');
     setAccInstitution(acc.institution || '');
+    setAccCurrency(acc.currency || 'USD');
     setAccBalance((acc.balance || 0).toString());
     setAccLimit((acc.creditLimit || '').toString());
     setAccNumber(acc.accountNumber || '');
@@ -68,14 +71,20 @@ export const AccountsView = ({
     e.preventDefault();
     if (!editingAccount || !setAccounts) return;
     let editedObj = null;
+    const parsedBal = accBalance === '' ? 0 : parseFloat(accBalance);
+    const validBal = Number.isFinite(parsedBal) ? parsedBal : 0;
+    const parsedLim = parseFloat(accLimit);
+    const validLim = Number.isFinite(parsedLim) ? parsedLim : undefined;
+
     const updated = accounts.map((a) => {
       if (a.id === editingAccount.id) {
         editedObj = {
           ...a,
           name: accName.trim() || a.name,
           institution: accInstitution.trim() || a.institution,
-          balance: parseFloat(accBalance) || 0,
-          creditLimit: a.type === 'credit' ? parseFloat(accLimit) || a.creditLimit : undefined,
+          currency: accCurrency,
+          balance: accCurrency === 'COP' ? Math.round(validBal) : Math.round(validBal * 100) / 100,
+          creditLimit: a.type === 'credit' ? validLim : undefined,
           accountNumber: accNumber.trim() || a.accountNumber,
         };
         return editedObj;
@@ -298,14 +307,14 @@ export const AccountsView = ({
                 {/* Main Balance Display */}
                 <div className="space-y-1 mb-4 relative z-10">
                   <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                    {acc.type === 'credit' ? 'Saldo Deudor Actual' : 'Saldo Disponible'}
+                    {acc.type === 'credit' ? `Saldo Deudor (${acc.currency || 'USD'})` : `Saldo Disponible (${acc.currency || 'USD'})`}
                   </span>
                   <p
-                    className={`text-2xl font-black tracking-tight ${
+                    className={`text-2xl font-black tracking-tight font-mono ${
                       isNegative ? 'text-rose-400' : 'text-white'
                     }`}
                   >
-                    {formatCurrency(acc.balance, currency, exchangeRate)}
+                    {formatNativeCurrency(acc.balance, acc.currency || 'USD')}
                   </p>
                 </div>
 
@@ -319,10 +328,10 @@ export const AccountsView = ({
                   {acc.type === 'credit' && acc.creditLimit && (
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-zinc-400">
-                          Límite {formatCurrency(acc.creditLimit, currency, exchangeRate)}
+                        <span className="text-zinc-400 font-mono">
+                          Límite {formatNativeCurrency(acc.creditLimit, acc.currency || 'USD')}
                         </span>
-                        <span className="text-rose-300 font-semibold">
+                        <span className="text-rose-300 font-semibold font-mono">
                           {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}%
                           utilizado
                         </span>
@@ -596,26 +605,44 @@ export const AccountsView = ({
               </div>
 
               <div>
-                <label className="block text-zinc-300 mb-1">Saldo en USD</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-zinc-300">Saldo ({accCurrency})</label>
+                  <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setAccCurrency('USD')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'USD' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                    >
+                      USD
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAccCurrency('COP')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'COP' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                    >
+                      COP
+                    </button>
+                  </div>
+                </div>
                 <input
-                  type="number"
-                  step="any"
-                  required
+                  type="tel"
+                  inputMode="decimal"
+                  placeholder="0"
                   value={accBalance}
-                  onChange={(e) => setAccBalance(e.target.value)}
-                  className="liquid-input text-xs font-bold"
+                  onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
+                  className="liquid-input text-xs font-bold font-mono"
                 />
               </div>
 
               {editingAccount.type === 'credit' && (
                 <div>
-                  <label className="block text-zinc-300 mb-1">Límite de Crédito USD</label>
+                  <label className="block text-zinc-300 mb-1">Límite de Crédito ({accCurrency})</label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     value={accLimit}
-                    onChange={(e) => setAccLimit(e.target.value)}
-                    className="liquid-input text-xs font-bold"
+                    onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-bold font-mono"
                   />
                 </div>
               )}

@@ -13,6 +13,7 @@ import {
 import {
   formatCurrency,
   formatSecondaryCurrency,
+  formatNativeCurrency,
   TIMEFRAME_CONFIG,
   DEFAULT_USD_COP_RATE,
 } from '../data/mockData.js';
@@ -28,22 +29,31 @@ export const HeroCard = ({
 }) => {
   const [showValues, setShowValues] = useState(true);
 
-  // Compute total positive liquidity (banks + cash) and total credit liabilities in USD
-  const liquidCash = accounts
+  // Separate USD accounts and COP accounts to avoid double-conversion rounding
+  const usdAccounts = accounts.filter((a) => (a.currency || 'USD') === 'USD');
+  const copAccounts = accounts.filter((a) => a.currency === 'COP');
+
+  const totalUSD = usdAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+  const totalCOP = copAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+
+  // Consolidated Net Capital in USD base
+  const netCapital = totalUSD + (totalCOP / (exchangeRate || DEFAULT_USD_COP_RATE));
+
+  // Compute positive liquidity and credit liabilities normalized for overview
+  const liquidCashUSD = accounts
     .filter((a) => a.type === 'cash')
-    .reduce((sum, a) => sum + (a.balance || 0), 0);
+    .reduce((sum, a) => sum + ((a.currency === 'COP' ? a.balance / exchangeRate : a.balance) || 0), 0);
 
-  const bankDeposits = accounts
+  const bankDepositsUSD = accounts
     .filter((a) => a.type === 'bank')
-    .reduce((sum, a) => sum + (a.balance || 0), 0);
+    .reduce((sum, a) => sum + ((a.currency === 'COP' ? a.balance / exchangeRate : a.balance) || 0), 0);
 
-  const creditDebt = accounts
+  const creditDebtUSD = accounts
     .filter((a) => a.type === 'credit')
-    .reduce((sum, a) => sum + (a.balance || 0), 0); // negative number
+    .reduce((sum, a) => sum + ((a.currency === 'COP' ? a.balance / exchangeRate : a.balance) || 0), 0);
 
-  const netCapital = liquidCash + bankDeposits + creditDebt;
-  const grossAssets = liquidCash + bankDeposits;
-  const debtAbs = Math.abs(creditDebt);
+  const grossAssets = liquidCashUSD + bankDepositsUSD;
+  const debtAbs = Math.abs(creditDebtUSD);
   const leveragePercent = grossAssets > 0 ? Math.round((debtAbs / grossAssets) * 100) : 0;
 
   const getAccountIcon = (type) => {
@@ -135,24 +145,24 @@ export const HeroCard = ({
           </div>
         </div>
 
-        {/* Mini stats pill-row */}
+        {/* Mini stats pill-row separated in native USD and COP */}
         <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
           <div className="liquid-pill p-2.5 min-w-0">
-            <span className="text-zinc-400 block text-[11px] truncate">Bancos & Ahorro</span>
-            <span className="text-xs sm:text-sm font-semibold text-purple-200 block truncate">
-              {showValues ? formatCurrency(bankDeposits, currency, exchangeRate) : '••••'}
+            <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Dólares</span>
+            <span className="text-xs sm:text-sm font-semibold text-purple-200 block truncate font-mono">
+              {showValues ? formatNativeCurrency(totalUSD, 'USD') : '••••'}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
-            <span className="text-zinc-400 block text-[11px] truncate">Efectivo Líquido</span>
-            <span className="text-xs sm:text-sm font-semibold text-emerald-300 block truncate">
-              {showValues ? formatCurrency(liquidCash, currency, exchangeRate) : '••••'}
+            <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Pesos (COP)</span>
+            <span className="text-xs sm:text-sm font-semibold text-emerald-300 block truncate font-mono">
+              {showValues ? formatNativeCurrency(totalCOP, 'COP') : '••••'}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Deuda en TDC</span>
-            <span className="text-xs sm:text-sm font-semibold text-rose-300 block truncate">
-              {showValues ? formatCurrency(creditDebt, currency, exchangeRate) : '••••'}
+            <span className="text-xs sm:text-sm font-semibold text-rose-300 block truncate font-mono">
+              {showValues ? formatCurrency(creditDebtUSD, currency, exchangeRate) : '••••'}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">
@@ -241,23 +251,25 @@ export const HeroCard = ({
                   </div>
 
                   <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-white/[0.06]">
-                    <span className="text-[11px] text-zinc-400 shrink-0">Balance</span>
+                    <span className="text-[11px] text-zinc-400 shrink-0">
+                      Balance ({acc.currency || 'USD'})
+                    </span>
                     <span
-                      className={`text-sm font-bold tracking-tight truncate ${
+                      className={`text-sm font-bold tracking-tight truncate font-mono ${
                         isNegative ? 'text-rose-400' : 'text-purple-100'
                       }`}
                     >
-                      {showValues ? formatCurrency(acc.balance, currency, exchangeRate) : '••••••••'}
+                      {showValues ? formatNativeCurrency(acc.balance, acc.currency || 'USD') : '••••••••'}
                     </span>
                   </div>
 
                   {acc.type === 'credit' && acc.creditLimit && (
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400">
-                        <span className="truncate">
-                          Límite {formatCurrency(acc.creditLimit, currency, exchangeRate)}
+                        <span className="truncate font-mono">
+                          Límite {formatNativeCurrency(acc.creditLimit, acc.currency || 'USD')}
                         </span>
-                        <span className="text-rose-300 font-medium shrink-0">
+                        <span className="text-rose-300 font-medium shrink-0 font-mono">
                           {Math.round((Math.abs(acc.balance) / acc.creditLimit) * 100)}% Usado
                         </span>
                       </div>

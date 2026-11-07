@@ -460,6 +460,7 @@ export const SettingsView = ({
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="Ingresa tu PIN actual"
@@ -475,6 +476,7 @@ export const SettingsView = ({
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="Nuevo PIN de 4 dígitos"
@@ -490,6 +492,7 @@ export const SettingsView = ({
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 placeholder="Repite el nuevo PIN"
@@ -621,15 +624,15 @@ export const SettingsView = ({
                 Tasa de Conversión (1 USD = X COP)
               </label>
               <input
-                type="number"
-                step="any"
+                type="tel"
+                inputMode="decimal"
                 required
                 value={customRate}
-                onChange={(e) => setCustomRate(e.target.value)}
+                onChange={(e) => setCustomRate(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="liquid-input text-xs font-mono font-bold"
               />
               <p className="text-[11px] text-zinc-400 mt-1">
-                Valor por defecto: 4,150 COP por dólar
+                Valor predeterminado del sistema: 3,200 COP por dólar
               </p>
             </div>
 
@@ -933,26 +936,26 @@ export const SettingsView = ({
               </div>
 
               <div>
-                <label className="block text-zinc-300 mb-1">Saldo en USD</label>
+                <label className="block text-zinc-300 mb-1">Saldo</label>
                 <input
-                  type="number"
-                  step="any"
-                  required
+                  type="tel"
+                  inputMode="decimal"
+                  placeholder="0"
                   value={accBalance}
-                  onChange={(e) => setAccBalance(e.target.value)}
-                  className="liquid-input text-xs font-bold"
+                  onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
+                  className="liquid-input text-xs font-bold font-mono"
                 />
               </div>
 
               {editingAccount.type === 'credit' && (
                 <div>
-                  <label className="block text-zinc-300 mb-1">Límite de Crédito USD</label>
+                  <label className="block text-zinc-300 mb-1">Límite de Crédito</label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     value={accLimit}
-                    onChange={(e) => setAccLimit(e.target.value)}
-                    className="liquid-input text-xs font-bold"
+                    onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-bold font-mono"
                   />
                 </div>
               )}
@@ -1018,27 +1021,26 @@ export const SettingsView = ({
               </div>
 
               <div>
-                <label className="block text-zinc-300 mb-1">Monto Mensual USD</label>
+                <label className="block text-zinc-300 mb-1">Monto Mensual</label>
                 <input
-                  type="number"
-                  step="any"
+                  type="tel"
+                  inputMode="decimal"
                   required
                   value={subAmount}
-                  onChange={(e) => setSubAmount(e.target.value)}
-                  className="liquid-input text-xs font-bold"
+                  onChange={(e) => setSubAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="liquid-input text-xs font-bold font-mono"
                 />
               </div>
 
               <div>
                 <label className="block text-zinc-300 mb-1">Día de Cobro (1-31)</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="31"
+                  type="tel"
+                  inputMode="numeric"
                   required
                   value={subBillingDay}
-                  onChange={(e) => setSubBillingDay(e.target.value)}
-                  className="liquid-input text-xs"
+                  onChange={(e) => setSubBillingDay(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="liquid-input text-xs font-mono"
                 />
               </div>
 
@@ -1094,25 +1096,25 @@ export const SettingsView = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Monto Total USD</label>
+                  <label className="block text-zinc-300 mb-1">Monto Total</label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     required
                     value={debtTotal}
-                    onChange={(e) => setDebtTotal(e.target.value)}
-                    className="liquid-input text-xs font-bold"
+                    onChange={(e) => setDebtTotal(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-zinc-300 mb-1">Monto Pagado USD</label>
+                  <label className="block text-zinc-300 mb-1">Monto Pagado</label>
                   <input
-                    type="number"
-                    step="any"
+                    type="tel"
+                    inputMode="decimal"
                     required
                     value={debtPaid}
-                    onChange={(e) => setDebtPaid(e.target.value)}
-                    className="liquid-input text-xs font-bold"
+                    onChange={(e) => setDebtPaid(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-xs font-bold font-mono"
                   />
                 </div>
               </div>
