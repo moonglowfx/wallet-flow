@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { SubscriptionsView } from './SubscriptionsView.jsx';
 import { DebtsView } from './DebtsView.jsx';
-import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG, isSubscriptionChargedInMonth } from '../data/mockData.js';
 
 export const CommitmentsView = ({
   currentUser,
@@ -70,6 +70,35 @@ export const CommitmentsView = ({
 
   const periodCommitment = totalMonthlyCommitment * periodMultiplier;
   const periodLabel = timeframe === 'weekly' ? 'Semanal' : timeframe === 'quarterly' ? 'Trimestral' : timeframe === 'yearly' ? 'Anual' : 'Mensual';
+
+  // Global Auto-Charge Master Configuration State
+  const [isAutoChargeGlobal, setIsAutoChargeGlobal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`wf_autocharge_enabled_${currentUser?.id || 'munboi'}`);
+      return stored !== null ? stored === 'true' : true;
+    }
+    return true;
+  });
+
+  const toggleGlobalAutoCharge = () => {
+    const next = !isAutoChargeGlobal;
+    setIsAutoChargeGlobal(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`wf_autocharge_enabled_${currentUser?.id || 'munboi'}`, String(next));
+    }
+  };
+
+  // Due pending subscriptions calculation
+  const now = new Date();
+  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentDay = now.getDate();
+  const pendingDueSubs = subscriptions.filter((sub) => {
+    if (!sub.active) return false;
+    if (sub.autoCharge === false) return false;
+    const bDay = Number(sub.billingDay) || 1;
+    if (currentDay < bDay) return false;
+    return !isSubscriptionChargedInMonth(sub, transactions, currentMonthPrefix);
+  });
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-6">
@@ -176,22 +205,62 @@ export const CommitmentsView = ({
           </button>
         </div>
 
-        {/* Auto-Execution System Strip */}
+        {/* Auto-Execution System Strip & Interactive Configuration */}
         <div className="pt-3 border-t border-white/10 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={toggleGlobalAutoCharge}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                isAutoChargeGlobal
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40 shadow-sm'
+                  : 'bg-zinc-800 text-zinc-400 border-white/10'
+              }`}
+              title="Configurar estado global del cobro automático"
+            >
+              <span className={`w-2 h-2 rounded-full ${isAutoChargeGlobal ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+              <span>{isAutoChargeGlobal ? 'Auto-Cobro: ACTIVO' : 'Auto-Cobro: PAUSADO'}</span>
+            </button>
+
             <span className="text-zinc-300">
-              <strong className="text-white">Auto-Ejecución Activa:</strong> Los gastos fijos se debitan automáticamente en su día de cobro.
+              {isAutoChargeGlobal ? (
+                <span>
+                  Los gastos fijos configurados con <strong className="text-purple-300">Auto-Cobro</strong> se debitan en su día de cobro.
+                </span>
+              ) : (
+                <span className="text-amber-300">
+                  Modo manual: las suscripciones programadas no se debitarán automáticamente.
+                </span>
+              )}
             </span>
           </div>
+
           {onExecuteDueSubscriptions && (
             <button
               type="button"
-              onClick={() => onExecuteDueSubscriptions()}
-              className="liquid-button-primary px-3 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-neon-purple shrink-0 active:scale-95 transition-all"
+              onClick={() => {
+                if (pendingDueSubs.length === 0) {
+                  alert('¡Todo al día! No hay cobros automáticos pendientes para la fecha actual.');
+                  return;
+                }
+                const names = pendingDueSubs.map((s) => `• ${s.name}: $${s.amount}`).join('\n');
+                if (window.confirm ? window.confirm(`¿Ejecutar cobro de ${pendingDueSubs.length} gasto(s) fijo(s) pendiente(s) hoy?\n\n${names}`) : true) {
+                  onExecuteDueSubscriptions(undefined, undefined, undefined, true);
+                }
+              }}
+              className={`px-3.5 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 ${
+                pendingDueSubs.length > 0
+                  ? 'liquid-button-primary shadow-neon-purple text-white'
+                  : 'bg-white/5 text-zinc-400 border border-white/10 hover:text-white'
+              }`}
+              title={pendingDueSubs.length > 0 ? `Cobrar ${pendingDueSubs.length} pendientes` : 'Todo al día este mes'}
             >
-              <Zap className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-              <span>Ejecutar Cobros de la Fecha</span>
+              <Zap className={`w-3.5 h-3.5 ${pendingDueSubs.length > 0 ? 'text-amber-300 animate-pulse' : 'text-zinc-500'}`} />
+              <span>
+                {pendingDueSubs.length > 0
+                  ? `Cobrar ${pendingDueSubs.length} pendiente(s) hoy`
+                  : 'Todo al día este mes'}
+              </span>
             </button>
           )}
         </div>

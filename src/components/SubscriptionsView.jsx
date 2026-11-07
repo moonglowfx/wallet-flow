@@ -13,7 +13,7 @@ import {
   Trash2,
   Clock,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth } from '../data/mockData.js';
 import { api } from '../services/api.js';
 
 export const SubscriptionsView = ({
@@ -38,6 +38,7 @@ export const SubscriptionsView = ({
   const [billingDay, setBillingDay] = useState('5');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [essential, setEssential] = useState(false);
+  const [autoCharge, setAutoCharge] = useState(true);
 
   const openEditSub = (sub) => {
     setEditingSubId(sub.id);
@@ -49,6 +50,7 @@ export const SubscriptionsView = ({
     setBillingDay(String(sub.billingDay || 5));
     setAccountId(sub.accountId || accounts[0]?.id || '');
     setEssential(Boolean(sub.essential));
+    setAutoCharge(sub.autoCharge !== false);
     setShowAddModal(true);
   };
 
@@ -59,6 +61,7 @@ export const SubscriptionsView = ({
     setSubCurrency(currency);
     setBillingDay('5');
     setEssential(false);
+    setAutoCharge(true);
     setShowAddModal(true);
   };
 
@@ -78,6 +81,18 @@ export const SubscriptionsView = ({
       prev.map((sub) => (sub.id === id ? { ...sub, active: !sub.active } : sub))
     );
     api.toggleSubscription(id).catch((err) => console.error('Error SQLite toggleSubscription:', err));
+  };
+
+  // Toggle individual autoCharge configuration
+  const toggleAutoCharge = (id) => {
+    const sub = subscriptions.find((s) => s.id === id);
+    if (!sub) return;
+    const nextAutoCharge = sub.autoCharge === false ? true : false;
+    const updated = { ...sub, autoCharge: nextAutoCharge };
+    setSubscriptions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    api.updateSubscription(updated, currentUser?.id || 'munboi').catch((err) =>
+      console.error('Error SQLite toggleAutoCharge:', err)
+    );
   };
 
   // Compute metrics
@@ -110,6 +125,7 @@ export const SubscriptionsView = ({
       accountId: accountId || accounts[0]?.id || '',
       active: existing ? existing.active : true,
       essential,
+      autoCharge: Boolean(autoCharge),
       badgeColor: existing?.badgeColor || '#A855F7',
     };
 
@@ -361,30 +377,40 @@ export const SubscriptionsView = ({
                   </span>
                 </div>
 
-                {/* Auto-execution status pill */}
+                {/* Auto-execution status and configuration toggle */}
                 {(() => {
                   const now = new Date();
                   const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                  const isExecuted = (transactions || []).some(
-                    (tx) =>
-                      (tx.subscriptionId === sub.id && tx.date?.startsWith(currentMonthPrefix)) ||
-                      tx.id === `auto-sub-${sub.id}-${currentMonthPrefix}` ||
-                      (tx.title?.toLowerCase().includes(sub.name?.toLowerCase()) && tx.date?.startsWith(currentMonthPrefix))
-                  );
+                  const isExecuted = isSubscriptionChargedInMonth(sub, transactions, currentMonthPrefix);
+                  const isAuto = sub.autoCharge !== false;
+
                   return (
                     <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
-                      <span className="text-zinc-400">Auto-Cobro</span>
-                      {isExecuted ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Cobrado este mes
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-200 border border-purple-400/30 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-purple-400" />
-                          Programado Día {sub.billingDay}
-                        </span>
-                      )}
+                      <span className="text-zinc-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-purple-400" />
+                        Día {sub.billingDay}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {isExecuted ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Cobrado
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => toggleAutoCharge(sub.id)}
+                          title={isAuto ? 'Auto-cobro programado activo. Clic para pasar a cobro manual' : 'Cobro manual. Clic para activar auto-cobro programado'}
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
+                            isAuto
+                              ? 'bg-purple-500/15 text-purple-200 border-purple-400/30 hover:bg-purple-500/25'
+                              : 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/25'
+                          }`}
+                        >
+                          <Zap className={`w-3 h-3 ${isAuto ? 'text-purple-400' : 'text-zinc-500'}`} />
+                          {isAuto ? 'Auto-Cobro' : 'Manual'}
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
@@ -522,6 +548,19 @@ export const SubscriptionsView = ({
               </div>
 
               <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="autoChargeCheck"
+                  checked={autoCharge}
+                  onChange={(e) => setAutoCharge(e.target.checked)}
+                  className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                />
+                <label htmlFor="autoChargeCheck" className="text-zinc-300 cursor-pointer font-medium">
+                  Habilitar Cobro Automático en la fecha de pago
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="essentialCheck"

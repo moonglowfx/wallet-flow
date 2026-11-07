@@ -133,11 +133,17 @@ export async function initDatabase() {
         active INTEGER DEFAULT 1,
         essential INTEGER DEFAULT 0,
         badgeColor TEXT,
+        autoCharge INTEGER DEFAULT 1,
         userId TEXT DEFAULT 'munboi',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (accountId) REFERENCES accounts(id)
       );
     `);
+
+    // Ensure autoCharge column exists if migrated from earlier schema
+    try {
+      await db.execute('ALTER TABLE subscriptions ADD COLUMN autoCharge INTEGER DEFAULT 1;');
+    } catch (_) {}
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS debts (

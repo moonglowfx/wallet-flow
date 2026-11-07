@@ -206,6 +206,33 @@ async function verifyDB() {
     assert(formattedUSD.includes('100') && formattedUSD.includes('USD'), `Formato USD correcto: ${formattedUSD}`);
     assert(formattedCOP3200.includes('320.000') && formattedCOP3200.includes('COP'), `Formato COP correcto con tasa 3,200: ${formattedCOP3200}`);
 
+    // -------------------------------------------------------------
+    // 8. COBRO AUTOMÁTICO DE GASTOS FIJOS Y PERSISTENCIA DE DATOS
+    // -------------------------------------------------------------
+    console.log('\n--- 8. Verificación de Gastos Fijos y Auto-Cobro ---');
+    const { isSubscriptionChargedInMonth, INITIAL_SUBSCRIPTIONS } = mock;
+
+    const googleSub = INITIAL_SUBSCRIPTIONS.find((s) => s.id === 'sub-google');
+    const chatgptSub = INITIAL_SUBSCRIPTIONS.find((s) => s.id === 'sub-chatgpt');
+    const claudeSub = INITIAL_SUBSCRIPTIONS.find((s) => s.id === 'sub-claude');
+
+    assert(isSubscriptionChargedInMonth(googleSub, txs, '2026-11') === true, 'Google Plus detectado como pagado en Noviembre 2026');
+    assert(isSubscriptionChargedInMonth(chatgptSub, txs, '2026-11') === true, 'ChatGPT Plus detectado como pagado en Noviembre 2026');
+    assert(isSubscriptionChargedInMonth(claudeSub, txs, '2026-11') === false, 'Claude Pro pendiente para cobro en Noviembre 2026');
+
+    // Test false positive prevention on empty or punctuation titles
+    const dummySub = { id: 'test-1', name: 'Netflix 4K' };
+    const fakeTxs = [{ id: 'fake-dot', title: '.', date: '2026-11-04' }];
+    assert(isSubscriptionChargedInMonth(dummySub, fakeTxs, '2026-11') === false, 'Títulos con solo puntos (.) no provocan falsos cobros');
+
+    // Verification of autoCharge UI configuration in SubscriptionsView and CommitmentsView
+    const subsViewCode = fs.readFileSync('src/components/SubscriptionsView.jsx', 'utf-8');
+    assert(subsViewCode.includes('toggleAutoCharge'), 'SubscriptionsView incluye toggle interactivo de auto-cobro por suscripción');
+    assert(subsViewCode.includes('autoChargeCheck'), 'Modal de suscripción incluye selector de Cobro Automático');
+
+    const commitmentsViewCode = fs.readFileSync('src/components/CommitmentsView.jsx', 'utf-8');
+    assert(commitmentsViewCode.includes('toggleGlobalAutoCharge'), 'CommitmentsView incluye interruptor maestro de auto-cobro global');
+
     console.log(`\n🎉 Resumen final de la auditoría: ${passed} pruebas superadas, ${failed} fallos.\n`);
   });
 }

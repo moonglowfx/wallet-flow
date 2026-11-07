@@ -9,7 +9,7 @@ import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
 import { LoginModal } from './components/LoginModal.jsx';
 import { USERS, getUserInitialData } from './data/users.js';
-import { DEFAULT_USD_COP_RATE } from './data/mockData.js';
+import { DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth } from './data/mockData.js';
 import { api } from './services/api.js';
 
 // Lazy-load heavier auxiliary views to make initial app load instantaneous
@@ -90,15 +90,8 @@ export function App() {
         if (state.user.currency) setCurrency(state.user.currency);
         if (state.user.exchangeRate) setExchangeRate(Number(state.user.exchangeRate));
       }
-      if (Array.isArray(state.accounts)) {
-        const sanitizedAccs = state.accounts.map((a) =>
-          a.id === 'acc-bofa-checking' && a.balance < 229.46 ? { ...a, balance: 229.46 } : a
-        );
-        setAccounts(sanitizedAccs);
-      }
-      if (Array.isArray(state.transactions)) {
-        setTransactions(state.transactions.filter((t) => !t.id?.startsWith('auto-sub-')));
-      }
+      if (Array.isArray(state.accounts)) setAccounts(state.accounts);
+      if (Array.isArray(state.transactions)) setTransactions(state.transactions);
       if (Array.isArray(state.subscriptions)) setSubscriptions(state.subscriptions);
       if (Array.isArray(state.debts)) setDebts(state.debts);
       return;
@@ -111,14 +104,8 @@ export function App() {
         const saved = localStorage.getItem(`wf_saved_state_${uid}`);
         if (saved) {
           const parsed = JSON.parse(saved);
-          const safeAccs = Array.isArray(parsed.accounts)
-            ? parsed.accounts.map((a) => (a.id === 'acc-bofa-checking' && a.balance < 229.46 ? { ...a, balance: 229.46 } : a))
-            : null;
-          const safeTxs = Array.isArray(parsed.transactions)
-            ? parsed.transactions.filter((t) => !t.id?.startsWith('auto-sub-'))
-            : null;
-          if (safeAccs) setAccounts(safeAccs);
-          if (safeTxs) setTransactions(safeTxs);
+          if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+          if (Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
           if (Array.isArray(parsed.subscriptions)) setSubscriptions(parsed.subscriptions);
           if (Array.isArray(parsed.debts)) setDebts(parsed.debts);
           return;
@@ -301,7 +288,12 @@ export function App() {
 
   // Automatic execution of active subscriptions / fixed expenses on billing dates
   const handleExecuteDueSubscriptions = useCallback(
-    async (subsToProcess, accsToProcess, txsToProcess) => {
+    async (subsToProcess, accsToProcess, txsToProcess, forceManual = false) => {
+      if (!forceManual && typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`wf_autocharge_enabled_${currentUser.id}`);
+        if (stored === 'false') return { executed: 0, reason: 'global_paused' };
+      }
+
       const activeSubs = (subsToProcess || subscriptions || []).filter((s) => s.active);
       if (activeSubs.length === 0) return { executed: 0 };
 
@@ -313,14 +305,10 @@ export function App() {
       const currentTxs = txsToProcess || transactions || [];
 
       const dueSubs = activeSubs.filter((sub) => {
+        if (sub.autoCharge === false) return false;
         const billingDay = Number(sub.billingDay) || 1;
         if (currentDay < billingDay) return false;
-        return !currentTxs.some((tx) => {
-          if (tx.subscriptionId && tx.subscriptionId === sub.id && tx.date?.startsWith(monthPrefix)) return true;
-          if (tx.id === `auto-sub-${sub.id}-${monthPrefix}`) return true;
-          if (tx.title?.toLowerCase().includes(sub.name?.toLowerCase()) && tx.date?.startsWith(monthPrefix)) return true;
-          return false;
-        });
+        return !isSubscriptionChargedInMonth(sub, currentTxs, monthPrefix);
       });
 
       if (dueSubs.length === 0) return { executed: 0 };

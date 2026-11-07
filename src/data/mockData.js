@@ -8543,3 +8543,34 @@ export function filterTransactionsByPeriod(transactions = [], timeframe = 'month
 
   return baseTxs;
 }
+
+/**
+ * Validador bidireccional y robusto de cobros de suscripciones en un mes dado.
+ * Evita falsos positivos con títulos cortos o emojis y garantiza detección exacta.
+ */
+export function isSubscriptionChargedInMonth(sub, transactions = [], monthPrefix) {
+  if (!sub || !transactions || transactions.length === 0) return false;
+  const targetPrefix = monthPrefix || new Date().toISOString().slice(0, 7);
+  const cleanSubName = (sub.name || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .trim();
+
+  return transactions.some((tx) => {
+    if (!tx.date || !tx.date.startsWith(targetPrefix)) return false;
+    if (tx.subscriptionId && tx.subscriptionId === sub.id) return true;
+    if (tx.id === `auto-sub-${sub.id}-${targetPrefix}`) return true;
+
+    const cleanTxTitle = (tx.title || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .trim();
+
+    if (cleanTxTitle.length < 3 || cleanSubName.length < 3) return false;
+
+    if (cleanTxTitle === cleanSubName) return true;
+    if (cleanTxTitle.includes(cleanSubName) || cleanSubName.includes(cleanTxTitle)) return true;
+
+    return false;
+  });
+}

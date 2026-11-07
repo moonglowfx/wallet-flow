@@ -52,6 +52,7 @@ function formatSubscriptionRow(row) {
     billingDay: Number(row.billingDay || 1),
     active: Boolean(row.active),
     essential: Boolean(row.essential),
+    autoCharge: row.autoCharge === undefined || row.autoCharge === null ? true : Boolean(row.autoCharge),
   };
 }
 
@@ -536,8 +537,8 @@ app.post('/api/subscriptions', async (req, res) => {
     const userId = normalizeUserId(sub.userId);
     const subCur = (sub.currency || 'USD').toUpperCase();
     await db.execute({
-      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId, autoCharge)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         sub.id,
         sub.name,
@@ -550,9 +551,10 @@ app.post('/api/subscriptions', async (req, res) => {
         sub.essential ? 1 : 0,
         sub.badgeColor || '#A855F7',
         userId,
+        sub.autoCharge !== false ? 1 : 0,
       ],
     });
-    res.status(201).json({ ...sub, currency: subCur, userId });
+    res.status(201).json({ ...sub, currency: subCur, userId, autoCharge: sub.autoCharge !== false });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -566,7 +568,7 @@ app.put('/api/subscriptions/:id', async (req, res) => {
     const subCur = (sub.currency || 'USD').toUpperCase();
     await db.execute({
       sql: `UPDATE subscriptions
-            SET name = ?, category = ?, amount = ?, currency = ?, billingDay = ?, accountId = ?, active = ?, essential = ?, badgeColor = ?
+            SET name = ?, category = ?, amount = ?, currency = ?, billingDay = ?, accountId = ?, active = ?, essential = ?, badgeColor = ?, autoCharge = ?
             WHERE id = ? AND userId = ?`,
       args: [
         sub.name,
@@ -578,6 +580,7 @@ app.put('/api/subscriptions/:id', async (req, res) => {
         sub.active ? 1 : 0,
         sub.essential ? 1 : 0,
         sub.badgeColor || '#A855F7',
+        sub.autoCharge !== false ? 1 : 0,
         id,
         userId,
       ],
@@ -811,8 +814,8 @@ app.post('/api/import', async (req, res) => {
     for (const sub of subscriptions) {
       const subCur = sub.currency === 'COP' ? 'COP' : 'USD';
       statements.push({
-        sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT OR REPLACE INTO subscriptions (id, name, category, amount, currency, billingDay, accountId, active, essential, badgeColor, userId, autoCharge)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           sub.id,
           sub.name,
@@ -825,6 +828,7 @@ app.post('/api/import', async (req, res) => {
           sub.essential ? 1 : 0,
           sub.badgeColor || '#A855F7',
           userId,
+          sub.autoCharge !== false ? 1 : 0,
         ],
       });
     }
