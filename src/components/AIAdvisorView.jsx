@@ -106,33 +106,54 @@ export const AIAdvisorView = ({
   const antExpenses = antTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   const antRatio = totalExpenses > 0 ? Math.round((antExpenses / totalExpenses) * 100) : 0;
 
-  // Liquid positive capital vs Credit debts
+  // Helper to normalize any balance/amount to USD base without drift
+  const toUSD = (val, itemCur) => {
+    const num = Number(val) || 0;
+    return itemCur === 'COP' ? num / (exchangeRate || DEFAULT_USD_COP_RATE) : num;
+  };
+
+  // Liquid positive capital normalized to USD
   const liquidCash = accounts
     .filter((a) => a.type === 'cash' || a.type === 'bank')
-    .reduce((sum, a) => sum + Math.max(0, Number(a.balance) || 0), 0);
+    .reduce((sum, a) => sum + Math.max(0, toUSD(a.balance, a.currency)), 0);
 
   const creditAccounts = accounts.filter((a) => a.type === 'credit');
-  const totalCreditLimit = creditAccounts.reduce((sum, a) => sum + (Number(a.creditLimit) || 0), 0);
+  const totalCreditLimit = creditAccounts.reduce(
+    (sum, a) => sum + Math.max(0, toUSD(a.creditLimit, a.currency)),
+    0
+  );
   const totalCreditDebt = Math.abs(
-    creditAccounts.reduce((sum, a) => sum + Math.min(0, Number(a.balance) || 0), 0)
+    creditAccounts.reduce(
+      (sum, a) => sum + Math.min(0, toUSD(a.balance, a.currency)),
+      0
+    )
   );
   const creditUtilization =
     totalCreditLimit > 0 ? Math.round((totalCreditDebt / totalCreditLimit) * 100) : 0;
 
-  // Subscriptions impact scaled to selected period
+  // Debts normalized to USD
+  const totalDebtsRemaining = debts.reduce(
+    (sum, d) => sum + Math.max(0, toUSD((d.totalAmount || 0) - (d.paidAmount || 0), d.currency)),
+    0
+  );
+
+  // Subscriptions impact scaled to selected period normalized to USD
   const activeSubs = subscriptions.filter((s) => s.active);
-  const totalMonthlySubs = activeSubs.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const totalMonthlySubs = activeSubs.reduce(
+    (sum, s) => sum + toUSD(s.amount, s.currency),
+    0
+  );
   const periodSubsImpact = Math.round(totalMonthlySubs * periodFactor * 100) / 100;
   const essentialSubs = activeSubs
     .filter((s) => s.essential)
-    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    .reduce((sum, s) => sum + toUSD(s.amount, s.currency), 0);
   const optionalSubs = totalMonthlySubs - essentialSubs;
   const fixedRatio = totalIncomes > 0 ? Math.round((periodSubsImpact / totalIncomes) * 100) : 0;
 
-  // Burn rate calculations strictly for the selected period
+  // Realistic Burn Rate calculations based on active period
   const dailyBurnRate = totalExpenses > 0 ? totalExpenses / periodDays : 0;
   const estimatedMonthlyExpense = dailyBurnRate > 0 ? dailyBurnRate * 30 : Math.max(1, totalMonthlySubs);
-  const runwayDays = dailyBurnRate > 0 ? Math.round(liquidCash / dailyBurnRate) : 999;
+  const runwayDays = dailyBurnRate > 0 ? Math.min(999, Math.round(liquidCash / dailyBurnRate)) : (liquidCash > 0 ? 180 : 0);
   const runwayMonths = Math.round((runwayDays / 30) * 10) / 10;
 
   // Largest single expense & top income source in the selected period
@@ -147,13 +168,13 @@ export const AIAdvisorView = ({
   // Aura Financial Health Score (0 - 100) dynamically computed for the active period
   let healthScore = 70;
   if (targetTxs.length > 0) {
-    let score = 52;
+    let score = 50;
     if (totalIncomes > totalExpenses) score += 22;
     else if (totalIncomes > 0 && totalExpenses <= totalIncomes * 1.1) score += 5;
-    else score -= 14;
+    else score -= 15;
 
     if (runwayMonths >= 3) score += 14;
-    else if (runwayMonths >= 1) score += 7;
+    else if (runwayMonths >= 1) score += 8;
     else score -= 8;
 
     if (antRatio <= 12) score += 12;
@@ -184,22 +205,26 @@ export const AIAdvisorView = ({
   targetTxs.forEach((tx) => {
     const amt = Number(tx.amount) || 0;
     if (tx.type === 'expense') {
-      const cat = (tx.category || '').toLowerCase();
+      const rawCat = (tx.category || '').toLowerCase();
+      const cat = rawCat.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       if (
+        cat.includes('alimen') ||
         cat.includes('food') ||
-        cat.includes('alimentación') ||
-        cat.includes('health') ||
         cat.includes('salud') ||
-        cat.includes('transport') ||
+        cat.includes('health') ||
+        cat.includes('transp') ||
         cat.includes('hogar') ||
-        cat.includes('household')
+        cat.includes('vivienda') ||
+        cat.includes('servici')
       ) {
         calculatedNeeds += amt;
       } else if (
-        cat.includes('inversión') ||
+        cat.includes('invers') ||
+        cat.includes('educa') ||
         cat.includes('trading') ||
-        cat.includes('transfer') ||
-        cat.includes('herramientas')
+        cat.includes('ahorro') ||
+        cat.includes('deuda') ||
+        cat.includes('amortiz')
       ) {
         calculatedSavings += amt;
       } else {
@@ -273,30 +298,55 @@ export const AIAdvisorView = ({
             </div>
           </div>
 
-          {/* Quick Rescan & Aura Score Pill */}
+          {/* Quick Rescan & Aura Score Pill with Radial Progress Ring */}
           <div className="flex items-center justify-between sm:justify-end gap-3 w-full lg:w-auto">
-            <div className="p-2.5 sm:p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3 flex-1 sm:flex-initial justify-between sm:justify-start">
-              <div className="text-left sm:text-right">
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-black/50 border border-purple-500/30 flex items-center gap-3 flex-1 sm:flex-initial shadow-liquid">
+              <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-white/10"
+                    strokeWidth="3.5"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-fuchsia-400 transition-all duration-700"
+                    strokeDasharray={`${healthScore}, 100`}
+                    strokeLinecap="round"
+                    strokeWidth="3.5"
+                    stroke="url(#auraGrad)"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <defs>
+                    <linearGradient id="auraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#A855F7" />
+                      <stop offset="100%" stopColor="#EC4899" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span className="absolute font-black text-xs font-mono text-white">
+                  {transactions.length > 0 ? healthScore : '--'}
+                </span>
+              </div>
+              <div className="min-w-0">
                 <span className="text-[10px] uppercase tracking-wider text-zinc-400 block font-semibold">
                   Score de Salud
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-white font-mono">
-                  {transactions.length > 0 ? healthScore : '--'}
-                  <span className="text-xs text-zinc-400 font-normal">/100</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${healthBadge.color} inline-block mt-0.5`}>
+                  {healthBadge.label}
                 </span>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${healthBadge.color}`}>
-                {healthBadge.label}
-              </span>
             </div>
 
             <button
               onClick={triggerRescan}
               disabled={isScanning}
-              className="liquid-pill px-3.5 py-3 text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-1.5 border-purple-500/40 cursor-pointer shrink-0"
+              className="liquid-button-primary px-3.5 py-3 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-neon-purple active:scale-95 transition-all"
               title="Re-ejecutar auditoría en base a tus movimientos"
             >
-              <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin text-fuchsia-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin text-white' : ''}`} />
               <span className="hidden sm:inline">{isScanning ? 'Escaneando...' : 'Reescanear'}</span>
             </button>
           </div>
@@ -516,12 +566,12 @@ export const AIAdvisorView = ({
               </div>
 
               {/* Detailed Diagnostic Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Finding 1: Gastos Hormiga */}
-                <div className="liquid-glass p-6 space-y-4 border-rose-500/30 relative overflow-hidden">
+                <div className="liquid-glass hover-lift p-5 space-y-3 border-rose-500/30 relative overflow-hidden transition-all duration-300">
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 shrink-0">
-                      <Flame className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 shrink-0">
+                      <Flame className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       {antRatio > 20 ? 'Fuga Alta' : 'Controlable'}
@@ -529,59 +579,59 @@ export const AIAdvisorView = ({
                   </div>
 
                   <div>
-                    <h4 className="text-base font-bold text-white tracking-tight">
-                      Microconsumos ({antTransactions.length} en {periodShortLabel})
+                    <h4 className="text-xs font-bold text-white tracking-tight">
+                      Microconsumos ({antTransactions.length} movs)
                     </h4>
-                    <p className="text-2xl font-black text-rose-400 mt-1">
+                    <p className="text-xl font-black text-rose-400 mt-1">
                       {formatCurrency(antExpenses, currency, exchangeRate)}
                     </p>
                   </div>
 
-                  <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                    <p>
-                      <strong className="text-white">Patrón detectado:</strong> Pagos menores o iguales a $15 USD (cafés, snacks, delivery, viajes cortos).
+                  <div className="space-y-1 text-[11px] text-zinc-300 leading-snug border-t border-white/10 pt-2.5">
+                    <p className="text-zinc-400">
+                      Pagos menores a $15 USD.
                     </p>
-                    <p className="text-rose-300/90 font-medium">
-                      Proyección anualizada a este ritmo: {formatCurrency((antExpenses / Math.max(0.23, periodFactor)) * 12, currency, exchangeRate)}.
+                    <p className="text-rose-300/90 font-semibold">
+                      Ritmo anual: {formatCurrency((antExpenses / Math.max(0.23, periodFactor)) * 12, currency, exchangeRate)}.
                     </p>
                   </div>
                 </div>
 
                 {/* Finding 2: Uso de Crédito */}
-                <div className="liquid-glass p-6 space-y-4 border-amber-500/30 relative overflow-hidden">
+                <div className="liquid-glass hover-lift p-5 space-y-3 border-amber-500/30 relative overflow-hidden transition-all duration-300">
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
-                      <AlertTriangle className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                      <AlertTriangle className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      {creditUtilization > 30 ? 'Atención Requerida' : 'Nivel Óptimo'}
+                      {creditUtilization > 30 ? 'Atención' : 'Nivel Óptimo'}
                     </span>
                   </div>
 
                   <div>
-                    <h4 className="text-base font-bold text-white tracking-tight">
-                      Líneas de Tarjetas ({creditUtilization}%)
+                    <h4 className="text-xs font-bold text-white tracking-tight">
+                      Líneas de Crédito ({creditUtilization}%)
                     </h4>
-                    <p className="text-2xl font-black text-amber-300 mt-1">
+                    <p className="text-xl font-black text-amber-300 mt-1">
                       {formatCurrency(totalCreditDebt, currency, exchangeRate)}
                     </p>
                   </div>
 
-                  <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                    <p>
-                      <strong className="text-white">Regla de oro:</strong> Mantener el crédito utilizado por debajo del 30% protege tu historial crediticio.
+                  <div className="space-y-1 text-[11px] text-zinc-300 leading-snug border-t border-white/10 pt-2.5">
+                    <p className="text-zinc-400">
+                      Regla ideal: bajo el 30%.
                     </p>
-                    <p className="text-amber-300/90 font-medium">
-                      Límite total disponible: {formatCurrency(Math.max(0, totalCreditLimit - totalCreditDebt), currency, exchangeRate)}.
+                    <p className="text-amber-300/90 font-semibold">
+                      Límite libre: {formatCurrency(Math.max(0, totalCreditLimit - totalCreditDebt), currency, exchangeRate)}.
                     </p>
                   </div>
                 </div>
 
                 {/* Finding 3: Runway de Liquidez */}
-                <div className="liquid-glass p-6 space-y-4 border-purple-500/30 relative overflow-hidden">
+                <div className="liquid-glass hover-lift p-5 space-y-3 border-purple-500/30 relative overflow-hidden transition-all duration-300">
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                      <ShieldCheck className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                      <ShieldCheck className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
                       Colchón
@@ -589,20 +639,50 @@ export const AIAdvisorView = ({
                   </div>
 
                   <div>
-                    <h4 className="text-base font-bold text-white tracking-tight">
-                      Liquidez Inmediata ({runwayDays} días)
+                    <h4 className="text-xs font-bold text-white tracking-tight">
+                      Fondo Inmediato ({runwayDays} días)
                     </h4>
-                    <p className="text-2xl font-black text-purple-300 mt-1">
+                    <p className="text-xl font-black text-purple-300 mt-1">
                       {formatCurrency(liquidCash, currency, exchangeRate)}
                     </p>
                   </div>
 
-                  <div className="space-y-2 text-xs text-zinc-300 leading-relaxed border-t border-white/10 pt-3">
-                    <p>
-                      <strong className="text-white">Fondo de Emergencia:</strong> Tu saldo líquido actual cubre aproximadamente {runwayMonths} meses de tu ritmo de egresos en {periodLabel.toLowerCase()}.
+                  <div className="space-y-1 text-[11px] text-zinc-300 leading-snug border-t border-white/10 pt-2.5">
+                    <p className="text-zinc-400">
+                      Cubre {runwayMonths} meses de egresos.
                     </p>
-                    <p className="text-purple-300/90 font-medium">
-                      Recomendación: Ampliar a 3-6 meses para blindaje financiero absoluto.
+                    <p className="text-purple-300/90 font-semibold">
+                      Meta: 3-6 meses de reserva.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Finding 4: Deudas & Compromisos de Capital */}
+                <div className="liquid-glass hover-lift p-5 space-y-3 border-emerald-500/30 relative overflow-hidden transition-all duration-300">
+                  <div className="flex items-start justify-between">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 shrink-0">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {totalDebtsRemaining > 0 ? 'En Proceso' : 'Libre de Deuda'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-white tracking-tight">
+                      Pasivos / Créditos ({debts.length})
+                    </h4>
+                    <p className="text-xl font-black text-emerald-400 mt-1">
+                      {formatCurrency(totalDebtsRemaining, currency, exchangeRate)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1 text-[11px] text-zinc-300 leading-snug border-t border-white/10 pt-2.5">
+                    <p className="text-zinc-400">
+                      {debts.length > 0 ? `${debts.length} créditos registrados.` : 'Sin pasivos bancarios.'}
+                    </p>
+                    <p className="text-emerald-300/90 font-semibold">
+                      Estrategia: Método Bola de Nieve.
                     </p>
                   </div>
                 </div>
@@ -723,59 +803,59 @@ export const AIAdvisorView = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   {/* Needs 50% */}
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="liquid-pill hover-lift p-4 space-y-2 transition-all duration-300">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white">Necesidades (Objetivo 50%)</span>
                       <span className={`font-mono font-bold ${needsPercent <= 50 ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {needsPercent}% Actual
                       </span>
                     </div>
-                    <p className="text-xl font-bold text-zinc-200">
+                    <p className="text-xl font-black text-zinc-100 font-mono">
                       {formatCurrency(calculatedNeeds, currency, exchangeRate)}
                     </p>
                     <p className="text-[11px] text-zinc-400">
                       Alimentación, transporte esencial, servicios básicos y salud
                     </p>
-                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, needsPercent)}%` }} />
+                    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, needsPercent)}%` }} />
                     </div>
                   </div>
 
                   {/* Wants 30% */}
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="liquid-pill hover-lift p-4 space-y-2 transition-all duration-300">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white">Estilo & Deseos (Objetivo 30%)</span>
                       <span className={`font-mono font-bold ${wantsPercent <= 30 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {wantsPercent}% Actual
                       </span>
                     </div>
-                    <p className="text-xl font-bold text-zinc-200">
+                    <p className="text-xl font-black text-zinc-100 font-mono">
                       {formatCurrency(calculatedWants, currency, exchangeRate)}
                     </p>
                     <p className="text-[11px] text-zinc-400">
                       Restaurantes, compras personales, gaming, salidas y viajes
                     </p>
-                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                      <div className="h-full bg-fuchsia-500 rounded-full" style={{ width: `${Math.min(100, wantsPercent)}%` }} />
+                    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, wantsPercent)}%` }} />
                     </div>
                   </div>
 
                   {/* Savings / Investments 20% */}
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="liquid-pill hover-lift p-4 space-y-2 transition-all duration-300">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white">Ahorro / Inversión (Objetivo 20%)</span>
                       <span className={`font-mono font-bold ${savingsPercent >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {savingsPercent}% Actual
                       </span>
                     </div>
-                    <p className="text-xl font-bold text-emerald-300">
+                    <p className="text-xl font-black text-emerald-300 font-mono">
                       {formatCurrency(calculatedSavings, currency, exchangeRate)}
                     </p>
                     <p className="text-[11px] text-zinc-400">
                       Inversiones de capital, trading, amortización y fondos líquidos
                     </p>
-                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${Math.min(100, savingsPercent)}%` }} />
+                    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, savingsPercent)}%` }} />
                     </div>
                   </div>
                 </div>
@@ -872,9 +952,9 @@ export const AIAdvisorView = ({
 
                 {/* Simulator Output Metrics */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="liquid-pill p-4 space-y-1">
+                  <div className="liquid-pill hover-lift p-4 space-y-1 transition-all duration-300">
                     <span className="text-zinc-400 text-xs block">Liquidez Mensual Recuperada</span>
-                    <p className="text-2xl font-black text-emerald-400">
+                    <p className="text-2xl font-black text-emerald-400 font-mono">
                       +{formatCurrency(monthlyAntSavings, currency, exchangeRate)}
                     </p>
                     <span className="text-[11px] text-zinc-400">
@@ -882,9 +962,9 @@ export const AIAdvisorView = ({
                     </span>
                   </div>
 
-                  <div className="liquid-pill p-4 space-y-1">
+                  <div className="liquid-pill hover-lift p-4 space-y-1 transition-all duration-300">
                     <span className="text-zinc-400 text-xs block">Ahorro Neto Anual (12 Meses)</span>
-                    <p className="text-2xl font-black text-purple-300">
+                    <p className="text-2xl font-black text-purple-300 font-mono">
                       +{formatCurrency(annualAntSavings, currency, exchangeRate)}
                     </p>
                     <span className="text-[11px] text-zinc-400">
@@ -892,11 +972,11 @@ export const AIAdvisorView = ({
                     </span>
                   </div>
 
-                  <div className="liquid-pill p-4 space-y-1 border-fuchsia-500/30 bg-fuchsia-950/20">
+                  <div className="liquid-pill hover-lift p-4 space-y-1 border-fuchsia-500/30 bg-fuchsia-950/20 transition-all duration-300">
                     <span className="text-fuchsia-200 text-xs block font-medium">
                       Proyección 5 Años Compuesto (10% E.A.)
                     </span>
-                    <p className="text-2xl font-black text-white">
+                    <p className="text-2xl font-black text-white font-mono">
                       {formatCurrency(fiveYearCompound, currency, exchangeRate)}
                     </p>
                     <span className="text-[11px] text-zinc-400">
@@ -915,28 +995,38 @@ export const AIAdvisorView = ({
 
                 <div className="space-y-3">
                   {[
+                    ...(totalDebtsRemaining > 0
+                      ? [
+                          {
+                            step: 'Paso 1: Amortización Acelerada de Créditos',
+                            description: `Tienes ${formatCurrency(totalDebtsRemaining, currency, exchangeRate)} en deuda pendiente. Prioriza abonos extra utilizando el capital recuperado para anular intereses pasivos.`,
+                            badge: 'Prioridad Inmediata',
+                            color: 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10',
+                          },
+                        ]
+                      : []),
                     {
-                      step: 'Paso 1: Blindaje del Fondo de Reserva',
+                      step: `${totalDebtsRemaining > 0 ? 'Paso 2' : 'Paso 1'}: Blindaje del Fondo de Reserva`,
                       description: `Consolida al menos ${formatCurrency(Math.round(estimatedMonthlyExpense * 2), currency, exchangeRate)} en tu cuenta de débito/ahorros líquida como colchón de emergencia antes de comprometer capital en inversiones de riesgo.`,
-                      badge: 'Prioridad 1',
-                      color: 'border-emerald-500/30 text-emerald-300',
+                      badge: 'Prioridad Alta',
+                      color: 'border-purple-500/30 text-purple-300',
                     },
                     {
-                      step: 'Paso 2: Contención de Microconsumos Diarios',
+                      step: `${totalDebtsRemaining > 0 ? 'Paso 3' : 'Paso 2'}: Contención de Microconsumos Diarios`,
                       description: `Implementa la regla de espera de 48 horas en compras impulsivas menores a $15 USD. Aplicando un recorte del ${antReductionPercent}%, retendrás ${formatCurrency(annualAntSavings, currency, exchangeRate)} al año.`,
-                      badge: 'Prioridad 2',
+                      badge: 'Optimización',
                       color: 'border-rose-500/30 text-rose-300',
                     },
                     {
-                      step: 'Paso 3: Depuración de Cargos Recurrentes',
+                      step: `${totalDebtsRemaining > 0 ? 'Paso 4' : 'Paso 3'}: Depuración de Cargos Recurrentes`,
                       description: `Tienes ${activeSubs.length} suscripciones activas sumando ${formatCurrency(totalMonthlySubs, currency, exchangeRate)} al mes. Revisa si utilizas todas semanalmente o pausa temporalmente las de menor frecuencia.`,
-                      badge: 'Prioridad 3',
-                      color: 'border-purple-500/30 text-purple-300',
+                      badge: 'Optimización',
+                      color: 'border-fuchsia-500/30 text-fuchsia-300',
                     },
                   ].map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-purple-500/30 transition-all text-xs"
+                      className="liquid-glass hover-lift flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-white/5 hover:border-purple-500/40 transition-all text-xs"
                     >
                       <div className="space-y-1 max-w-2xl">
                         <div className="flex items-center gap-2">

@@ -495,10 +495,10 @@ export function App() {
         currentUserId={currentUser?.id}
       />
 
-      {/* Floating Toast Notification (Responsive on Mobile & Desktop) */}
+      {/* Floating Toast Notification (Responsive on Mobile & Desktop with Safe-Area) */}
       {toastMessage && (
-        <div className="fixed top-3 inset-x-3 sm:inset-x-auto sm:top-5 sm:right-5 z-50 bg-[#161324]/95 backdrop-blur-xl border border-purple-500/40 text-purple-200 px-4 py-2.5 rounded-2xl shadow-liquid-purple text-xs font-semibold flex items-center justify-center sm:justify-start gap-2 animate-bounce max-w-md mx-auto sm:mx-0">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+        <div className="fixed top-[max(1.2rem,calc(env(safe-area-inset-top,0px)+0.85rem))] inset-x-3 sm:inset-x-auto sm:top-5 sm:right-5 z-50 bg-[#161324]/98 border border-purple-500/40 text-purple-200 px-4 py-2.5 rounded-2xl shadow-liquid-purple text-xs font-semibold flex items-center justify-center sm:justify-start gap-2 animate-fade-in max-w-md mx-auto sm:mx-0">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-ping" />
           <span className="truncate">{toastMessage}</span>
         </div>
       )}
