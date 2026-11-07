@@ -60,7 +60,7 @@ export const MonthlyExpensesView = ({
 
     // Sort transactions within each month strictly by date descending (newest first)
     Object.keys(groups).forEach((key) => {
-      groups[key].transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+      groups[key].transactions.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
       groups[key].netBalance = groups[key].totalIncome - groups[key].totalExpense;
     });
 

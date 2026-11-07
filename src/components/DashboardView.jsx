@@ -29,11 +29,16 @@ export const DashboardView = ({
 
   const tfData = TIMEFRAME_CONFIG[timeframe] || TIMEFRAME_CONFIG.monthly;
 
-  // Reference date: the latest transaction date (e.g. 2026-11-05), or fallback to today
+  // Reference date: latest transaction date (e.g. 2026-11-05), or fallback to today
   const latestDate = useMemo(() => {
     if (!transactions || transactions.length === 0) return new Date();
-    const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-    const d = new Date(sorted[0].date);
+    let maxDateStr = transactions[0]?.date || '';
+    for (let i = 1; i < transactions.length; i++) {
+      if (transactions[i].date && transactions[i].date > maxDateStr) {
+        maxDateStr = transactions[i].date;
+      }
+    }
+    const d = new Date(maxDateStr);
     return isNaN(d.getTime()) ? new Date() : d;
   }, [transactions]);
 
@@ -43,14 +48,13 @@ export const DashboardView = ({
     const ref = new Date(latestDate);
     const refYear = ref.getFullYear();
     const refMonthStr = `${refYear}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+    const refStr = `${refYear}-${String(ref.getMonth() + 1).padStart(2, '0')}-${String(ref.getDate()).padStart(2, '0')}`;
 
     if (timeframe === 'weekly') {
       const weekStart = new Date(ref);
       weekStart.setDate(weekStart.getDate() - 7);
-      return transactions.filter((t) => {
-        const d = new Date(t.date);
-        return d >= weekStart && d <= ref;
-      });
+      const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
+      return transactions.filter((t) => t.date && t.date >= weekStartStr && t.date <= refStr);
     }
 
     if (timeframe === 'monthly') {
@@ -60,10 +64,8 @@ export const DashboardView = ({
     if (timeframe === 'quarterly') {
       const qStart = new Date(ref);
       qStart.setDate(qStart.getDate() - 90);
-      return transactions.filter((t) => {
-        const d = new Date(t.date);
-        return d >= qStart && d <= ref;
-      });
+      const qStartStr = `${qStart.getFullYear()}-${String(qStart.getMonth() + 1).padStart(2, '0')}-${String(qStart.getDate()).padStart(2, '0')}`;
+      return transactions.filter((t) => t.date && t.date >= qStartStr && t.date <= refStr);
     }
 
     if (timeframe === 'yearly') {

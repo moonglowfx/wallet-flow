@@ -29,6 +29,7 @@ async function safeApiFetch(url, options = {}) {
 }
 
 export const api = {
+  isBackendConfigured,
   // Accounts
   async getAccounts(userId = 'munboi') {
     const data = await safeApiFetch(`${API_BASE}/accounts?userId=${userId}`);

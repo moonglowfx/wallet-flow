@@ -296,8 +296,10 @@ export function App() {
     showToast(`Sesión activa: ${user.username} (${user.role})`);
   }, [showToast]);
 
-  // Initial load from SQLite Database for active user
+  // Initial sync from SQLite Database (only if local backend is active, avoiding redundant render cycles)
   useEffect(() => {
+    if (!api.isBackendConfigured || !api.isBackendConfigured()) return;
+
     async function loadData() {
       try {
         const [accs, txs, subs, dts] = await Promise.all([
@@ -307,7 +309,6 @@ export function App() {
           api.getDebts(currentUser.id),
         ]);
         if (currentUser.id === 'tiago') {
-          // Tiago only loads whatever is explicitly in SQLite (starts at 0)
           setAccounts(accs || []);
           setTransactions(txs || []);
           setSubscriptions(subs || []);
@@ -327,25 +328,45 @@ export function App() {
     loadData();
   }, [currentUser.id]);
 
-  // Sync isolated user state to localStorage
+  // Non-blocking asynchronous sync to localStorage (debounced to keep main UI thread 100% fluid)
   useEffect(() => {
     localStorage.setItem(`wf_user_${currentUser.id}_currency`, currency);
   }, [currentUser.id, currency]);
 
   useEffect(() => {
-    localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(accounts));
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`wf_user_${currentUser.id}_accounts`, JSON.stringify(accounts));
+      } catch (_) {}
+    }, 350);
+    return () => clearTimeout(timer);
   }, [currentUser.id, accounts]);
 
   useEffect(() => {
-    localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(transactions));
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`wf_user_${currentUser.id}_transactions`, JSON.stringify(transactions));
+      } catch (_) {}
+    }, 350);
+    return () => clearTimeout(timer);
   }, [currentUser.id, transactions]);
 
   useEffect(() => {
-    localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(subscriptions));
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`wf_user_${currentUser.id}_subscriptions`, JSON.stringify(subscriptions));
+      } catch (_) {}
+    }, 350);
+    return () => clearTimeout(timer);
   }, [currentUser.id, subscriptions]);
 
   useEffect(() => {
-    localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(debts));
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`wf_user_${currentUser.id}_debts`, JSON.stringify(debts));
+      } catch (_) {}
+    }, 350);
+    return () => clearTimeout(timer);
   }, [currentUser.id, debts]);
 
   // Handle successful login

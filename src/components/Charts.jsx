@@ -56,18 +56,21 @@ export const FluidLineChart = ({
     }
 
     try {
-      // Aggregate real transactions based on timeframe
-      const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const refDate = new Date(sorted[0].date);
+      // Find latest date in transactions without expensive date sorting
+      let latestDateStr = transactions[0]?.date || '2026-11-05';
+      for (let i = 1; i < transactions.length; i++) {
+        if (transactions[i].date && transactions[i].date > latestDateStr) {
+          latestDateStr = transactions[i].date;
+        }
+      }
+      const refDate = new Date(latestDateStr);
       const currentYear = refDate.getFullYear();
 
       if (timeframe === 'weekly') {
         const wStart = new Date(refDate);
         wStart.setDate(wStart.getDate() - 7);
-        const wTxs = transactions.filter((t) => {
-          const d = new Date(t.date);
-          return d >= wStart && d <= refDate;
-        });
+        const wStartStr = wStart.toISOString().slice(0, 10);
+        const wTxs = transactions.filter((t) => t.date && t.date >= wStartStr && t.date <= latestDateStr);
 
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         const dayBuckets = dayNames.map((label) => ({ label, income: 0, expense: 0 }));
@@ -84,7 +87,7 @@ export const FluidLineChart = ({
       }
 
       if (timeframe === 'monthly') {
-        const latestMonth = sorted[0].date.slice(0, 7); // e.g. 2026-11
+        const latestMonth = latestDateStr.slice(0, 7); // e.g. 2026-11
         const monthTxs = transactions.filter((t) => t.date && t.date.startsWith(latestMonth));
 
         const weeks = [
