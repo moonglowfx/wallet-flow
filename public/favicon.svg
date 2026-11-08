@@ -1,27 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1E1035" />
-      <stop offset="50%" stop-color="#120B20" />
-      <stop offset="100%" stop-color="#09080E" />
+    <!-- Dark obsidian gradient with subtle liquid purple tone -->
+    <linearGradient id="wf-dark-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#141122" />
+      <stop offset="45%" stop-color="#0B0913" />
+      <stop offset="100%" stop-color="#06050A" />
     </linearGradient>
-    <linearGradient id="orb" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A855F7" />
-      <stop offset="50%" stop-color="#7C3AED" />
-      <stop offset="100%" stop-color="#D946EF" />
+
+    <!-- Radial atmospheric core glow -->
+    <radialGradient id="wf-core-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.28" />
+      <stop offset="60%" stop-color="#6D28D9" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Glass border reflection -->
+    <linearGradient id="wf-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.5" />
+      <stop offset="40%" stop-color="#FFFFFF" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#581C87" stop-opacity="0.4" />
     </linearGradient>
-    <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28" />
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.06" />
+
+    <!-- Wallet crisp icon stroke -->
+    <linearGradient id="wf-wallet-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F5F3FF" />
+      <stop offset="100%" stop-color="#DDD6FE" />
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="115" fill="url(#bg)" />
-  <circle cx="390" cy="120" r="160" fill="#A855F7" opacity="0.25" />
-  <circle cx="120" cy="400" r="150" fill="#D946EF" opacity="0.2" />
-  <rect x="76" y="76" width="360" height="360" rx="88" fill="url(#orb)" />
-  <rect x="82" y="82" width="348" height="348" rx="82" fill="none" stroke="url(#glass)" stroke-width="6" />
-  <g transform="translate(136, 136) scale(10)" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+
+  <!-- Dark rounded squircle base -->
+  <rect width="512" height="512" rx="128" fill="url(#wf-dark-bg)" />
+  <rect width="512" height="512" rx="128" fill="url(#wf-core-glow)" />
+  
+  <!-- Subtle inner glass rim -->
+  <rect x="8" y="8" width="496" height="496" rx="120" fill="none" stroke="url(#wf-border)" stroke-width="8" />
+
+  <!-- Iconic Wallet Emblem centered -->
+  <g transform="translate(116, 116) scale(11.67)" fill="none" stroke="url(#wf-wallet-stroke)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
     <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    <!-- Clasp security dot in signature neon violet -->
+    <circle cx="18" cy="13" r="1.1" fill="#A855F7" stroke="#A855F7" stroke-width="0.3" />
   </g>
 </svg>
