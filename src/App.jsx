@@ -76,7 +76,7 @@ export function App() {
   // Load user data directly from SQLite database
   const loadUserFromSQLite = useCallback(async (targetUserId) => {
     const state = await api.getState(targetUserId);
-    if (state) {
+    if (state && !state.error && state.user) {
       if (!targetUserId) {
         const isSessionUnlocked =
           typeof window !== 'undefined' &&

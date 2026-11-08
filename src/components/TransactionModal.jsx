@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
   TrendingUp,
   TrendingDown,
@@ -193,19 +192,6 @@ export const TransactionModal = ({
     onClose();
   };
 
-  // Prevent background body scroll when modal is open
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
   const handleDelete = () => {
     if (!editingTransaction || !onDeleteTransaction) return;
     if (window.confirm(`¿Eliminar el movimiento "${editingTransaction.title}"?`)) {
@@ -214,16 +200,12 @@ export const TransactionModal = ({
     }
   };
 
-  if (!isOpen) return null;
-
-  const modalContent = (
+  return (
     <div
-      role="dialog"
-      aria-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/90 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -232,8 +214,8 @@ export const TransactionModal = ({
         {/* Glow orb */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-52 h-52 rounded-full bg-purple-600/25 blur-3xl" />
 
-        {/* Header with Dynamic Island Safe Area */}
-        <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.5rem))] pb-3.5 sm:py-6 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
           <div className="flex items-center gap-2.5">
             <div
               className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
@@ -596,12 +578,12 @@ export const TransactionModal = ({
             </div>
 
             {/* Actions Footer - Always Sticky & 100% Touchable on Mobile */}
-            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/98 backdrop-blur-2xl relative z-10 pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
               {editingTransaction && onDeleteTransaction ? (
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="liquid-pill py-3 px-3.5 text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/35 flex items-center justify-center gap-1.5 cursor-pointer font-semibold min-h-[48px] active:scale-95"
+                  className="liquid-pill py-2.5 px-3.5 text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/35 flex items-center justify-center gap-1.5 cursor-pointer font-semibold min-h-[44px]"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Eliminar</span>
@@ -614,13 +596,13 @@ export const TransactionModal = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="liquid-pill py-3 px-4 text-zinc-300 hover:text-white cursor-pointer font-semibold text-center flex items-center justify-center min-h-[48px] active:scale-95"
+                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer font-semibold text-center flex items-center justify-center min-h-[44px]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="liquid-button-primary py-3 px-6 font-bold cursor-pointer text-center flex items-center justify-center min-h-[48px] shadow-neon-purple active:scale-95"
+                  className="liquid-button-primary py-2.5 px-6 font-bold cursor-pointer text-center flex items-center justify-center min-h-[44px] shadow-neon-purple active:scale-95"
                 >
                   {editingTransaction
                     ? 'Guardar'
@@ -635,6 +617,4 @@ export const TransactionModal = ({
       </div>
     </div>
   );
-
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };
