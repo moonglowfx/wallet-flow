@@ -1,12 +1,13 @@
 {
-  "timestamp": "2026-11-08T00:19:18.926Z",
+  "timestamp": "2026-11-08T06:49:51.311Z",
   "metadata": {
     "usersCount": 2,
     "accountsCount": 5,
     "transactionsCount": 728,
     "subscriptionsCount": 9,
     "debtsCount": 2,
-    "debtPaymentsCount": 5
+    "debtPaymentsCount": 5,
+    "prismaSettingsCount": 1
   },
   "data": {
     "users": [
@@ -11277,7 +11278,22 @@
       {
         "key": "db_initialized",
         "value": "true",
-        "updated_at": "2026-11-08 00:14:06"
+        "updated_at": "2026-11-08 06:04:12"
+      }
+    ],
+    "prisma_settings": [
+      {
+        "userId": "munboi",
+        "income": 7504,
+        "fixed": 200,
+        "goal": 4000,
+        "emerStock": 4000,
+        "profileKey": "mid",
+        "alloc": "{\"emer\":15,\"deuda\":5,\"fiscal\":5,\"fija\":15,\"cripto\":15,\"refugio\":5,\"lp\":10,\"trade\":15,\"opp\":5,\"life\":10}",
+        "locks": "{\"emer\":true}",
+        "disabled": "{}",
+        "yieldRates": "{\"emer\":4.5,\"deuda\":0,\"fiscal\":4,\"fija\":6.5,\"cripto\":14,\"refugio\":5.5,\"lp\":10,\"trade\":18,\"opp\":8,\"life\":0}",
+        "updated_at": "2026-11-08 06:04:12"
       }
     ]
   }

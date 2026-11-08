@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   TrendingUp,
   TrendingDown,
@@ -192,6 +193,17 @@ export const TransactionModal = ({
     onClose();
   };
 
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
+
   const handleDelete = () => {
     if (!editingTransaction || !onDeleteTransaction) return;
     if (window.confirm(`¿Eliminar el movimiento "${editingTransaction.title}"?`)) {
@@ -200,22 +212,24 @@ export const TransactionModal = ({
     }
   };
 
-  return (
+  return typeof document !== 'undefined' && createPortal(
     <div
+      role="dialog"
+      aria-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg h-[100dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
+        className="w-full max-w-lg h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
       >
         {/* Glow orb */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-52 h-52 rounded-full bg-purple-600/25 blur-3xl" />
 
-        {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
+        {/* Header with Dynamic Island & Notch Safe Area */}
+        <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3.5 sm:py-5 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
           <div className="flex items-center gap-2.5">
             <div
               className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
@@ -284,7 +298,7 @@ export const TransactionModal = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden text-xs relative z-10">
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar overscroll-contain">
               {/* Segmented Type Toggle (Salida / Entrada / Transferencia) */}
               {!editingTransaction && (
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-black/50 border border-white/10">
@@ -524,7 +538,7 @@ export const TransactionModal = ({
                 placeholder="ej. Depósito consultoría, Supermercado, Starbucks"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="liquid-input text-xs"
+                className="liquid-input text-base sm:text-xs min-h-[46px]"
               />
             </div>
           )}
@@ -541,7 +555,7 @@ export const TransactionModal = ({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="liquid-input text-xs"
+                className="liquid-input text-base sm:text-xs min-h-[46px]"
               />
             </div>
 
@@ -571,14 +585,14 @@ export const TransactionModal = ({
               placeholder="Detalles sobre el ticket, referencia o comprobante"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="liquid-input text-xs"
+              className="liquid-input text-base sm:text-xs min-h-[46px]"
             />
           </div>
 
             </div>
 
             {/* Actions Footer - Always Sticky & 100% Touchable on Mobile */}
-            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(1rem,env(safe-area-inset-bottom,0px))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
               {editingTransaction && onDeleteTransaction ? (
                 <button
                   type="button"
@@ -615,6 +629,7 @@ export const TransactionModal = ({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

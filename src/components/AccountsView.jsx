@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Wallet,
   Plus,
@@ -80,6 +81,17 @@ export const AccountsView = ({
     setAccLimit((acc.creditLimit || '').toString());
     setAccNumber(acc.accountNumber || '');
   };
+
+  // Lock body scroll when editing account
+  useEffect(() => {
+    if (editingAccount) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [editingAccount]);
 
   const handleSaveEditedAccount = (e) => {
     e.preventDefault();
@@ -761,66 +773,72 @@ export const AccountsView = ({
       </div>
 
       {/* Inline Account Edit Modal */}
-      {editingAccount && (
+      {editingAccount && typeof document !== 'undefined' && createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
           onClick={(e) => {
             if (e.target === e.currentTarget) setEditingAccount(null);
           }}
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden text-xs shadow-2xl"
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-0 overflow-hidden text-xs shadow-neon-purple relative"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
               <h3 className="text-base font-bold text-white">Editar Cuenta</h3>
               <button
                 type="button"
                 onClick={() => setEditingAccount(null)}
-                className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedAccount} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <form onSubmit={handleSaveEditedAccount} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 custom-scrollbar overscroll-contain">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Nombre de la Cuenta</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Nombre de la Cuenta</label>
                   <input
                     type="text"
                     required
                     value={accName}
                     onChange={(e) => setAccName(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Institución</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Institución</label>
                   <input
                     type="text"
                     value={accInstitution}
                     onChange={(e) => setAccInstitution(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-300">Saldo ({accCurrency})</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-zinc-300 font-medium text-xs">Saldo ({accCurrency})</label>
                     <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
                       <button
                         type="button"
                         onClick={() => setAccCurrency('USD')}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'USD' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          accCurrency === 'USD' ? 'bg-purple-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                        }`}
                       >
                         USD
                       </button>
                       <button
                         type="button"
                         onClick={() => setAccCurrency('COP')}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${accCurrency === 'COP' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          accCurrency === 'COP' ? 'bg-purple-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                        }`}
                       >
                         COP
                       </button>
@@ -832,49 +850,55 @@ export const AccountsView = ({
                     placeholder="0"
                     value={accBalance}
                     onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
-                    className="liquid-input text-xs font-bold font-mono"
+                    className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                   />
                 </div>
 
                 {editingAccount.type === 'credit' && (
                   <div>
-                    <label className="block text-zinc-300 mb-1">Límite de Crédito ({accCurrency})</label>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Límite de Crédito ({accCurrency})</label>
                     <input
                       type="tel"
                       inputMode="decimal"
                       value={accLimit}
                       onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
-                      className="liquid-input text-xs font-bold font-mono"
+                      className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Número de Cuenta / Referencia</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Número de Cuenta / Referencia</label>
                   <input
                     type="text"
                     value={accNumber}
                     onChange={(e) => setAccNumber(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  onClick={() => setEditingAccount(null)}
-                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[44px] flex items-center justify-center">
-                  Guardar
-                </button>
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAccount(null)}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    Guardar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

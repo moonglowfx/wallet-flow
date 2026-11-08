@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HandCoins,
   Plus,
@@ -12,6 +13,7 @@ import {
   Clock,
   Pencil,
   Trash2,
+  X,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { api } from '../services/api.js';
@@ -64,6 +66,17 @@ export const DebtsView = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Lock background scroll when any debt modal is open
+  useEffect(() => {
+    if (selectedDebtForPayment || showNewDebtModal) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [selectedDebtForPayment, showNewDebtModal]);
 
   // Compute overall debt statistics
   const totalPrincipal = debts.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
@@ -438,39 +451,43 @@ export const DebtsView = ({
       )}
 
       {/* Modal: Ingresar Abono a Deuda */}
-      {selectedDebtForPayment && (
+      {selectedDebtForPayment && typeof document !== 'undefined' && createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedDebtForPayment(null);
           }}
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl liquid-glass border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden shadow-2xl relative"
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden relative"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
-              <div>
-                <h3 className="text-base font-bold text-white">
+            {/* Header with Notch & Dynamic Island Safe Area */}
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="min-w-0 pr-2">
+                <h3 className="text-base font-bold text-white truncate">
                   Ingresar Abono a Deuda
                 </h3>
-                <p className="text-xs text-purple-300 font-medium">
+                <p className="text-xs text-purple-300 font-medium truncate">
                   {selectedDebtForPayment.title}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedDebtForPayment(null)}
-                className="text-zinc-400 hover:text-white p-1 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddPayment} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2 text-xs">
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
-                <div className="p-3 rounded-xl bg-purple-900/20 border border-purple-500/20 text-xs text-purple-200">
-                  Saldo actual pendiente:{' '}
-                  <span className="font-bold text-white">
+            <form onSubmit={handleAddPayment} className="flex-1 min-h-0 flex flex-col overflow-hidden text-xs">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar overscroll-contain">
+                <div className="p-3.5 rounded-xl bg-purple-900/25 border border-purple-500/30 text-xs text-purple-200">
+                  <span className="text-[11px] block text-purple-300/80 mb-0.5">Saldo actual pendiente:</span>
+                  <span className="font-mono text-base font-bold text-white">
                     {formatCurrency(
                       selectedDebtForPayment.totalAmount - selectedDebtForPayment.paidAmount,
                       currency,
@@ -478,191 +495,18 @@ export const DebtsView = ({
                     )}
                   </span>
                 </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-zinc-300 font-medium">
-                    Monto del Abono
-                  </label>
-                  <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentCurrency('USD')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                        paymentCurrency === 'USD'
-                          ? 'bg-purple-600 text-white shadow-sm'
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      USD $
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentCurrency('COP')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                        paymentCurrency === 'COP'
-                          ? 'bg-purple-600 text-white shadow-sm'
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      COP $
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="tel"
-                  inputMode="decimal"
-                  required
-                  placeholder={
-                    paymentCurrency === 'COP'
-                      ? `ej. ${Math.round((selectedDebtForPayment.minimumMonthlyPayment || 100) * exchangeRate)}`
-                      : `ej. ${selectedDebtForPayment.minimumMonthlyPayment || 100}`
-                  }
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="liquid-input text-xs text-lg font-bold font-mono"
-                />
-              </div>
 
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Cuenta de Origen de los Fondos
-                </label>
-                <select
-                  value={paymentAccount}
-                  onChange={(e) => setPaymentAccount(e.target.value)}
-                  className="liquid-input text-xs bg-[#13111C]"
-                >
-                  {accounts
-                    .filter((a) => a.type !== 'credit')
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} — Saldo: {formatCurrency(a.balance, currency, exchangeRate)}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Nota / Concepto del Abono
-                </label>
-                <input
-                  type="text"
-                  placeholder="ej. Pago mensualidad ordinaria + abono a capital"
-                  value={paymentNote}
-                  onChange={(e) => setPaymentNote(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <button
-                type="button"
-                onClick={() => setSelectedDebtForPayment(null)}
-                className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[44px] flex items-center justify-center shadow-neon-purple active:scale-95"
-              >
-                Confirmar Abono
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
-
-      {/* Modal: Registrar Nueva Deuda */}
-      {showNewDebtModal && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowNewDebtModal(false);
-          }}
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl liquid-glass border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden shadow-2xl relative"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
-              <h3 className="text-base font-bold text-white">
-                {editingDebtId ? 'Editar Deuda / Crédito' : 'Registrar Deuda o Préstamo'}
-              </h3>
-              <button
-                onClick={() => {
-                  setEditingDebtId(null);
-                  setShowNewDebtModal(false);
-                }}
-                className="text-zinc-400 hover:text-white p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateDebt} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2 text-xs">
-              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Concepto / Título de la Deuda
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. Crédito Automotriz, Préstamo Familiar"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Acreedor / Institución
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="ej. Santander, Amex"
-                    value={newCounterparty}
-                    onChange={(e) => setNewCounterparty(e.target.value)}
-                    className="liquid-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    className="liquid-input text-xs bg-[#13111C]"
-                  >
-                    <option value="Crédito Automotriz">Crédito Automotriz</option>
-                    <option value="Tarjeta / MSI">Tarjeta / MSI</option>
-                    <option value="Préstamo Personal">Préstamo Personal</option>
-                    <option value="Crédito Educativo / Tech">Crédito Educativo / Tech</option>
-                    <option value="Préstamo Otorgado">Préstamo Otorgado</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-300 font-medium">
-                      Monto Original
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-zinc-300 font-medium text-xs">
+                      Monto del Abono
                     </label>
                     <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
                       <button
                         type="button"
-                        onClick={() => setNewDebtCurrency('USD')}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                          newDebtCurrency === 'USD'
+                        onClick={() => setPaymentCurrency('USD')}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
+                          paymentCurrency === 'USD'
                             ? 'bg-purple-600 text-white shadow-sm'
                             : 'text-zinc-400 hover:text-white'
                         }`}
@@ -671,9 +515,9 @@ export const DebtsView = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setNewDebtCurrency('COP')}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                          newDebtCurrency === 'COP'
+                        onClick={() => setPaymentCurrency('COP')}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
+                          paymentCurrency === 'COP'
                             ? 'bg-purple-600 text-white shadow-sm'
                             : 'text-zinc-400 hover:text-white'
                         }`}
@@ -686,102 +530,286 @@ export const DebtsView = ({
                     type="tel"
                     inputMode="decimal"
                     required
-                    placeholder={newDebtCurrency === 'COP' ? 'ej. 20000000' : 'ej. 5000'}
-                    value={newTotal}
-                    onChange={(e) => setNewTotal(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-mono"
+                    placeholder={
+                      paymentCurrency === 'COP'
+                        ? `ej. ${Math.round((selectedDebtForPayment.minimumMonthlyPayment || 100) * exchangeRate)}`
+                        : `ej. ${selectedDebtForPayment.minimumMonthlyPayment || 100}`
+                    }
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Ya Amortizado ({newDebtCurrency})
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Cuenta de Origen de los Fondos
+                  </label>
+                  <select
+                    value={paymentAccount}
+                    onChange={(e) => setPaymentAccount(e.target.value)}
+                    className="liquid-input text-base sm:text-xs bg-[#13111C] min-h-[46px]"
+                  >
+                    {accounts
+                      .filter((a) => a.type !== 'credit')
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} — Saldo: {formatCurrency(a.balance, currency, exchangeRate)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Nota / Concepto del Abono
                   </label>
                   <input
-                    type="tel"
-                    inputMode="decimal"
-                    placeholder="0 si es nueva"
-                    value={newPaid}
-                    onChange={(e) => setNewPaid(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-mono"
+                    type="text"
+                    placeholder="ej. Pago mensualidad ordinaria + abono a capital"
+                    value={paymentNote}
+                    onChange={(e) => setPaymentNote(e.target.value)}
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Tasa Anual (%)
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="decimal"
-                    value={newRate}
-                    onChange={(e) => setNewRate(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Pago Mínimo ({newDebtCurrency})
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="decimal"
-                    placeholder={newDebtCurrency === 'COP' ? 'ej. 500000' : 'ej. 150'}
-                    value={newMinMonthly}
-                    onChange={(e) => setNewMinMonthly(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Fecha Límite
-                  </label>
-                  <input
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    className="liquid-input text-xs"
-                  />
+              {/* Sticky Touch-Friendly Footer */}
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDebtForPayment(null)}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    Confirmar Abono
+                  </button>
                 </div>
               </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Registrar Nueva Deuda */}
+      {showNewDebtModal && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewDebtModal(false);
+          }}
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md h-[94dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden relative"
+          >
+            {/* Header with Notch & Dynamic Island Safe Area */}
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <h3 className="text-base font-bold text-white truncate pr-2">
+                {editingDebtId ? 'Editar Deuda / Crédito' : 'Registrar Deuda o Préstamo'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingDebtId(null);
+                  setShowNewDebtModal(false);
+                }}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-              {editingDebtId ? (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteDebt(editingDebtId)}
-                  className="liquid-pill py-2.5 px-3.5 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar</span>
-                </button>
-              ) : null}
+            <form onSubmit={handleCreateDebt} className="flex-1 min-h-0 flex flex-col overflow-hidden text-xs">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar overscroll-contain">
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Concepto / Título de la Deuda
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. Crédito Automotriz, Préstamo Familiar"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
+                  />
+                </div>
 
-              <div className="grid grid-cols-2 gap-2 w-full sm:w-auto ml-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingDebtId(null);
-                    setShowNewDebtModal(false);
-                  }}
-                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[44px] flex items-center justify-center shadow-neon-purple active:scale-95"
-                >
-                  {editingDebtId ? 'Guardar' : 'Crear Deuda'}
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Acreedor / Institución
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ej. Santander, Amex"
+                      value={newCounterparty}
+                      onChange={(e) => setNewCounterparty(e.target.value)}
+                      className="liquid-input text-base sm:text-xs min-h-[46px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Categoría
+                    </label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="liquid-input text-base sm:text-xs bg-[#13111C] min-h-[46px]"
+                    >
+                      <option value="Crédito Automotriz">Crédito Automotriz</option>
+                      <option value="Tarjeta / MSI">Tarjeta / MSI</option>
+                      <option value="Préstamo Personal">Préstamo Personal</option>
+                      <option value="Crédito Educativo / Tech">Crédito Educativo / Tech</option>
+                      <option value="Préstamo Otorgado">Préstamo Otorgado</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-zinc-300 font-medium text-xs">
+                        Monto Original
+                      </label>
+                      <div className="flex items-center gap-1 bg-white/5 p-0.5 rounded-lg border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setNewDebtCurrency('USD')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                            newDebtCurrency === 'USD'
+                              ? 'bg-purple-600 text-white shadow-sm'
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                        >
+                          USD $
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewDebtCurrency('COP')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                            newDebtCurrency === 'COP'
+                              ? 'bg-purple-600 text-white shadow-sm'
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                        >
+                          COP $
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      required
+                      placeholder={newDebtCurrency === 'COP' ? 'ej. 20000000' : 'ej. 5000'}
+                      value={newTotal}
+                      onChange={(e) => setNewTotal(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Ya Amortizado ({newDebtCurrency})
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      placeholder="0 si es nueva"
+                      value={newPaid}
+                      onChange={(e) => setNewPaid(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Tasa Anual (%)
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      value={newRate}
+                      onChange={(e) => setNewRate(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Pago Mínimo ({newDebtCurrency})
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      placeholder={newDebtCurrency === 'COP' ? 'ej. 500000' : 'ej. 150'}
+                      value={newMinMonthly}
+                      onChange={(e) => setNewMinMonthly(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Fecha Límite
+                    </label>
+                    <input
+                      type="date"
+                      value={newDueDate}
+                      onChange={(e) => setNewDueDate(e.target.value)}
+                      className="liquid-input text-base sm:text-xs min-h-[46px]"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
+
+              {/* Sticky Touch-Friendly Footer */}
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {editingDebtId ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDebt(editingDebtId)}
+                    className="liquid-pill py-2.5 px-3.5 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer min-h-[46px] text-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </button>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDebtId(null);
+                      setShowNewDebtModal(false);
+                    }}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    {editingDebtId ? 'Guardar' : 'Crear Deuda'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

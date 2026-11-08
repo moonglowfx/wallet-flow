@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Lock,
   Unlock,
@@ -166,13 +167,17 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
     }, 1400);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-xl overflow-y-auto animate-fadeIn">
+  return typeof document !== 'undefined' && createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-xl overflow-y-auto animate-fadeIn"
+    >
       {/* Background ambient lighting */}
       <div className="pointer-events-none absolute w-96 h-96 rounded-full bg-purple-600/20 blur-[130px] -top-20 -left-20" />
       <div className="pointer-events-none absolute w-96 h-96 rounded-full bg-fuchsia-600/15 blur-[140px] -bottom-20 -right-20" />
 
-      <div className="w-full max-w-md max-h-[100dvh] sm:max-h-[92dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 p-4 sm:p-8 shadow-[0_30px_70px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative text-center space-y-4 sm:space-y-6 pb-[max(1.2rem,env(safe-area-inset-bottom))] custom-scrollbar">
+      <div className="w-full max-w-md max-h-[94dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 p-4 sm:p-8 shadow-[0_30px_70px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative text-center space-y-4 sm:space-y-6 pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] custom-scrollbar">
         {/* Glow */}
         <div className="pointer-events-none absolute -top-16 -right-16 w-44 h-44 rounded-full bg-violet-600/20 blur-3xl" />
 
@@ -449,6 +454,7 @@ export const LoginModal = ({ isOpen, onLoginSuccess, currentUserId }) => {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

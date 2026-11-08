@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CalendarClock,
   Plus,
@@ -12,6 +13,7 @@ import {
   Pencil,
   Trash2,
   Clock,
+  X,
 } from 'lucide-react';
 import { formatCurrency, DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth } from '../data/mockData.js';
 import { api } from '../services/api.js';
@@ -53,6 +55,17 @@ export const SubscriptionsView = ({
     setAutoCharge(sub.autoCharge !== false);
     setShowAddModal(true);
   };
+
+  // Lock background scroll when modal is open
+  useEffect(() => {
+    if (showAddModal) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [showAddModal]);
 
   const openNewSub = () => {
     setEditingSubId(null);
@@ -421,187 +434,189 @@ export const SubscriptionsView = ({
       )}
 
       {/* Add Subscription Modal */}
-      {showAddModal && (
+      {showAddModal && typeof document !== 'undefined' && createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowAddModal(false);
           }}
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl liquid-glass border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden shadow-2xl relative"
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-0 overflow-hidden shadow-neon-purple relative"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
-              <h3 className="text-base font-bold text-white">
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <h3 className="text-base font-bold text-white truncate pr-2">
                 {editingSubId ? 'Editar Suscripción / Pago Fijo' : 'Registrar Gasto Fijo o Suscripción'}
               </h3>
               <button
+                type="button"
                 onClick={() => {
                   setEditingSubId(null);
                   setShowAddModal(false);
                 }}
-                className="text-zinc-400 hover:text-white p-1 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubscription} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2 text-xs">
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Nombre del Servicio o Pago
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. Netflix 4K, Renta Depto, Gimnasio"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="liquid-input text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleAddSubscription} className="flex-1 min-h-0 flex flex-col overflow-hidden text-xs">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar overscroll-contain">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-300 font-medium">Monto Mensual</label>
-                    <div className="flex items-center gap-1 bg-black/50 rounded-lg p-0.5 border border-white/10 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => setSubCurrency('USD')}
-                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                          subCurrency === 'USD' ? 'bg-purple-600 text-white font-bold' : 'text-zinc-400'
-                        }`}
-                      >
-                        USD
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSubCurrency('COP')}
-                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                          subCurrency === 'COP' ? 'bg-emerald-600 text-white font-bold' : 'text-zinc-400'
-                        }`}
-                      >
-                        COP
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="tel"
-                    inputMode="decimal"
-                    required
-                    placeholder={subCurrency === 'USD' ? 'ej. 19.99' : 'ej. 80000'}
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-300 font-medium mb-1">
-                    Día de Cobro (1 - 31)
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Nombre del Servicio o Pago
                   </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
+                    type="text"
                     required
-                    placeholder="1"
-                    value={billingDay}
-                    onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="liquid-input text-xs font-mono"
+                    placeholder="ej. Netflix 4K, Renta Depto, Gimnasio"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-zinc-300 font-medium text-xs">Monto Mensual</label>
+                      <div className="flex items-center gap-1 bg-black/50 rounded-lg p-0.5 border border-white/10 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setSubCurrency('USD')}
+                          className={`px-2 py-0.5 rounded cursor-pointer ${
+                            subCurrency === 'USD' ? 'bg-purple-600 text-white font-bold' : 'text-zinc-400'
+                          }`}
+                        >
+                          USD
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubCurrency('COP')}
+                          className={`px-2 py-0.5 rounded cursor-pointer ${
+                            subCurrency === 'COP' ? 'bg-emerald-600 text-white font-bold' : 'text-zinc-400'
+                          }`}
+                        >
+                          COP
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="decimal"
+                      required
+                      placeholder={subCurrency === 'USD' ? 'ej. 19.99' : 'ej. 80000'}
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                      Día de Cobro (1 - 31)
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      required
+                      placeholder="1"
+                      value={billingDay}
+                      onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Categoría
+                  </label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="liquid-input text-base sm:text-xs bg-[#13111C] min-h-[46px]"
+                  >
+                    <option value="Vivienda & Servicios">Vivienda & Servicios</option>
+                    <option value="Streaming & Media">Streaming & Media</option>
+                    <option value="Software & IA">Software & IA</option>
+                    <option value="Salud & Fitness">Salud & Fitness</option>
+                    <option value="Seguros & Protección">Seguros & Protección</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">
+                    Cuenta de Débito / Tarjeta vinculada
+                  </label>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="liquid-input text-base sm:text-xs bg-[#13111C] min-h-[46px]"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.institution})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="autoChargeCheck"
+                    checked={autoCharge}
+                    onChange={(e) => setAutoCharge(e.target.checked)}
+                    className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
+                  />
+                  <label htmlFor="autoChargeCheck" className="text-zinc-300 cursor-pointer font-medium text-xs">
+                    Habilitar Cobro Automático en la fecha de pago
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="essentialCheck"
+                    checked={essential}
+                    onChange={(e) => setEssential(e.target.checked)}
+                    className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
+                  />
+                  <label htmlFor="essentialCheck" className="text-zinc-300 cursor-pointer text-xs">
+                    Marcar como gasto esencial no negociable (ej. renta, seguro)
+                  </label>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Categoría
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="liquid-input text-xs bg-[#13111C]"
-                >
-                  <option value="Vivienda & Servicios">Vivienda & Servicios</option>
-                  <option value="Streaming & Media">Streaming & Media</option>
-                  <option value="Software & IA">Software & IA</option>
-                  <option value="Salud & Fitness">Salud & Fitness</option>
-                  <option value="Seguros & Protección">Seguros & Protección</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-zinc-300 font-medium mb-1">
-                  Cuenta de Débito / Tarjeta vinculada
-                </label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="liquid-input text-xs bg-[#13111C]"
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.institution})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="autoChargeCheck"
-                  checked={autoCharge}
-                  onChange={(e) => setAutoCharge(e.target.checked)}
-                  className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                />
-                <label htmlFor="autoChargeCheck" className="text-zinc-300 cursor-pointer font-medium">
-                  Habilitar Cobro Automático en la fecha de pago
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="essentialCheck"
-                  checked={essential}
-                  onChange={(e) => setEssential(e.target.checked)}
-                  className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                />
-                <label htmlFor="essentialCheck" className="text-zinc-300 cursor-pointer">
-                  Marcar como gasto esencial no negociable (ej. renta, seguro)
-                </label>
-              </div>
-
-              </div>
-
-              <div className="pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                 {editingSubId ? (
                   <button
                     type="button"
                     onClick={() => handleDeleteSub(editingSubId)}
-                    className="liquid-pill py-2.5 px-3.5 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+                    className="liquid-pill py-2.5 px-3.5 text-rose-400 hover:text-rose-200 border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer min-h-[46px] text-xs"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Eliminar</span>
                   </button>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto ml-auto">
+                <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto ml-auto">
                   <button
                     type="button"
                     onClick={() => {
                       setEditingSubId(null);
                       setShowAddModal(false);
                     }}
-                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[44px] flex items-center justify-center shadow-neon-purple active:scale-95"
+                    className="liquid-button-primary py-2.5 px-5 font-semibold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
                   >
                     {editingSubId ? 'Guardar' : 'Guardar'}
                   </button>
@@ -609,7 +624,8 @@ export const SubscriptionsView = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

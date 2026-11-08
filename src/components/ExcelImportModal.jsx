@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileSpreadsheet,
   Download,
@@ -26,6 +27,17 @@ export const ExcelImportModal = ({
   const [parsedData, setParsedData] = useState(null);
   const [importMode, setImportMode] = useState('replace'); // 'replace' or 'merge'
   const fileInputRef = useRef(null);
+
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -59,23 +71,25 @@ export const ExcelImportModal = ({
     onClose();
   };
 
-  return (
+  return typeof document !== 'undefined' && createPortal(
     <div
+      role="dialog"
+      aria-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl h-[100dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
+        className="w-full max-w-xl h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/35 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.2)] relative overflow-hidden"
       >
         {/* Ambient glow */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 rounded-full bg-emerald-600/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-20 w-60 h-60 rounded-full bg-purple-600/20 blur-3xl" />
 
-        {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
+        {/* Header with Dynamic Island & Notch Safe Area */}
+        <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3.5 sm:py-5 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 shrink-0">
               <FileSpreadsheet className="w-5 h-5" />
@@ -242,12 +256,12 @@ export const ExcelImportModal = ({
         </div>
 
         {/* Sticky Footer Actions - Guaranteed Touch Targets on Mobile */}
-        <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+        <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5 w-full">
             <button
               type="button"
               onClick={onClose}
-              className="liquid-pill py-2.5 px-4 text-xs text-zinc-400 hover:text-white font-semibold cursor-pointer text-center flex items-center justify-center min-h-[44px]"
+              className="liquid-pill py-2.5 px-4 text-xs text-zinc-400 hover:text-white font-semibold cursor-pointer text-center flex items-center justify-center min-h-[46px]"
             >
               Cancelar
             </button>
@@ -255,7 +269,7 @@ export const ExcelImportModal = ({
               type="button"
               disabled={!parsedData || isParsing}
               onClick={handleConfirm}
-              className={`liquid-button-primary py-2.5 px-5 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple active:scale-95 text-center min-h-[44px] ${
+              className={`liquid-button-primary py-2.5 px-5 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple active:scale-95 text-center min-h-[46px] ${
                 !parsedData || isParsing ? 'opacity-40 cursor-not-allowed' : ''
               }`}
             >
@@ -265,7 +279,7 @@ export const ExcelImportModal = ({
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
   );
 };

@@ -112,18 +112,18 @@ export const SettingsView = ({
   const [dbLiveInfo, setDbLiveInfo] = useState(null);
   const [isLoadingLiveInfo, setIsLoadingLiveInfo] = useState(false);
 
-  // Prevent background body scroll when breakdown modal is open on mobile
+  // Prevent background body scroll when any modal in Settings is open on mobile
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    if (isBreakdownModalOpen) {
+    const isAnyModalOpen = isBreakdownModalOpen || editingAccount || editingSub || editingDebt;
+    if (isAnyModalOpen) {
+      const prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isBreakdownModalOpen]);
+  }, [isBreakdownModalOpen, editingAccount, editingSub, editingDebt]);
 
   // ----------------- PIN CHANGE HANDLER -----------------
   const handleUpdatePin = (e) => {
@@ -1446,253 +1446,313 @@ export const SettingsView = ({
       )}
 
       {/* ---------------- EDIT ACCOUNT MODAL ---------------- */}
-      {editingAccount && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
-          <div className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+      {editingAccount && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingAccount(null);
+          }}
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden text-xs relative"
+          >
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
               <h3 className="text-base font-bold text-white">Editar Cuenta</h3>
-              <button onClick={() => setEditingAccount(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setEditingAccount(null)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedAccount} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <form onSubmit={handleSaveEditedAccount} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 custom-scrollbar overscroll-contain">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Nombre de la Cuenta</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Nombre de la Cuenta</label>
                   <input
                     type="text"
                     required
                     value={accName}
                     onChange={(e) => setAccName(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Institución</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Institución</label>
                   <input
                     type="text"
                     value={accInstitution}
                     onChange={(e) => setAccInstitution(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Saldo</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Saldo</label>
                   <input
                     type="tel"
                     inputMode="decimal"
                     placeholder="0"
                     value={accBalance}
                     onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.-]/g, ''))}
-                    className="liquid-input text-xs font-bold font-mono"
+                    className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                   />
                 </div>
 
                 {editingAccount.type === 'credit' && (
                   <div>
-                    <label className="block text-zinc-300 mb-1">Límite de Crédito</label>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Límite de Crédito</label>
                     <input
                       type="tel"
                       inputMode="decimal"
                       value={accLimit}
                       onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.]/g, ''))}
-                      className="liquid-input text-xs font-bold font-mono"
+                      className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Número de Cuenta / Referencia</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Número de Cuenta / Referencia</label>
                   <input
                     type="text"
                     value={accNumber}
                     onChange={(e) => setAccNumber(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  onClick={() => setEditingAccount(null)}
-                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[44px] flex items-center justify-center">
-                  Guardar
-                </button>
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAccount(null)}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    Guardar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ---------------- EDIT SUBSCRIPTION MODAL ---------------- */}
-      {editingSub && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
-          <div className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+      {editingSub && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingSub(null);
+          }}
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden text-xs relative"
+          >
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
               <h3 className="text-base font-bold text-white">Editar Suscripción</h3>
-              <button onClick={() => setEditingSub(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setEditingSub(null)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedSub} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <form onSubmit={handleSaveEditedSub} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 custom-scrollbar overscroll-contain">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Nombre</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Nombre</label>
                   <input
                     type="text"
                     required
                     value={subName}
                     onChange={(e) => setSubName(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Categoría</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Categoría</label>
                   <input
                     type="text"
                     value={subCategory}
                     onChange={(e) => setSubCategory(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Monto Mensual</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Monto Mensual</label>
                   <input
                     type="tel"
                     inputMode="decimal"
                     required
                     value={subAmount}
                     onChange={(e) => setSubAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="liquid-input text-xs font-bold font-mono"
+                    className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Día de Cobro (1-31)</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Día de Cobro (1-31)</label>
                   <input
                     type="tel"
                     inputMode="numeric"
                     required
                     value={subBillingDay}
                     onChange={(e) => setSubBillingDay(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="liquid-input text-xs font-mono"
+                    className="liquid-input text-base sm:text-xs font-mono min-h-[46px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  onClick={() => setEditingSub(null)}
-                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[44px] flex items-center justify-center">
-                  Guardar
-                </button>
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSub(null)}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    Guardar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ---------------- EDIT DEBT MODAL ---------------- */}
-      {editingDebt && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
-          <div className="w-full max-w-md h-[100dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 p-4 sm:p-6 overflow-hidden text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+      {editingDebt && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingDebt(null);
+          }}
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#14121E] sm:bg-[#14121E]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden text-xs relative"
+          >
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3 sm:py-4 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
               <h3 className="text-base font-bold text-white">Editar Deuda</h3>
-              <button onClick={() => setEditingDebt(null)} className="p-1 rounded-full text-zinc-400 hover:text-white cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setEditingDebt(null)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedDebt} className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pt-2">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <form onSubmit={handleSaveEditedDebt} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 custom-scrollbar overscroll-contain">
                 <div>
-                  <label className="block text-zinc-300 mb-1">Título de la Deuda</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Título de la Deuda</label>
                   <input
                     type="text"
                     required
                     value={debtTitle}
                     onChange={(e) => setDebtTitle(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Contraparte / Entidad</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Contraparte / Entidad</label>
                   <input
                     type="text"
                     value={debtCounterparty}
                     onChange={(e) => setDebtCounterparty(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-300 mb-1">Monto Total</label>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Monto Total</label>
                     <input
                       type="tel"
                       inputMode="decimal"
                       required
                       value={debtTotal}
                       onChange={(e) => setDebtTotal(e.target.value.replace(/[^0-9.]/g, ''))}
-                      className="liquid-input text-xs font-bold font-mono"
+                      className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                     />
                   </div>
                   <div>
-                    <label className="block text-zinc-300 mb-1">Monto Pagado</label>
+                    <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Monto Pagado</label>
                     <input
                       type="tel"
                       inputMode="decimal"
                       required
                       value={debtPaid}
                       onChange={(e) => setDebtPaid(e.target.value.replace(/[^0-9.]/g, ''))}
-                      className="liquid-input text-xs font-bold font-mono"
+                      className="liquid-input text-base sm:text-xs font-bold font-mono min-h-[46px]"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-zinc-300 mb-1">Fecha Límite</label>
+                  <label className="block text-zinc-300 font-medium mb-1.5 text-xs">Fecha Límite</label>
                   <input
                     type="date"
                     value={debtDueDate}
                     onChange={(e) => setDebtDueDate(e.target.value)}
-                    className="liquid-input text-xs"
+                    className="liquid-input text-base sm:text-xs min-h-[46px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  onClick={() => setEditingDebt(null)}
-                  className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[44px] flex items-center justify-center font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[44px] flex items-center justify-center">
-                  Guardar
-                </button>
+              <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDebt(null)}
+                    className="liquid-pill py-2.5 px-4 text-zinc-400 hover:text-white cursor-pointer text-center min-h-[46px] flex items-center justify-center font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="liquid-button-primary py-2.5 px-4 font-bold cursor-pointer text-center min-h-[46px] flex items-center justify-center shadow-neon-purple active:scale-95 text-xs"
+                  >
+                    Guardar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ---------------- MODAL DE DESGLOSE COMPLETO DE CAMBIOS MANUALES ---------------- */}
@@ -2001,37 +2061,66 @@ export const SettingsView = ({
 
                 {/* Sub-Tab 4: Detalle de Deudas */}
                 {breakdownActiveTab === 'deudas' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                    {pendingImportData.debts.length === 0 ? (
-                      <p className="text-xs text-zinc-400 p-4 text-center col-span-2">No hay deudas en este respaldo.</p>
-                    ) : (
-                      pendingImportData.debts.map((d, idx) => {
-                        const tot = Number(d.totalAmount) || 0;
-                        const paid = Number(d.paidAmount) || 0;
-                        const rem = Math.max(0, tot - paid);
-                        return (
-                          <div
-                            key={d.id || idx}
-                            className="bg-black/30 border border-white/10 rounded-2xl p-3.5 space-y-2 hover:border-purple-500/40 transition-all"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <h4 className="text-xs font-bold text-white">{d.title}</h4>
-                                <span className="text-[10px] text-zinc-400 block">{d.counterparty || 'Entidad'}</span>
-                              </div>
-                              <span className="font-mono text-xs font-bold text-amber-300">
-                                Saldo: {formatCurrency(rem, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}
-                              </span>
-                            </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
+                      <span>Deudas detectadas: <strong className="text-white">{pendingImportData.debts.length}</strong></span>
+                      <span className="font-mono text-purple-300 font-bold">
+                        Total Adeudado: {formatCurrency(breakdownMetrics.remainingDebtsUSD, pendingImportData.currency, pendingImportData.exchangeRate)}
+                      </span>
+                    </div>
 
-                            <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-white/5">
-                              <span>Total: {formatCurrency(tot, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}</span>
-                              <span>Vence: {d.dueDate || 'N/A'}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[46dvh] sm:max-h-80 overflow-y-auto custom-scrollbar overscroll-contain pr-1">
+                      {pendingImportData.debts.length === 0 ? (
+                        <p className="text-xs text-zinc-400 p-6 text-center col-span-2 bg-white/[0.02] rounded-2xl border border-white/5">
+                          No hay deudas en este respaldo.
+                        </p>
+                      ) : (
+                        pendingImportData.debts.map((d, idx) => {
+                          const tot = Number(d.totalAmount) || 0;
+                          const paid = Number(d.paidAmount) || 0;
+                          const rem = Math.max(0, tot - paid);
+                          const progressPct = tot > 0 ? Math.min(100, Math.round((paid / tot) * 100)) : 0;
+                          return (
+                            <div
+                              key={d.id || idx}
+                              className="bg-black/40 border border-white/10 hover:border-purple-500/40 rounded-2xl p-3.5 space-y-2.5 transition-all shadow-sm"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-bold text-white truncate">{d.title}</h4>
+                                  <span className="text-[10px] text-zinc-400 block truncate">{d.counterparty || 'Entidad'}</span>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="text-[10px] block text-zinc-400">Saldo Pendiente</span>
+                                  <span className="font-mono text-xs font-bold text-amber-300">
+                                    {formatCurrency(rem, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="space-y-1">
+                                <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400 transition-all duration-300"
+                                    style={{ width: `${progressPct}%` }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                                  <span>Amortizado: {progressPct}% ({formatCurrency(paid, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)})</span>
+                                  <span>Total: {formatCurrency(tot, d.currency || pendingImportData.currency, pendingImportData.exchangeRate)}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1.5 border-t border-white/5">
+                                <span>{d.category || 'Crédito'}</span>
+                                <span>Vence: <strong className="text-zinc-300">{d.dueDate || 'N/A'}</strong></span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
