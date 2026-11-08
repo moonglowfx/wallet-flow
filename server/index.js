@@ -1229,6 +1229,145 @@ app.post('/api/database/restore', async (req, res) => {
   }
 });
 
+// --- PRISMA OS SETTINGS & BUCKETS ENDPOINTS ---
+app.get('/api/prisma', async (req, res) => {
+  try {
+    const cookieAccountId = getAccountCookie(req);
+    const userId = normalizeUserId(req.query.userId || cookieAccountId || 'munboi');
+
+    let result = await db.execute({
+      sql: 'SELECT * FROM prisma_settings WHERE userId = ?',
+      args: [userId],
+    });
+
+    if (result.rows.length === 0) {
+      const defaultAlloc = {
+        emer: 12,
+        deuda: 8,
+        fiscal: 8,
+        fija: 12,
+        cripto: 12,
+        refugio: 5,
+        lp: 8,
+        trade: 12,
+        opp: 8,
+        life: 15,
+      };
+      const defaultYields = {
+        emer: 4.5,
+        deuda: 0,
+        fiscal: 4.0,
+        fija: 6.5,
+        cripto: 14.0,
+        refugio: 5.5,
+        lp: 10.0,
+        trade: 18.0,
+        opp: 8.0,
+        life: 0,
+      };
+
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO prisma_settings (userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates, updated_at)
+              VALUES (?, 7504, 200, 4000, 4000, 'mid', ?, '{}', '{}', ?, CURRENT_TIMESTAMP)`,
+        args: [userId, JSON.stringify(defaultAlloc), JSON.stringify(defaultYields)],
+      });
+
+      return res.json({
+        userId,
+        income: 7504,
+        fixed: 200,
+        goal: 4000,
+        emerStock: 4000,
+        profileKey: 'mid',
+        alloc: defaultAlloc,
+        locks: {},
+        disabled: {},
+        yieldRates: defaultYields,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    const row = result.rows[0];
+    let alloc = {};
+    let locks = {};
+    let disabled = {};
+    let yieldRates = {};
+    try { alloc = JSON.parse(row.alloc || '{}'); } catch (_) {}
+    try { locks = JSON.parse(row.locks || '{}'); } catch (_) {}
+    try { disabled = JSON.parse(row.disabled || '{}'); } catch (_) {}
+    try { yieldRates = JSON.parse(row.yieldRates || '{}'); } catch (_) {}
+
+    res.json({
+      userId: row.userId,
+      income: Number(row.income || 7504),
+      fixed: Number(row.fixed || 200),
+      goal: Number(row.goal || 4000),
+      emerStock: Number(row.emerStock || 4000),
+      profileKey: row.profileKey || 'mid',
+      alloc,
+      locks,
+      disabled,
+      yieldRates,
+      updated_at: row.updated_at,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/prisma', async (req, res) => {
+  try {
+    const cookieAccountId = getAccountCookie(req);
+    const userId = normalizeUserId(req.body.userId || req.query.userId || cookieAccountId || 'munboi');
+
+    const {
+      income = 7504,
+      fixed = 200,
+      goal = 4000,
+      emerStock = 4000,
+      profileKey = 'mid',
+      alloc = {},
+      locks = {},
+      disabled = {},
+      yieldRates = {},
+    } = req.body;
+
+    await db.execute({
+      sql: `INSERT OR REPLACE INTO prisma_settings 
+            (userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      args: [
+        userId,
+        Number(income) || 0,
+        Number(fixed) || 0,
+        Number(goal) || 0,
+        Number(emerStock) || 0,
+        String(profileKey || 'mid'),
+        JSON.stringify(alloc),
+        JSON.stringify(locks),
+        JSON.stringify(disabled),
+        JSON.stringify(yieldRates),
+      ],
+    });
+
+    // Auto-sync binary backup if present
+    const sourceDb = path.resolve('wallet_flow.db');
+    if (fs.existsSync(sourceDb)) {
+      try {
+        fs.copyFileSync(sourceDb, path.resolve('wallet_flow.db.bak'));
+      } catch (_) {}
+    }
+
+    res.json({
+      success: true,
+      userId,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start standalone HTTP server only when executed directly
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(__dirname, '../dist');

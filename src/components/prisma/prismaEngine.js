@@ -283,3 +283,66 @@ export const evaluateRules = ({
 
   return alerts;
 };
+
+/**
+ * Calcula el plan de rendimiento e interés compuesto para un horizonte específico
+ * FV = P*(1+r)^n + PMT * [((1+r)^n - 1) / r]
+ */
+export const calculateHorizonCompounding = ({
+  initialCapital = 0,
+  monthlyContribution = 0,
+  annualRatePct = 0,
+  years = 1
+}) => {
+  const p = Math.max(0, Number(initialCapital) || 0);
+  const pmt = Math.max(0, Number(monthlyContribution) || 0);
+  const rate = Math.max(0, Number(annualRatePct) || 0);
+  const rAnnual = rate / 100;
+  const rMonthly = rAnnual / 12;
+  const n = Math.round(years * 12);
+
+  let futureValue = p;
+  const totalInvested = Math.round(p + pmt * n);
+
+  if (rMonthly <= 0) {
+    futureValue = totalInvested;
+  } else {
+    const factor = Math.pow(1 + rMonthly, n);
+    const pGrowth = p * factor;
+    const annuityGrowth = pmt * ((factor - 1) / rMonthly);
+    futureValue = Math.round(pGrowth + annuityGrowth);
+  }
+
+  const interestEarned = Math.max(0, futureValue - totalInvested);
+  const gainPct = totalInvested > 0 ? Math.round((interestEarned / totalInvested) * 100) : 0;
+  const multiplier = totalInvested > 0 ? (futureValue / totalInvested).toFixed(2) : "1.00";
+
+  return {
+    years,
+    months: n,
+    totalInvested,
+    interestEarned,
+    futureValue,
+    gainPct,
+    multiplier
+  };
+};
+
+/**
+ * Genera el plan multi-horizonte (1, 3, 5 y 10 años) con interés compuesto
+ */
+export const generateCompoundPerformancePlan = ({
+  initialCapital = 0,
+  monthlyContribution = 0,
+  annualRatePct = 0
+}) => {
+  const horizons = [1, 3, 5, 10];
+  return horizons.map((yr) =>
+    calculateHorizonCompounding({
+      initialCapital,
+      monthlyContribution,
+      annualRatePct,
+      years: yr
+    })
+  );
+};

@@ -301,4 +301,18 @@ export const api = {
   async getDatabaseInfo() {
     return await sqliteFetch(`${API_BASE}/database/info`);
   },
+
+  // Prisma Capital OS Settings & Bucket Allocations
+  async getPrismaSettings(userId) {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+    return await sqliteFetch(`${API_BASE}/prisma${query}`);
+  },
+
+  async savePrismaSettings(settings, userId) {
+    return await sqliteFetch(`${API_BASE}/prisma`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...settings, userId }),
+    });
+  },
 };

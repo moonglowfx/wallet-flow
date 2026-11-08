@@ -639,6 +639,7 @@ export function App() {
               }
             >
               <AIAdvisorView
+                userId={currentUser?.id || 'munboi'}
                 accounts={accounts}
                 transactions={transactions}
                 subscriptions={subscriptions}

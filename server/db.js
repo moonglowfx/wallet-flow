@@ -215,6 +215,23 @@ export async function initDatabase() {
       );
     `);
 
+    // 2.1 Prisma OS Persistent Settings table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS prisma_settings (
+        userId TEXT PRIMARY KEY,
+        income REAL NOT NULL DEFAULT 7504,
+        fixed REAL NOT NULL DEFAULT 200,
+        goal REAL NOT NULL DEFAULT 4000,
+        emerStock REAL NOT NULL DEFAULT 4000,
+        profileKey TEXT NOT NULL DEFAULT 'mid',
+        alloc TEXT NOT NULL,
+        locks TEXT NOT NULL,
+        disabled TEXT NOT NULL,
+        yieldRates TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 3. Garantizar columnas no disruptivas de compatibilidad
     const tables = ['accounts', 'transactions', 'subscriptions', 'debts', 'debt_payments'];
     for (const t of tables) {

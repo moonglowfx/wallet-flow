@@ -3,7 +3,7 @@
 // Integración perfecta en la Sección IA de Wallet Flow (Liquid Glass UI)
 // ==============================================================================
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   PieChart,
   Pie,
@@ -26,9 +26,13 @@ import {
   TrendingUp,
   Layers,
   Compass,
-  Plus
+  Plus,
+  Save,
+  Check,
+  Database
 } from "lucide-react";
-import { BUCKETS, PROFILES, LAYERS, C, scoreColor } from "./prismaConfig.js";
+import { BUCKETS, PROFILES, LAYERS, C, scoreColor, DEFAULT_YIELD_RATES } from "./prismaConfig.js";
+import { api } from "../../services/api.js";
 import {
   fmt,
   fmtUSD,
@@ -47,6 +51,7 @@ import {
 } from "./PrismaComponents.jsx";
 
 export const PrismaView = ({
+  userId = "munboi",
   initialIncome = 7504,
   initialFixed = 200,
   initialGoal = 4000,
@@ -61,11 +66,113 @@ export const PrismaView = ({
   const [emerStock, setEmerStock] = useState(initialEmerStock);
   const [profileKey, setProfileKey] = useState("mid");
 
-  // Estado de Asignaciones y Control
+  // Estado de Asignaciones, Bloqueos y Rendimientos
   const [alloc, setAlloc] = useState({ ...PROFILES.mid.pct });
   const [locks, setLocks] = useState({});
   const [disabled, setDisabled] = useState({});
+  const [yieldRates, setYieldRates] = useState({ ...DEFAULT_YIELD_RATES });
   const [touched, setTouched] = useState(false);
+
+  // Estados de Sincronización con Base de Datos SQLite
+  const [saveStatus, setSaveStatus] = useState("synced"); // 'synced' | 'saving' | 'error'
+  const [lastSaved, setLastSaved] = useState(null);
+  const [isLoadedFromDb, setIsLoadedFromDb] = useState(false);
+  const autoSaveTimerRef = useRef(null);
+
+  // Cargar configuración persistida desde SQLite al montar
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSettings() {
+      try {
+        const data = await api.getPrismaSettings(userId);
+        if (isMounted && data && !data.error) {
+          if (typeof data.income === "number") setIncome(data.income);
+          if (typeof data.fixed === "number") setFixed(data.fixed);
+          if (typeof data.goal === "number") setGoal(data.goal);
+          if (typeof data.emerStock === "number") setEmerStock(data.emerStock);
+          if (data.profileKey) setProfileKey(data.profileKey);
+          if (data.alloc && Object.keys(data.alloc).length > 0) setAlloc(data.alloc);
+          if (data.locks) setLocks(data.locks);
+          if (data.disabled) setDisabled(data.disabled);
+          if (data.yieldRates && Object.keys(data.yieldRates).length > 0) {
+            setYieldRates((prev) => ({ ...prev, ...data.yieldRates }));
+          }
+          if (data.updated_at) setLastSaved(new Date(data.updated_at));
+        }
+      } catch (err) {
+        console.warn("Prisma: Error cargando configuración desde BD:", err);
+      } finally {
+        if (isMounted) setIsLoadedFromDb(true);
+      }
+    }
+    loadSettings();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  // Función de Persistencia Inmediata en Base de Datos
+  const persistToDatabase = useCallback(
+    async (manual = false) => {
+      setSaveStatus("saving");
+      try {
+        const payload = {
+          userId,
+          income,
+          fixed,
+          goal,
+          emerStock,
+          profileKey,
+          alloc,
+          locks,
+          disabled,
+          yieldRates
+        };
+        const res = await api.savePrismaSettings(payload, userId);
+        if (res && res.success) {
+          setSaveStatus("synced");
+          setLastSaved(new Date());
+        } else {
+          setSaveStatus("error");
+        }
+      } catch (err) {
+        console.error("Prisma: Error guardando en BD:", err);
+        setSaveStatus("error");
+      }
+    },
+    [userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates]
+  );
+
+  // Auto-guardado inteligente (Debounce de 800ms)
+  useEffect(() => {
+    if (!isLoadedFromDb) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      persistToDatabase(false);
+    }, 800);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [
+    income,
+    fixed,
+    goal,
+    emerStock,
+    profileKey,
+    alloc,
+    locks,
+    disabled,
+    yieldRates,
+    isLoadedFromDb,
+    persistToDatabase
+  ]);
+
+  const handleYieldRateChange = useCallback((bucketId, newRate) => {
+    setTouched(true);
+    setYieldRates((prev) => ({ ...prev, [bucketId]: newRate }));
+  }, []);
 
   // Cálculos Derivados Inmediatos
   const totalAlloc = useMemo(() => {
@@ -450,6 +557,19 @@ export const PrismaView = ({
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono">
                 Live Engine
               </span>
+
+              {/* Status de Sincronización en Base de Datos */}
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/50 border border-white/10 text-[10px] font-mono text-zinc-400">
+                <Database size={11} className={saveStatus === "saving" ? "animate-spin text-amber-400" : "text-amber-400"} />
+                {saveStatus === "saving" && <span className="text-amber-300 animate-pulse">Guardando en SQLite...</span>}
+                {saveStatus === "synced" && (
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <Check size={11} />
+                    {lastSaved ? `Sincronizado ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Sincronizado"}
+                  </span>
+                )}
+                {saveStatus === "error" && <span className="text-red-400">Error BD</span>}
+              </div>
             </div>
             <h1 className="font-serif text-3xl sm:text-4xl text-zinc-100 tracking-tight font-medium">
               Arquitectura de Distribución Patrimonial
@@ -459,37 +579,49 @@ export const PrismaView = ({
             </p>
           </div>
 
-          {/* Selector de Presets de Perfil */}
-          <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
-            {Object.keys(PROFILES).map((key) => {
-              const p = PROFILES[key];
-              const active = profileKey === key && !touched;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyProfile(key)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-mono tracking-wider transition-all cursor-pointer ${
-                    active
-                      ? "bg-amber-400/20 border-amber-400/60 text-amber-200 shadow-[0_0_15px_rgba(212,165,116,0.2)] font-semibold"
-                      : "bg-white/[0.02] border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
+          {/* Selector de Presets de Perfil & Guardado Forzado */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+              {Object.keys(PROFILES).map((key) => {
+                const p = PROFILES[key];
+                const active = profileKey === key && !touched;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => applyProfile(key)}
+                    className={`px-3.5 py-2 rounded-xl border text-xs font-mono tracking-wider transition-all cursor-pointer ${
+                      active
+                        ? "bg-amber-400/20 border-amber-400/60 text-amber-200 shadow-[0_0_15px_rgba(212,165,116,0.2)] font-semibold"
+                        : "bg-white/[0.02] border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
 
-            {touched && (
-              <button
-                type="button"
-                onClick={() => applyProfile(profileKey)}
-                className="p-2 rounded-xl border border-white/10 text-zinc-400 hover:text-amber-300 hover:border-amber-400/30 transition-all cursor-pointer"
-                title="Restaurar preset del perfil"
-              >
-                <RotateCcw size={14} />
-              </button>
-            )}
+              {touched && (
+                <button
+                  type="button"
+                  onClick={() => applyProfile(profileKey)}
+                  className="p-2 rounded-xl border border-white/10 text-zinc-400 hover:text-amber-300 hover:border-amber-400/30 transition-all cursor-pointer"
+                  title="Restaurar preset del perfil"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => persistToDatabase(true)}
+              className="px-3 py-2 rounded-xl border border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Guardar y respaldar estado inmediatamente en la base de datos SQLite"
+            >
+              <Save size={13} />
+              <span>Guardar en BD</span>
+            </button>
           </div>
         </div>
       </div>
@@ -766,6 +898,8 @@ export const PrismaView = ({
               amount={allocAmounts[bucket.id] || 0}
               fixed={fixed}
               emerStock={emerStock}
+              yieldRate={yieldRates[bucket.id]}
+              onYieldRateChange={handleYieldRateChange}
             />
           ))}
         </div>

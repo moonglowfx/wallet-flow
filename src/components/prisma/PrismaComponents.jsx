@@ -13,10 +13,12 @@ import {
   AlertTriangle,
   Info,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  TrendingUp,
+  Percent
 } from "lucide-react";
-import { C, scoreColor } from "./prismaConfig.js";
-import { fmt, fmtUSD, fmtUSDk } from "./prismaEngine.js";
+import { C, scoreColor, DEFAULT_YIELD_RATES } from "./prismaConfig.js";
+import { fmt, fmtUSD, fmtUSDk, generateCompoundPerformancePlan } from "./prismaEngine.js";
 
 /**
  * Contenedor de Sección con Kicker estilizado
@@ -313,9 +315,13 @@ export const BucketDetailCard = ({
   pct = 0,
   amount = 0,
   fixed = 0,
-  emerStock = 0
+  emerStock = 0,
+  yieldRate,
+  onYieldRateChange
 }) => {
   const [open, setOpen] = useState(false);
+  const activeRate =
+    typeof yieldRate === "number" ? yieldRate : DEFAULT_YIELD_RATES[bucket.id] ?? 0;
   const acumulado6 = amount * 6;
   const acumulado12 = amount * 12;
   const acumulado24 = amount * 24;
@@ -324,6 +330,12 @@ export const BucketDetailCard = ({
   const monthsToTarget =
     target && amount > 0 ? Math.ceil((target - currentBalance) / amount) : null;
   const reached = target ? currentBalance >= target : false;
+
+  const performancePlans = generateCompoundPerformancePlan({
+    initialCapital: currentBalance,
+    monthlyContribution: amount,
+    annualRatePct: activeRate
+  });
 
   return (
     <div
@@ -412,6 +424,77 @@ export const BucketDetailCard = ({
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* PLAN DE RENDIMIENTO & INTERÉS COMPUESTO (1, 3, 5 y 10 AÑOS) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-500/[0.04] via-black/40 to-amber-500/[0.04] border border-emerald-500/20 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-mono text-[10px] tracking-wider uppercase font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <TrendingUp size={13} />
+                  Plan de Rendimiento & Interés Compuesto
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                  Proyección exponencial considerando tu aporte mensual de <span className="text-zinc-200 font-mono">${fmt(amount)}</span> + reinversión continua.
+                </p>
+              </div>
+
+              {/* Input de Tasa de Retorno Personalizable */}
+              <div className="flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-xl border border-white/10 self-start sm:self-auto">
+                <span className="font-mono text-[10px] uppercase text-zinc-400 tracking-wider">
+                  Tasa Estimada:
+                </span>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="100"
+                    value={activeRate}
+                    onChange={(e) => {
+                      const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                      if (onYieldRateChange) onYieldRateChange(bucket.id, val);
+                    }}
+                    className="w-14 bg-transparent text-right font-mono text-xs text-amber-300 font-bold outline-none border-b border-amber-400/40 focus:border-amber-300"
+                  />
+                  <span className="text-[10px] text-zinc-400 font-mono ml-0.5">% APY</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid de Horizontes: 1a, 3a, 5a, 10a */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {performancePlans.map((plan, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-white/[0.02] border border-white/10 flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between font-mono text-[9px] uppercase text-zinc-400 mb-1">
+                    <span>{plan.years} {plan.years === 1 ? "Año" : "Años"}</span>
+                    {plan.interestEarned > 0 && (
+                      <span className="text-emerald-400 font-semibold">
+                        +{plan.gainPct}%
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="font-serif italic text-base sm:text-lg text-emerald-300 font-medium tabular-nums my-0.5">
+                    ${fmt(plan.futureValue)}
+                  </div>
+
+                  <div className="space-y-0.5 pt-1 border-t border-white/5 text-[9px] font-mono text-zinc-500">
+                    <div className="flex justify-between">
+                      <span>Aporte:</span>
+                      <span className="text-zinc-400">${fmt(plan.totalInvested)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Ganancia:</span>
+                      <span className="text-emerald-400 font-semibold">+${fmt(plan.interestEarned)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Dónde Guardarlo & Distribución Interna */}

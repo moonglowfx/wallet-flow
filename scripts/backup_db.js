@@ -30,7 +30,7 @@ export async function createDatabaseBackup() {
 
   // 2. Export full high-fidelity JSON snapshot from active libSQL/Turso connection
   try {
-    const [usersRes, accountsRes, txsRes, subsRes, debtsRes, paymentsRes, stateRes] =
+    const [usersRes, accountsRes, txsRes, subsRes, debtsRes, paymentsRes, stateRes, prismaRes] =
       await Promise.all([
         db.execute('SELECT * FROM users'),
         db.execute('SELECT * FROM accounts'),
@@ -39,6 +39,7 @@ export async function createDatabaseBackup() {
         db.execute('SELECT * FROM debts'),
         db.execute('SELECT * FROM debt_payments'),
         db.execute('SELECT * FROM app_state'),
+        db.execute('SELECT * FROM prisma_settings').catch(() => ({ rows: [] })),
       ]);
 
     const snapshot = {
@@ -50,6 +51,7 @@ export async function createDatabaseBackup() {
         subscriptionsCount: subsRes.rows.length,
         debtsCount: debtsRes.rows.length,
         debtPaymentsCount: paymentsRes.rows.length,
+        prismaSettingsCount: (prismaRes.rows || []).length,
       },
       data: {
         users: usersRes.rows,
@@ -59,6 +61,7 @@ export async function createDatabaseBackup() {
         debts: debtsRes.rows,
         debt_payments: paymentsRes.rows,
         app_state: stateRes.rows,
+        prisma_settings: prismaRes.rows || [],
       },
     };
 

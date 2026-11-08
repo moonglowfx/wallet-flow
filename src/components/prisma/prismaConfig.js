@@ -389,3 +389,20 @@ export const PROFILES = {
     pct: { emer: 5, deuda: 5, fiscal: 10, fija: 15, cripto: 15, refugio: 10, lp: 12, trade: 8, opp: 12, life: 8 }
   }
 };
+
+/**
+ * Tasas de Retorno y Rendimiento Anual por Defecto (% APY / CAGR)
+ * Personalizables por el usuario en tiempo real dentro de Prisma
+ */
+export const DEFAULT_YIELD_RATES = {
+  emer: 4.5,    // 4.5% APY (USDC Earn flexible / Cuentas de alto rendimiento)
+  deuda: 0.0,   // 0.0% (Liquidación de deuda pasiva)
+  fiscal: 4.0,  // 4.0% APY (Buffer líquido con yield conservador)
+  fija: 6.5,    // 6.5% APY (CDTs colombianos / bonos / stable yields)
+  cripto: 14.0, // 14.0% APY (CAGR histórico / Staking BTC + ETH)
+  refugio: 5.5, // 5.5% APY (Apreciación histórica oro / PAXG)
+  lp: 10.0,     // 10.0% APY (ETFs indexados VT / VTI / S&P 500)
+  trade: 18.0,  // 18.0% APY (Retorno operacional sobre capital fondeado)
+  opp: 8.0,     // 8.0% APY (Rendimiento esperado de oportunidades y capital semilla)
+  life: 0.0     // 0.0% (Flujo operativo de vida)
+};

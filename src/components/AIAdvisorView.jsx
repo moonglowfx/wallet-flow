@@ -40,6 +40,7 @@ import {
 const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
 export const AIAdvisorView = ({
+  userId = 'munboi',
   accounts = [],
   transactions = [],
   subscriptions = [],
@@ -1370,6 +1371,7 @@ export const AIAdvisorView = ({
           {activeTab === 'prisma' && (
             <div className="space-y-6 animate-fade-in">
               <PrismaView
+                userId={userId}
                 initialIncome={totalIncomes > 0 ? Math.round(totalIncomes) : 7504}
                 initialFixed={totalExpenses > 0 ? Math.round(totalExpenses * 0.4) : 200}
                 initialGoal={4000}
