@@ -27,7 +27,9 @@ import {
   Percent,
   Calendar,
   Pencil,
+  Compass,
 } from 'lucide-react';
+const PrismaView = React.lazy(() => import('./prisma/PrismaView.jsx'));
 import {
   formatCurrency,
   DEFAULT_USD_COP_RATE,
@@ -529,6 +531,17 @@ export const AIAdvisorView = ({
             }`}
           >
             4. Simulador & Aura Copilot
+          </button>
+          <button
+            onClick={() => setActiveTab('prisma')}
+            className={`px-3 py-2 sm:px-4 rounded-xl transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+              activeTab === 'prisma'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black font-extrabold border border-amber-300 shadow-[0_0_20px_rgba(212,165,116,0.35)]'
+                : 'text-amber-400/80 hover:text-amber-300 bg-amber-500/[0.04] border border-amber-400/20'
+            }`}
+          >
+            <Compass size={14} className={activeTab === 'prisma' ? 'animate-spin-slow' : ''} />
+            <span>5. Prisma OS</span>
           </button>
         </div>
       </div>
@@ -1350,6 +1363,20 @@ export const AIAdvisorView = ({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB 5: PRISMA CAPITAL OS */}
+          {activeTab === 'prisma' && (
+            <div className="space-y-6 animate-fade-in">
+              <PrismaView
+                initialIncome={totalIncomes > 0 ? Math.round(totalIncomes) : 7504}
+                initialFixed={totalExpenses > 0 ? Math.round(totalExpenses * 0.4) : 200}
+                initialGoal={4000}
+                initialEmerStock={liquidCash > 0 ? Math.round(liquidCash) : 4000}
+                currency={currency}
+                exchangeRate={exchangeRate}
+              />
             </div>
           )}
         </>
