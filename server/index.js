@@ -937,10 +937,23 @@ app.post('/api/import', async (req, res) => {
       subscriptions = [],
       debts = [],
       mode = 'replace',
+      currency,
+      exchangeRate,
     } = req.body;
     const userId = normalizeUserId(rawUserId);
 
     const statements = [];
+
+    if (currency || exchangeRate) {
+      statements.push({
+        sql: `UPDATE users
+              SET currency = COALESCE(?, currency),
+                  exchangeRate = COALESCE(?, exchangeRate),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+        args: [currency || null, exchangeRate ? Number(exchangeRate) : null, userId],
+      });
+    }
 
     if (mode === 'replace') {
       statements.push(

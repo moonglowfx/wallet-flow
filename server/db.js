@@ -63,7 +63,7 @@ const DEFAULT_USERS = [
     pin: '0800',
     role: 'Portafolio Principal',
     avatarGradient: 'from-purple-600 via-indigo-600 to-fuchsia-600',
-    description: 'Historial completo 2024-2026 (726 transacciones reales)',
+    description: 'Historial completo 2024-2026 (728 transacciones reales)',
     currency: 'USD',
     exchangeRate: DEFAULT_USD_COP_RATE,
   },

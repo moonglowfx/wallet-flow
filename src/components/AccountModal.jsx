@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Wallet,
   X,
@@ -93,12 +94,27 @@ export const AccountModal = ({
     onClose();
   };
 
-  return (
+  // Prevent background body scroll when modal is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  const modalContent = (
     <div
+      role="dialog"
+      aria-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/90 backdrop-blur-md overflow-hidden animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -107,8 +123,8 @@ export const AccountModal = ({
         {/* Glow */}
         <div className="pointer-events-none absolute -top-20 -left-20 w-52 h-52 rounded-full bg-violet-600/25 blur-3xl" />
 
-        {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
+        {/* Header with Dynamic Island Safe Area */}
+        <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.5rem))] pb-3.5 sm:py-6 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 relative z-10">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
               <Wallet className="w-5 h-5" />
@@ -319,17 +335,17 @@ export const AccountModal = ({
         </div>
 
         {/* Sticky Action Buttons - Full-width touch targets on mobile */}
-          <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/95 backdrop-blur-xl relative z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))] grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5 w-full">
+          <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/98 backdrop-blur-2xl relative z-10 pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5 w-full">
             <button
               type="button"
               onClick={onClose}
-              className="liquid-pill py-2.5 px-4 text-xs text-zinc-400 hover:text-white cursor-pointer font-semibold text-center flex items-center justify-center min-h-[44px]"
+              className="liquid-pill py-3 px-4 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer text-center flex items-center justify-center min-h-[48px] active:scale-95"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="liquid-button-primary py-2.5 px-6 text-xs font-bold cursor-pointer text-center flex items-center justify-center min-h-[44px] shadow-neon-purple active:scale-95"
+              className="liquid-button-primary py-3 px-6 text-xs font-bold cursor-pointer text-center flex items-center justify-center min-h-[48px] shadow-neon-purple active:scale-95"
             >
               Guardar Cuenta
             </button>
@@ -338,4 +354,6 @@ export const AccountModal = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

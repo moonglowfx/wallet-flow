@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Settings,
   Shield,
@@ -110,6 +111,19 @@ export const SettingsView = ({
   const [txSearchTerm, setTxSearchTerm] = useState('');
   const [dbLiveInfo, setDbLiveInfo] = useState(null);
   const [isLoadingLiveInfo, setIsLoadingLiveInfo] = useState(false);
+
+  // Prevent background body scroll when breakdown modal is open on mobile
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (isBreakdownModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isBreakdownModalOpen]);
 
   // ----------------- PIN CHANGE HANDLER -----------------
   const handleUpdatePin = (e) => {
@@ -556,6 +570,8 @@ export const SettingsView = ({
           transactions: finalTransactions,
           subscriptions: finalSubscriptions,
           debts: finalDebts,
+          currency: pendingImportData.currency,
+          exchangeRate: pendingImportData.exchangeRate,
         },
         importMode,
         currentUser.id
@@ -1680,20 +1696,24 @@ export const SettingsView = ({
       )}
 
       {/* ---------------- MODAL DE DESGLOSE COMPLETO DE CAMBIOS MANUALES ---------------- */}
-      {isBreakdownModalOpen && pendingImportData && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
+      {isBreakdownModalOpen && pendingImportData && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 md:p-6 bg-black/90 backdrop-blur-md overflow-hidden animate-fadeIn"
+        >
           <div className="w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#12101C] sm:bg-[#12101C]/95 backdrop-blur-2xl border-t sm:border border-purple-500/40 shadow-neon-purple overflow-hidden text-xs">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
-              <div className="flex items-center gap-3">
+            {/* Modal Header with Dynamic Island & Notch Safe Area */}
+            <div className="pt-[max(1.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] pb-3.5 sm:py-5 px-4 sm:px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-purple-600/40 border border-purple-400/40 flex items-center justify-center text-purple-300 shrink-0">
                   <Layers className="w-5 h-5 text-purple-200" />
                 </div>
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-black text-white truncate flex items-center gap-2">
                     Desglose Completo de Cambios Manuales & Respaldo
                   </h3>
-                  <span className="text-[11px] text-zinc-300 block truncate max-w-md">
+                  <span className="text-[10px] sm:text-[11px] text-zinc-300 block truncate max-w-xs sm:max-w-md">
                     Origen: <strong className="text-purple-300">{pendingImportData.sourceName}</strong>
                   </span>
                 </div>
@@ -1705,7 +1725,7 @@ export const SettingsView = ({
                   setIsBreakdownModalOpen(false);
                   setPendingImportData(null);
                 }}
-                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer transition-all"
+                className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer transition-all shrink-0 ml-2"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2076,7 +2096,7 @@ export const SettingsView = ({
             </div>
 
             {/* Modal Footer - Always Sticky & 100% Touchable on Mobile */}
-            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0F0D18]/98 backdrop-blur-xl pb-[max(0.85rem,env(safe-area-inset-bottom))] space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0E0C18]/98 backdrop-blur-2xl pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+0.85rem))] space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3 relative z-20">
               <span className="text-[11px] text-zinc-400 block text-center sm:text-left">
                 <span className="hidden sm:inline">Se persistirán en SQLite/Turso: </span>
                 <strong className="text-white">
@@ -2092,7 +2112,7 @@ export const SettingsView = ({
                     setIsBreakdownModalOpen(false);
                     setPendingImportData(null);
                   }}
-                  className="liquid-pill py-2.5 px-4 text-xs font-bold text-zinc-400 hover:text-white cursor-pointer text-center flex items-center justify-center min-h-[44px]"
+                  className="liquid-pill py-3 px-4 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer text-center flex items-center justify-center min-h-[48px] active:scale-95"
                 >
                   Cancelar
                 </button>
@@ -2101,7 +2121,7 @@ export const SettingsView = ({
                   type="button"
                   disabled={isApplyingImport}
                   onClick={handleConfirmImport}
-                  className="liquid-button-primary py-2.5 px-5 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple active:scale-95 text-center min-h-[44px]"
+                  className="liquid-button-primary py-3 px-5 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple active:scale-95 text-center min-h-[48px]"
                 >
                   {isApplyingImport ? (
                     <>
@@ -2118,7 +2138,8 @@ export const SettingsView = ({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
