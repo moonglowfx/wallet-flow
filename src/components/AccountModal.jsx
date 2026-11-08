@@ -43,8 +43,6 @@ export const AccountModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   // Lock background scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -55,6 +53,8 @@ export const AccountModal = ({
       };
     }
   }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();

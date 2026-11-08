@@ -626,7 +626,7 @@ export function App() {
               transactions={transactions}
               onLogPaymentTransaction={handleSaveTransaction}
               onExecuteDueSubscriptions={handleExecuteDueSubscriptions}
-              onOpenNewTransaction={() => setIsTransactionModalOpen(true)}
+              onOpenNewTransaction={handleOpenNewTransaction}
             />
           )}
 

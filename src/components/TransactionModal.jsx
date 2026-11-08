@@ -101,6 +101,17 @@ export const TransactionModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentCategories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -192,17 +203,6 @@ export const TransactionModal = ({
     setIsAntExpense(false);
     onClose();
   };
-
-  // Prevent background scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const prevOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = prevOverflow;
-      };
-    }
-  }, [isOpen]);
 
   const handleDelete = () => {
     if (!editingTransaction || !onDeleteTransaction) return;
