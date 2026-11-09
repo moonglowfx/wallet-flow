@@ -1328,17 +1328,39 @@ app.post('/api/prisma', async (req, res) => {
     const cookieAccountId = getAccountCookie(req);
     const userId = normalizeUserId(req.body.userId || req.query.userId || cookieAccountId || 'munboi');
 
-    const {
-      income = 7504,
-      fixed = 200,
-      goal = 4000,
-      emerStock = 4000,
-      profileKey = 'mid',
-      alloc = {},
-      locks = {},
-      disabled = {},
-      yieldRates = {},
-    } = req.body;
+    const existingRes = await db.execute({
+      sql: 'SELECT * FROM prisma_settings WHERE userId = ?',
+      args: [userId],
+    });
+    const existing = existingRes.rows[0];
+
+    const body = req.body || {};
+    const nextIncome = body.income !== undefined ? Number(body.income) : Number(existing?.income ?? 7504);
+    const nextFixed = body.fixed !== undefined ? Number(body.fixed) : Number(existing?.fixed ?? 200);
+    const nextGoal = body.goal !== undefined ? Number(body.goal) : Number(existing?.goal ?? 4000);
+    const nextEmerStock = body.emerStock !== undefined ? Number(body.emerStock) : Number(existing?.emerStock ?? 4000);
+    const nextProfileKey = body.profileKey !== undefined ? String(body.profileKey) : String(existing?.profileKey || 'mid');
+
+    let parsedExistingAlloc = {};
+    let parsedExistingLocks = {};
+    let parsedExistingDisabled = {};
+    let parsedExistingYieldRates = {};
+    if (existing) {
+      try { parsedExistingAlloc = JSON.parse(existing.alloc || '{}'); } catch (_) {}
+      try { parsedExistingLocks = JSON.parse(existing.locks || '{}'); } catch (_) {}
+      try { parsedExistingDisabled = JSON.parse(existing.disabled || '{}'); } catch (_) {}
+      try { parsedExistingYieldRates = JSON.parse(existing.yieldRates || '{}'); } catch (_) {}
+    }
+
+    const nextAlloc = body.alloc !== undefined && Object.keys(body.alloc || {}).length > 0 ? body.alloc : parsedExistingAlloc;
+    const nextLocks = body.locks !== undefined ? body.locks : parsedExistingLocks;
+    const nextDisabled = body.disabled !== undefined ? body.disabled : parsedExistingDisabled;
+    const nextYieldRates = body.yieldRates !== undefined && Object.keys(body.yieldRates || {}).length > 0 ? body.yieldRates : parsedExistingYieldRates;
+
+    const allocStr = typeof nextAlloc === 'string' ? nextAlloc : JSON.stringify(nextAlloc || {});
+    const locksStr = typeof nextLocks === 'string' ? nextLocks : JSON.stringify(nextLocks || {});
+    const disabledStr = typeof nextDisabled === 'string' ? nextDisabled : JSON.stringify(nextDisabled || {});
+    const yieldRatesStr = typeof nextYieldRates === 'string' ? nextYieldRates : JSON.stringify(nextYieldRates || {});
 
     await db.execute({
       sql: `INSERT OR REPLACE INTO prisma_settings 
@@ -1346,29 +1368,40 @@ app.post('/api/prisma', async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
       args: [
         userId,
-        Number(income) || 0,
-        Number(fixed) || 0,
-        Number(goal) || 0,
-        Number(emerStock) || 0,
-        String(profileKey || 'mid'),
-        JSON.stringify(alloc),
-        JSON.stringify(locks),
-        JSON.stringify(disabled),
-        JSON.stringify(yieldRates),
+        nextIncome,
+        nextFixed,
+        nextGoal,
+        nextEmerStock,
+        nextProfileKey,
+        allocStr,
+        locksStr,
+        disabledStr,
+        yieldRatesStr,
       ],
     });
 
-    // Auto-sync binary backup if present
-    const sourceDb = path.resolve('wallet_flow.db');
-    if (fs.existsSync(sourceDb)) {
-      try {
-        fs.copyFileSync(sourceDb, path.resolve('wallet_flow.db.bak'));
-      } catch (_) {}
+    // Auto-sync binary backup if present (entorno local Node)
+    if (!process.env.VERCEL) {
+      const sourceDb = path.resolve('wallet_flow.db');
+      if (fs.existsSync(sourceDb)) {
+        try {
+          fs.copyFileSync(sourceDb, path.resolve('wallet_flow.db.bak'));
+        } catch (_) {}
+      }
     }
 
     res.json({
       success: true,
       userId,
+      income: nextIncome,
+      fixed: nextFixed,
+      goal: nextGoal,
+      emerStock: nextEmerStock,
+      profileKey: nextProfileKey,
+      alloc: typeof nextAlloc === 'string' ? JSON.parse(nextAlloc) : nextAlloc,
+      locks: typeof nextLocks === 'string' ? JSON.parse(nextLocks) : nextLocks,
+      disabled: typeof nextDisabled === 'string' ? JSON.parse(nextDisabled) : nextDisabled,
+      yieldRates: typeof nextYieldRates === 'string' ? JSON.parse(nextYieldRates) : nextYieldRates,
       updated_at: new Date().toISOString(),
     });
   } catch (error) {

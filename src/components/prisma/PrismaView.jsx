@@ -50,6 +50,18 @@ import {
   BucketDetailCard
 } from "./PrismaComponents.jsx";
 
+function getPrismaCachedSettings(uid) {
+  if (typeof window === "undefined" || !uid) return null;
+  try {
+    const raw = localStorage.getItem(`wf_prisma_settings_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch (_) {}
+  return null;
+}
+
 export const PrismaView = ({
   userId = "munboi",
   initialIncome = 7504,
@@ -59,33 +71,109 @@ export const PrismaView = ({
   currency = "USD",
   exchangeRate = 1
 }) => {
-  // Estados Financieros Principales
-  const [income, setIncome] = useState(initialIncome);
-  const [fixed, setFixed] = useState(initialFixed);
-  const [goal, setGoal] = useState(initialGoal);
-  const [emerStock, setEmerStock] = useState(initialEmerStock);
-  const [profileKey, setProfileKey] = useState("mid");
+  const cached = useMemo(() => getPrismaCachedSettings(userId), [userId]);
+
+  // Estados Financieros Principales (inicializados desde caché local persistente o defaults)
+  const [income, setIncome] = useState(() => (typeof cached?.income === "number" ? cached.income : initialIncome));
+  const [fixed, setFixed] = useState(() => (typeof cached?.fixed === "number" ? cached.fixed : initialFixed));
+  const [goal, setGoal] = useState(() => (typeof cached?.goal === "number" ? cached.goal : initialGoal));
+  const [emerStock, setEmerStock] = useState(() => (typeof cached?.emerStock === "number" ? cached.emerStock : initialEmerStock));
+  const [profileKey, setProfileKey] = useState(() => cached?.profileKey || "mid");
 
   // Estado de Asignaciones, Bloqueos y Rendimientos
-  const [alloc, setAlloc] = useState({ ...PROFILES.mid.pct });
-  const [locks, setLocks] = useState({});
-  const [disabled, setDisabled] = useState({});
-  const [yieldRates, setYieldRates] = useState({ ...DEFAULT_YIELD_RATES });
+  const [alloc, setAlloc] = useState(() => {
+    if (cached?.alloc && Object.keys(cached.alloc).length > 0) return cached.alloc;
+    const profile = PROFILES[cached?.profileKey || "mid"] || PROFILES.mid;
+    return { ...profile.pct };
+  });
+  const [locks, setLocks] = useState(() => cached?.locks || {});
+  const [disabled, setDisabled] = useState(() => cached?.disabled || {});
+  const [yieldRates, setYieldRates] = useState(() => ({ ...DEFAULT_YIELD_RATES, ...(cached?.yieldRates || {}) }));
   const [touched, setTouched] = useState(false);
 
-  // Estados de Sincronización con Base de Datos SQLite
+  // Estados de Sincronización con Base de Datos SQLite / Turso Cloud
   const [saveStatus, setSaveStatus] = useState("synced"); // 'synced' | 'saving' | 'error'
-  const [lastSaved, setLastSaved] = useState(null);
-  const [isLoadedFromDb, setIsLoadedFromDb] = useState(false);
+  const [lastSaved, setLastSaved] = useState(() => (cached?.updated_at ? new Date(cached.updated_at) : null));
+  const isInitialSyncDoneRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
+  const hasPendingSaveRef = useRef(false);
+  const latestStateRef = useRef(null);
 
-  // Cargar configuración persistida desde SQLite al montar
+  // Mantener latestStateRef sincronizado en cada render
+  latestStateRef.current = {
+    userId,
+    income,
+    fixed,
+    goal,
+    emerStock,
+    profileKey,
+    alloc,
+    locks,
+    disabled,
+    yieldRates,
+  };
+
+  // 1. Persistencia Inmediata en Local Cache (0ms de latencia, nunca se pierde un cambio en sliders ni inputs)
+  useEffect(() => {
+    if (typeof window === "undefined" || !userId) return;
+    try {
+      localStorage.setItem(`wf_prisma_settings_${userId}`, JSON.stringify({
+        ...latestStateRef.current,
+        updated_at: new Date().toISOString()
+      }));
+    } catch (_) {}
+  }, [userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates]);
+
+  // Función para ejecutar la persistencia en la base de datos SQLite / Turso Cloud
+  const saveToDb = useCallback(async (statePayload = null, isManual = false) => {
+    const payload = statePayload || latestStateRef.current;
+    if (!payload || !payload.userId) return;
+
+    setSaveStatus("saving");
+    try {
+      const res = await api.savePrismaSettings(payload, payload.userId);
+      if (res && res.success) {
+        setSaveStatus("synced");
+        const now = new Date();
+        setLastSaved(now);
+        hasPendingSaveRef.current = false;
+      } else {
+        setSaveStatus("error");
+      }
+    } catch (err) {
+      console.warn("Prisma: Error persistiendo en BD:", err.message);
+      setSaveStatus("error");
+    }
+  }, []);
+
+  // Función de disparo de auto-guardado con debounce inteligente (400ms)
+  const triggerAutoSave = useCallback((immediate = false) => {
+    hasPendingSaveRef.current = true;
+    setSaveStatus("saving");
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    if (immediate) {
+      saveToDb(latestStateRef.current, true);
+    } else {
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveToDb(latestStateRef.current, false);
+      }, 400);
+    }
+  }, [saveToDb]);
+
+  // Cargar configuración persistida desde SQLite / Turso Cloud al montar
   useEffect(() => {
     let isMounted = true;
     async function loadSettings() {
       try {
         const data = await api.getPrismaSettings(userId);
-        if (isMounted && data && !data.error) {
+        if (!isMounted) return;
+
+        if (data && !data.error) {
           if (typeof data.income === "number") setIncome(data.income);
           if (typeof data.fixed === "number") setFixed(data.fixed);
           if (typeof data.goal === "number") setGoal(data.goal);
@@ -98,63 +186,37 @@ export const PrismaView = ({
             setYieldRates((prev) => ({ ...prev, ...data.yieldRates }));
           }
           if (data.updated_at) setLastSaved(new Date(data.updated_at));
+
+          // Actualizar caché local
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(`wf_prisma_settings_${userId}`, JSON.stringify(data));
+            } catch (_) {}
+          }
         }
       } catch (err) {
         console.warn("Prisma: Error cargando configuración desde BD:", err);
       } finally {
-        if (isMounted) setIsLoadedFromDb(true);
+        if (isMounted) {
+          // Activar auto-guardado posterior a la sincronización inicial
+          setTimeout(() => {
+            if (isMounted) isInitialSyncDoneRef.current = true;
+          }, 150);
+        }
       }
     }
+
     loadSettings();
+
     return () => {
       isMounted = false;
     };
   }, [userId]);
 
-  // Función de Persistencia Inmediata en Base de Datos
-  const persistToDatabase = useCallback(
-    async (manual = false) => {
-      setSaveStatus("saving");
-      try {
-        const payload = {
-          userId,
-          income,
-          fixed,
-          goal,
-          emerStock,
-          profileKey,
-          alloc,
-          locks,
-          disabled,
-          yieldRates
-        };
-        const res = await api.savePrismaSettings(payload, userId);
-        if (res && res.success) {
-          setSaveStatus("synced");
-          setLastSaved(new Date());
-        } else {
-          setSaveStatus("error");
-        }
-      } catch (err) {
-        console.error("Prisma: Error guardando en BD:", err);
-        setSaveStatus("error");
-      }
-    },
-    [userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates]
-  );
-
-  // Auto-guardado inteligente (Debounce de 800ms)
+  // Auto-guardado en base de datos en cualquier cambio una vez completada la carga inicial
   useEffect(() => {
-    if (!isLoadedFromDb) return;
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      persistToDatabase(false);
-    }, 800);
-
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
+    if (!isInitialSyncDoneRef.current) return;
+    triggerAutoSave(false);
   }, [
     income,
     fixed,
@@ -165,9 +227,27 @@ export const PrismaView = ({
     locks,
     disabled,
     yieldRates,
-    isLoadedFromDb,
-    persistToDatabase
+    triggerAutoSave
   ]);
+
+  // Guardado inmediato en BD al desmontar el componente (cambio de pestaña, navegación a otra sección)
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      if (hasPendingSaveRef.current && latestStateRef.current) {
+        api.savePrismaSettings(latestStateRef.current, latestStateRef.current.userId).catch(() => {});
+      }
+    };
+  }, []);
+
+  const persistToDatabase = useCallback(
+    (manual = false) => {
+      triggerAutoSave(true);
+    },
+    [triggerAutoSave]
+  );
 
   const handleYieldRateChange = useCallback((bucketId, newRate) => {
     setTouched(true);
@@ -559,16 +639,34 @@ export const PrismaView = ({
               </span>
 
               {/* Status de Sincronización en Base de Datos */}
-              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/50 border border-white/10 text-[10px] font-mono text-zinc-400">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] font-mono text-zinc-400 shadow-sm">
                 <Database size={11} className={saveStatus === "saving" ? "animate-spin text-amber-400" : "text-amber-400"} />
-                {saveStatus === "saving" && <span className="text-amber-300 animate-pulse">Guardando en SQLite...</span>}
+                {saveStatus === "saving" && (
+                  <span className="text-amber-300 animate-pulse font-medium">Auto-guardando en Turso / SQLite...</span>
+                )}
                 {saveStatus === "synced" && (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <Check size={11} />
-                    {lastSaved ? `Sincronizado ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Sincronizado"}
+                  <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <span>Auto-guardado activo</span>
+                    {lastSaved && (
+                      <span className="text-zinc-500 font-normal">
+                        ({lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })})
+                      </span>
+                    )}
                   </span>
                 )}
-                {saveStatus === "error" && <span className="text-red-400">Error BD</span>}
+                {saveStatus === "error" && (
+                  <span className="text-rose-400 flex items-center gap-1 font-medium">
+                    <span>Error al guardar</span>
+                    <button
+                      type="button"
+                      onClick={() => persistToDatabase(true)}
+                      className="underline hover:text-white cursor-pointer ml-1"
+                    >
+                      Reintentar
+                    </button>
+                  </span>
+                )}
               </div>
             </div>
             <h1 className="font-serif text-3xl sm:text-4xl text-zinc-100 tracking-tight font-medium">

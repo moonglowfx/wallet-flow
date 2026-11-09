@@ -138,6 +138,22 @@ export async function restoreDatabase(snapshotOrPath = null) {
     );
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS prisma_settings (
+      userId TEXT PRIMARY KEY,
+      income REAL NOT NULL DEFAULT 7504,
+      fixed REAL NOT NULL DEFAULT 200,
+      goal REAL NOT NULL DEFAULT 4000,
+      emerStock REAL NOT NULL DEFAULT 4000,
+      profileKey TEXT NOT NULL DEFAULT 'mid',
+      alloc TEXT NOT NULL,
+      locks TEXT NOT NULL,
+      disabled TEXT NOT NULL,
+      yieldRates TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   const statements = [];
 
   for (const u of data.users || []) {
@@ -192,6 +208,26 @@ export async function restoreDatabase(snapshotOrPath = null) {
     statements.push({
       sql: `INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)`,
       args: [st.key, st.value],
+    });
+  }
+
+  for (const pr of data.prisma_settings || []) {
+    statements.push({
+      sql: `INSERT OR REPLACE INTO prisma_settings (userId, income, fixed, goal, emerStock, profileKey, alloc, locks, disabled, yieldRates, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        pr.userId || 'munboi',
+        pr.income ?? 7504,
+        pr.fixed ?? 200,
+        pr.goal ?? 4000,
+        pr.emerStock ?? 4000,
+        pr.profileKey || 'mid',
+        typeof pr.alloc === 'string' ? pr.alloc : JSON.stringify(pr.alloc || {}),
+        typeof pr.locks === 'string' ? pr.locks : JSON.stringify(pr.locks || {}),
+        typeof pr.disabled === 'string' ? pr.disabled : JSON.stringify(pr.disabled || {}),
+        typeof pr.yieldRates === 'string' ? pr.yieldRates : JSON.stringify(pr.yieldRates || {}),
+        pr.updated_at || new Date().toISOString(),
+      ],
     });
   }
 

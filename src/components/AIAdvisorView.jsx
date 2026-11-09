@@ -1371,6 +1371,7 @@ export const AIAdvisorView = ({
           {activeTab === 'prisma' && (
             <div className="space-y-6 animate-fade-in">
               <PrismaView
+                key={userId}
                 userId={userId}
                 initialIncome={totalIncomes > 0 ? Math.round(totalIncomes) : 7504}
                 initialFixed={totalExpenses > 0 ? Math.round(totalExpenses * 0.4) : 200}
