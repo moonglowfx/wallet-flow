@@ -7,6 +7,7 @@
     "dev": "vite",
     "server": "node server/index.js",
     "db:init": "node -e \"import('./server/db.js').then(m => m.initDatabase())\"",
+    "db:verify": "node scripts/verify-turso.js",
     "db:backup": "node scripts/backup_db.js",
     "db:restore": "node scripts/restore_db.js",
     "build": "vite build",

@@ -13,7 +13,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 
-// Ensure SQLite database is initialized before handling any API request
+// URL prefix normalization middleware for serverless (Vercel) & direct API routing compatibility
+app.use((req, _res, next) => {
+  if (req.url && !req.url.startsWith('/api') && !req.url.startsWith('/assets') && !req.url.startsWith('/vite') && !req.url.includes('.')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
+// Ensure SQLite / Turso database is initialized before handling any API request
 app.use(async (_req, _res, next) => {
   try {
     await initDatabase();

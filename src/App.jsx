@@ -126,6 +126,31 @@ export function App() {
     loadUserFromSQLite();
   }, [loadUserFromSQLite]);
 
+  // Sincronización automática en segundo plano al enfocar pestaña o recuperar internet (estabilidad multi-dispositivo)
+  useEffect(() => {
+    const handleSyncOnFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !isSwitchingUserRef.current) {
+        loadUserFromSQLite(activeUserRef.current);
+      }
+    };
+    const handleSyncOnOnline = () => {
+      loadUserFromSQLite(activeUserRef.current);
+      showToast('🌐 Conexión restablecida: datos sincronizados');
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleSyncOnFocus);
+      window.addEventListener('online', handleSyncOnOnline);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleSyncOnFocus);
+        window.removeEventListener('online', handleSyncOnOnline);
+      }
+    };
+  }, [loadUserFromSQLite, showToast]);
+
   // Persist currency change in SQLite
   const handleSetCurrency = useCallback(
     (nextCurrency) => {

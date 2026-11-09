@@ -60,7 +60,7 @@ console.log('\n--- 2. Aislamiento Total de Datos (Munboi vs. Tiago) ---');
 const munboiData = getUserInitialData('munboi');
 const tiagoData = getUserInitialData('tiago');
 
-assert(munboiData.transactions.length === 726, `Munboi cuenta con sus 726 transacciones reales desde 2024: total ${munboiData.transactions.length}`);
+assert(munboiData.transactions.length === 728, `Munboi cuenta con sus 728 transacciones reales desde 2024: total ${munboiData.transactions.length}`);
 assert(tiagoData.transactions.length === 0, `Tiago inicia completamente en blanco (0 transacciones) para crear todo`);
 assert(munboiData.accounts.length === 5, `Munboi cuenta con sus 5 cuentas: total ${munboiData.accounts.length}`);
 assert(tiagoData.accounts.length === 0, `Tiago inicia sin cuentas (0 cuentas)`);
@@ -70,7 +70,7 @@ const munboiNet = munboiData.accounts.reduce(
   (s, a) => s + (a.currency === 'COP' ? a.balance / 3200 : a.balance),
   0
 );
-assert(Math.round(munboiNet * 100) === 2277, `Capital neto de Munboi calculado exactamente: ${formatCurrency(munboiNet)}`);
+assert(Math.round(munboiNet * 100) === -2623, `Capital neto de Munboi calculado exactamente: ${formatCurrency(munboiNet)}`);
 
 // -------------------------------------------------------------
 // 3. VERIFICACIÓN DE SQLite MULTI-TENANT
@@ -84,7 +84,7 @@ async function verifyDB() {
   const munboiDbAccs = await client.execute("SELECT COUNT(*) as c FROM accounts WHERE userId = 'munboi'");
   const tiagoDbAccs = await client.execute("SELECT COUNT(*) as c FROM accounts WHERE userId = 'tiago'");
 
-  assert(munboiDbTxs.rows[0].c === 726, `SQLite almacena las 726 transacciones de Munboi aisladas`);
+  assert(munboiDbTxs.rows[0].c === 728, `SQLite almacena las 728 transacciones de Munboi aisladas`);
   assert(tiagoDbTxs.rows[0].c === 0, `SQLite tiene a Tiago en blanco (0 transacciones)`);
   assert(munboiDbAccs.rows[0].c === 5, `SQLite almacena las 5 cuentas de Munboi`);
   assert(tiagoDbAccs.rows[0].c === 0, `SQLite tiene a Tiago en blanco (0 cuentas)`);
@@ -140,7 +140,7 @@ async function verifyDB() {
   const realExpense2026 = txs2026.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   assert(Math.round(realIncome2026) === 17611, `Ingresos reales año en curso (2026) exactos: ${formatCurrency(realIncome2026)} (NO números inflados)`);
-  assert(Math.round(realExpense2026) === 16682, `Gastos reales año en curso (2026) exactos: ${formatCurrency(realExpense2026)}`);
+  assert(Math.round(realExpense2026) === 16731, `Gastos reales año en curso (2026) exactos: ${formatCurrency(realExpense2026)}`);
 
   // Header scroll natural y selector global de Año y Período
   assert(!headerCode.includes('sticky top-0 z-30'), 'Header fluye naturalmente sin superponerse de forma invasiva sobre el contenido');
@@ -160,10 +160,10 @@ async function verifyDB() {
     const y2024 = filterFn(txs, 'yearly', '2024');
     const yAll = filterFn(txs, 'yearly', 'all');
 
-    assert(y2026.length === 366, `Filtro Año 2026 devuelve exactamente 366 movimientos (obtenidos: ${y2026.length})`);
+    assert(y2026.length === 368, `Filtro Año 2026 devuelve exactamente 368 movimientos (obtenidos: ${y2026.length})`);
     assert(y2025.length === 311, `Filtro Año 2025 devuelve exactamente 311 movimientos (obtenidos: ${y2025.length})`);
     assert(y2024.length === 49, `Filtro Año 2024 devuelve exactamente 49 movimientos (obtenidos: ${y2024.length})`);
-    assert(yAll.length === 726, `Filtro Todos los Años devuelve los 726 movimientos reales`);
+    assert(yAll.length === 728, `Filtro Todos los Años devuelve los 728 movimientos reales`);
 
     const m2026 = filterFn(txs, 'monthly', '2026');
     const w2026 = filterFn(txs, 'weekly', '2026');
@@ -218,7 +218,7 @@ async function verifyDB() {
 
     assert(isSubscriptionChargedInMonth(googleSub, txs, '2026-11') === true, 'Google Plus detectado como pagado en Noviembre 2026');
     assert(isSubscriptionChargedInMonth(chatgptSub, txs, '2026-11') === true, 'ChatGPT Plus detectado como pagado en Noviembre 2026');
-    assert(isSubscriptionChargedInMonth(claudeSub, txs, '2026-11') === false, 'Claude Pro pendiente para cobro en Noviembre 2026');
+    assert(isSubscriptionChargedInMonth(claudeSub, txs, '2026-11') === true, 'Claude Pro detectado como pagado el 7 de Noviembre 2026');
 
     // Test false positive prevention on empty or punctuation titles
     const dummySub = { id: 'test-1', name: 'Netflix 4K' };

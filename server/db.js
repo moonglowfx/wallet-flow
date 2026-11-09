@@ -10,47 +10,79 @@ import {
 
 dotenv.config();
 
+function cleanEnv(val) {
+  if (!val) return undefined;
+  const str = String(val).trim();
+  const unquoted = str.replace(/^["']|["']$/g, '').trim();
+  return unquoted || undefined;
+}
+
 const defaultLocalUrl = process.env.VERCEL ? 'file:/tmp/wallet_flow.db' : 'file:wallet_flow.db';
-const rawUrl =
+
+// Soporte universal para todas las variables de entorno de Turso y Vercel Integration
+const rawUrl = cleanEnv(
   process.env.TURSO_DATABASE_URL ||
+  process.env.TURSO_DB_URL ||
+  process.env.TURSO_URL ||
   process.env.DATABASE_URL ||
-  process.env.LIBSQL_CLIENT_URL;
+  process.env.LIBSQL_URL ||
+  process.env.LIBSQL_CLIENT_URL
+);
 
-const authToken =
+const authToken = cleanEnv(
   process.env.TURSO_AUTH_TOKEN ||
+  process.env.TURSO_DB_AUTH_TOKEN ||
+  process.env.TURSO_TOKEN ||
   process.env.DATABASE_AUTH_TOKEN ||
-  process.env.LIBSQL_CLIENT_AUTH_TOKEN ||
-  undefined;
+  process.env.LIBSQL_AUTH_TOKEN ||
+  process.env.LIBSQL_CLIENT_AUTH_TOKEN
+);
 
-// Determine connection strategy: Turso Cloud, Embedded Replica (local SQLite + Turso sync), or Local SQLite
+// Normalizar URL: auto-prefijo libsql:// si se colocó un dominio de Turso sin protocolo
+let normalizedUrl = rawUrl;
+if (normalizedUrl && normalizedUrl.includes('.turso.io') && !normalizedUrl.includes('://')) {
+  normalizedUrl = `libsql://${normalizedUrl}`;
+}
+
+// Determinar estrategia de conexion: Turso Cloud (libSQL), Replica Embebida, o SQLite local
 const isRemoteTurso = Boolean(
-  rawUrl && (rawUrl.startsWith('libsql://') || rawUrl.startsWith('https://'))
+  normalizedUrl && (
+    normalizedUrl.startsWith('libsql://') ||
+    normalizedUrl.startsWith('https://') ||
+    normalizedUrl.startsWith('http://')
+  )
 );
 
 let clientConfig = {};
 if (isRemoteTurso) {
-  if (process.env.TURSO_EMBEDDED_REPLICA === 'true') {
+  // En Vercel Serverless NUNCA usar réplica embebida en disco local porque el filesystem es efímero/de solo lectura.
+  // Siempre conectar directamente a la nube de Turso mediante libSQL HTTP.
+  if (process.env.TURSO_EMBEDDED_REPLICA === 'true' && !process.env.VERCEL) {
     clientConfig = {
       url: 'file:wallet_flow.db',
-      syncUrl: rawUrl,
+      syncUrl: normalizedUrl,
       authToken,
       syncInterval: 60000,
     };
     console.log('🔗 Turso: Conectado en modo réplica embebida (SQLite local + Turso Cloud sync)');
   } else {
     clientConfig = {
-      url: rawUrl,
+      url: normalizedUrl,
       authToken,
     };
-    console.log(`🔗 Turso: Conectado directamente a base de datos en la nube (${rawUrl})`);
+    console.log(`🔗 Turso Cloud: Conectado directamente a base de datos en la nube (${normalizedUrl})`);
   }
 } else {
-  const localUrl = rawUrl || defaultLocalUrl;
+  const localUrl = normalizedUrl || defaultLocalUrl;
   clientConfig = {
     url: localUrl,
     authToken,
   };
-  console.log(`💾 SQLite: Conectado a archivo persistente (${localUrl})`);
+  if (process.env.VERCEL) {
+    console.warn('⚠️ [Vercel Warning]: No se detectó TURSO_DATABASE_URL ni DATABASE_URL en la nube. Usando /tmp/wallet_flow.db local (efímero). Agrega TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en las variables de entorno de tu proyecto en Vercel para persistencia permanente.');
+  } else {
+    console.log(`💾 SQLite: Conectado a archivo persistente (${localUrl})`);
+  }
 }
 
 export const db = createClient(clientConfig);
@@ -84,197 +116,235 @@ let initPromise = null;
 
 /**
  * Inicializador estrictamente no destructivo e idempotente de la base de datos.
- * Crea tablas e índices si no existen y PRESERVA el 100% de los datos preexistentes.
- * NUNCA elimina ni sobreescribe registros de usuarios en reinicios o despliegues.
+ * Optimizado para Serverless (Vercel) y conexiones remotas Turso Cloud:
+ * 1. Fast-path: Si app_state.db_initialized ya es 'true', retorna de inmediato sin roundtrips DDL.
+ * 2. Creación por lotes (executeMultiple): Ejecuta todas las tablas e índices en 1 único viaje de red.
+ * 3. Preservación 100%: NUNCA borra ni sobreescribe datos preexistentes.
+ * 4. Tolerancia a fallos: En caso de error de red transitorio, resetea la promesa para reintentar.
  */
 export async function initDatabase() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    // 0. Si se usa réplica embebida de Turso, sincronizar antes de consultar
-    if (typeof db.sync === 'function' && clientConfig.syncUrl) {
-      try {
-        await db.sync();
-        console.log('🔄 Turso: Réplica local sincronizada con la nube.');
-      } catch (syncErr) {
-        console.warn('⚠️ Turso sync warning (offline o primer inicio):', syncErr.message);
+    try {
+      // 0. Si se usa réplica embebida de Turso (solo local), sincronizar antes de consultar
+      if (typeof db.sync === 'function' && clientConfig.syncUrl) {
+        try {
+          await db.sync();
+          console.log('🔄 Turso: Réplica local sincronizada con la nube.');
+        } catch (syncErr) {
+          console.warn('⚠️ Turso sync warning (offline o primer inicio):', syncErr.message);
+        }
       }
-    }
 
-    // 1. Users & Session State tables
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT NOT NULL,
-        displayName TEXT NOT NULL,
-        pin TEXT NOT NULL,
-        role TEXT NOT NULL,
-        avatarGradient TEXT,
-        description TEXT,
-        currency TEXT DEFAULT 'USD',
-        exchangeRate REAL DEFAULT 3200,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 2. Core Financial Tables with userId and native currency columns
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS accounts (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        institution TEXT NOT NULL,
-        type TEXT NOT NULL,
-        currency TEXT DEFAULT 'USD',
-        balance REAL NOT NULL DEFAULT 0,
-        creditLimit REAL,
-        cutOffDay INTEGER,
-        paymentDueDay INTEGER,
-        accountNumber TEXT NOT NULL,
-        accentGradient TEXT,
-        yieldRate REAL,
-        userId TEXT DEFAULT 'munboi',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS transactions (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        amount REAL NOT NULL,
-        currency TEXT DEFAULT 'USD',
-        originalAmount REAL,
-        type TEXT NOT NULL,
-        category TEXT NOT NULL,
-        accountId TEXT NOT NULL,
-        date TEXT NOT NULL,
-        notes TEXT,
-        isAntExpense INTEGER DEFAULT 0,
-        userId TEXT DEFAULT 'munboi',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (accountId) REFERENCES accounts(id)
-      );
-    `);
-
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS subscriptions (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL,
-        amount REAL NOT NULL,
-        currency TEXT DEFAULT 'USD',
-        billingDay INTEGER NOT NULL,
-        accountId TEXT NOT NULL,
-        active INTEGER DEFAULT 1,
-        essential INTEGER DEFAULT 0,
-        badgeColor TEXT,
-        autoCharge INTEGER DEFAULT 1,
-        userId TEXT DEFAULT 'munboi',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (accountId) REFERENCES accounts(id)
-      );
-    `);
-
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS debts (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        counterparty TEXT NOT NULL,
-        category TEXT NOT NULL,
-        currency TEXT DEFAULT 'USD',
-        totalAmount REAL NOT NULL,
-        paidAmount REAL NOT NULL,
-        interestRate REAL DEFAULT 0,
-        minimumMonthlyPayment REAL DEFAULT 0,
-        dueDate TEXT NOT NULL,
-        userId TEXT DEFAULT 'munboi',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS debt_payments (
-        id TEXT PRIMARY KEY,
-        debtId TEXT NOT NULL,
-        amount REAL NOT NULL,
-        currency TEXT DEFAULT 'USD',
-        date TEXT NOT NULL,
-        note TEXT,
-        accountId TEXT,
-        userId TEXT DEFAULT 'munboi',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (debtId) REFERENCES debts(id)
-      );
-    `);
-
-    // 2.1 Prisma OS Persistent Settings table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS prisma_settings (
-        userId TEXT PRIMARY KEY,
-        income REAL NOT NULL DEFAULT 7504,
-        fixed REAL NOT NULL DEFAULT 200,
-        goal REAL NOT NULL DEFAULT 4000,
-        emerStock REAL NOT NULL DEFAULT 4000,
-        profileKey TEXT NOT NULL DEFAULT 'mid',
-        alloc TEXT NOT NULL,
-        locks TEXT NOT NULL,
-        disabled TEXT NOT NULL,
-        yieldRates TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 3. Garantizar columnas no disruptivas de compatibilidad
-    const tables = ['accounts', 'transactions', 'subscriptions', 'debts', 'debt_payments'];
-    for (const t of tables) {
+      // Fast check: verificar si la base de datos ya está completamente inicializada
+      // Esto ahorra 25+ roundtrips de red en cada cold start en Vercel
       try {
-        await db.execute(`ALTER TABLE ${t} ADD COLUMN userId TEXT DEFAULT 'munboi'`);
-      } catch (_) {}
-      try {
-        await db.execute(`ALTER TABLE ${t} ADD COLUMN currency TEXT DEFAULT 'USD'`);
-      } catch (_) {}
-    }
-    try {
-      await db.execute(`ALTER TABLE transactions ADD COLUMN originalAmount REAL`);
-    } catch (_) {}
-    try {
-      await db.execute(`ALTER TABLE subscriptions ADD COLUMN autoCharge INTEGER DEFAULT 1`);
-    } catch (_) {}
+        const [initStateRes, accountsCountRes] = await Promise.all([
+          db.execute("SELECT value FROM app_state WHERE key = 'db_initialized'"),
+          db.execute("SELECT COUNT(*) as c FROM accounts"),
+        ]);
+        const isInit = initStateRes.rows[0]?.value === 'true';
+        const totalAccounts = Number(accountsCountRes.rows[0]?.c || 0);
 
-    // 4. Crear índices para rendimiento
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(userId)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(userId, date DESC)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(userId)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_debts_user ON debts(userId)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_debt_payments_user ON debt_payments(userId)');
+        if (isInit || totalAccounts > 0) {
+          return;
+        }
+      } catch (_) {
+        // Las tablas aún no existen en Turso/SQLite, continuar con creación
+      }
 
-    // 5. Garantizar active_user_id en app_state
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO app_state (key, value) VALUES ('active_user_id', 'munboi')`,
-      args: [],
-    });
+      // 1. Script DDL completo para creación en 1 solo viaje de red
+      const ddlScript = `
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL,
+          displayName TEXT NOT NULL,
+          pin TEXT NOT NULL,
+          role TEXT NOT NULL,
+          avatarGradient TEXT,
+          description TEXT,
+          currency TEXT DEFAULT 'USD',
+          exchangeRate REAL DEFAULT 3200,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-    // 6. Verificar si ya existen datos en la base de datos
-    const [initStateRes, accountsCountRes] = await Promise.all([
-      db.execute("SELECT value FROM app_state WHERE key = 'db_initialized'"),
-      db.execute("SELECT COUNT(*) as c FROM accounts"),
-    ]);
+        CREATE TABLE IF NOT EXISTS app_state (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-    const isInitialized = initStateRes.rows[0]?.value === 'true';
-    const totalAccounts = Number(accountsCountRes.rows[0]?.c || 0);
+        CREATE TABLE IF NOT EXISTS accounts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          institution TEXT NOT NULL,
+          type TEXT NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          balance REAL NOT NULL DEFAULT 0,
+          creditLimit REAL,
+          cutOffDay INTEGER,
+          paymentDueDay INTEGER,
+          accountNumber TEXT NOT NULL,
+          accentGradient TEXT,
+          yieldRate REAL,
+          userId TEXT DEFAULT 'munboi',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-    // REGLA DE ORO DE PERSISTENCIA: Si ya hay cuentas o el estado marca inicializado,
-    // NO ELIMINAR NINGÚN DATO, NO SOBREESCRIBIR Y NO RE-SEMBRAR.
-    if (isInitialized || totalAccounts > 0) {
-      // Registrar usuarios por defecto si faltaran, pero sin tocar nada preexistente
+        CREATE TABLE IF NOT EXISTS transactions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          originalAmount REAL,
+          type TEXT NOT NULL,
+          category TEXT NOT NULL,
+          accountId TEXT NOT NULL,
+          date TEXT NOT NULL,
+          notes TEXT,
+          isAntExpense INTEGER DEFAULT 0,
+          userId TEXT DEFAULT 'munboi',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (accountId) REFERENCES accounts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          billingDay INTEGER NOT NULL,
+          accountId TEXT NOT NULL,
+          active INTEGER DEFAULT 1,
+          essential INTEGER DEFAULT 0,
+          badgeColor TEXT,
+          autoCharge INTEGER DEFAULT 1,
+          userId TEXT DEFAULT 'munboi',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (accountId) REFERENCES accounts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS debts (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          counterparty TEXT NOT NULL,
+          category TEXT NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          totalAmount REAL NOT NULL,
+          paidAmount REAL NOT NULL,
+          interestRate REAL DEFAULT 0,
+          minimumMonthlyPayment REAL DEFAULT 0,
+          dueDate TEXT NOT NULL,
+          userId TEXT DEFAULT 'munboi',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS debt_payments (
+          id TEXT PRIMARY KEY,
+          debtId TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          date TEXT NOT NULL,
+          note TEXT,
+          accountId TEXT,
+          userId TEXT DEFAULT 'munboi',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (debtId) REFERENCES debts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS prisma_settings (
+          userId TEXT PRIMARY KEY,
+          income REAL NOT NULL DEFAULT 7504,
+          fixed REAL NOT NULL DEFAULT 200,
+          goal REAL NOT NULL DEFAULT 4000,
+          emerStock REAL NOT NULL DEFAULT 4000,
+          profileKey TEXT NOT NULL DEFAULT 'mid',
+          alloc TEXT NOT NULL,
+          locks TEXT NOT NULL,
+          disabled TEXT NOT NULL,
+          yieldRates TEXT NOT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(userId);
+        CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(userId, date DESC);
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(userId);
+        CREATE INDEX IF NOT EXISTS idx_debts_user ON debts(userId);
+        CREATE INDEX IF NOT EXISTS idx_debt_payments_user ON debt_payments(userId);
+      `;
+
+      if (typeof db.executeMultiple === 'function') {
+        await db.executeMultiple(ddlScript);
+      } else {
+        const statements = ddlScript
+          .split(';')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        for (const sql of statements) {
+          await db.execute(sql);
+        }
+      }
+
+      // Columnas retrocompatibles por si se conecta a un archivo SQLite anterior
+      const tables = ['accounts', 'transactions', 'subscriptions', 'debts', 'debt_payments'];
+      for (const t of tables) {
+        try { await db.execute(`ALTER TABLE ${t} ADD COLUMN userId TEXT DEFAULT 'munboi'`); } catch (_) {}
+        try { await db.execute(`ALTER TABLE ${t} ADD COLUMN currency TEXT DEFAULT 'USD'`); } catch (_) {}
+      }
+      try { await db.execute(`ALTER TABLE transactions ADD COLUMN originalAmount REAL`); } catch (_) {}
+      try { await db.execute(`ALTER TABLE subscriptions ADD COLUMN autoCharge INTEGER DEFAULT 1`); } catch (_) {}
+
+      // Garantizar active_user_id en app_state
+      await db.execute({
+        sql: `INSERT OR IGNORE INTO app_state (key, value) VALUES ('active_user_id', 'munboi')`,
+        args: [],
+      });
+
+      // Verificar si ya existen datos en la base de datos
+      const [initStateRes, accountsCountRes] = await Promise.all([
+        db.execute("SELECT value FROM app_state WHERE key = 'db_initialized'"),
+        db.execute("SELECT COUNT(*) as c FROM accounts"),
+      ]);
+
+      const isInitialized = initStateRes.rows[0]?.value === 'true';
+      const totalAccounts = Number(accountsCountRes.rows[0]?.c || 0);
+
+      // REGLA DE ORO: Si ya hay cuentas o el estado marca inicializado, PRESERVAR TODO
+      if (isInitialized || totalAccounts > 0) {
+        for (const u of DEFAULT_USERS) {
+          await db.execute({
+            sql: `INSERT OR IGNORE INTO users (id, username, displayName, pin, role, avatarGradient, description, currency, exchangeRate)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              u.id,
+              u.username,
+              u.displayName,
+              u.pin,
+              u.role,
+              u.avatarGradient,
+              u.description,
+              u.currency,
+              u.exchangeRate,
+            ],
+          });
+        }
+
+        await db.execute(
+          "INSERT OR REPLACE INTO app_state (key, value) VALUES ('db_initialized', 'true')"
+        );
+
+        console.log(
+          `✅ Base de datos persistente verificada: ${totalAccounts} cuentas preservadas intactas en ${
+            isRemoteTurso ? 'Turso Cloud' : 'SQLite local'
+          }.`
+        );
+        return;
+      }
+
+      // Únicamente si la base de datos está 100% vacía (primera vez absoluta en Turso / SQLite):
+      console.log('🌱 Primera ejecución: sembrando base de datos limpia por única vez...');
       for (const u of DEFAULT_USERS) {
         await db.execute({
           sql: `INSERT OR IGNORE INTO users (id, username, displayName, pin, role, avatarGradient, description, currency, exchangeRate)
@@ -293,43 +363,16 @@ export async function initDatabase() {
         });
       }
 
+      await seedUserData('munboi');
       await db.execute(
         "INSERT OR REPLACE INTO app_state (key, value) VALUES ('db_initialized', 'true')"
       );
-
-      console.log(
-        `✅ Base de datos persistente verificada: ${totalAccounts} cuentas preservadas intactas en ${
-          isRemoteTurso ? 'Turso Cloud' : 'SQLite local'
-        }.`
-      );
-      return;
+      console.log('✅ Siembra inicial completada exitosamente.');
+    } catch (err) {
+      initPromise = null; // Reiniciar en caso de error para permitir reintento en la próxima petición
+      console.error('❌ Error inicializando base de datos:', err);
+      throw err;
     }
-
-    // 7. Únicamente si la base de datos está 100% vacía (primera vez absoluta):
-    console.log('🌱 Primera ejecución: sembrando base de datos limpia por única vez...');
-    for (const u of DEFAULT_USERS) {
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO users (id, username, displayName, pin, role, avatarGradient, description, currency, exchangeRate)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          u.id,
-          u.username,
-          u.displayName,
-          u.pin,
-          u.role,
-          u.avatarGradient,
-          u.description,
-          u.currency,
-          u.exchangeRate,
-        ],
-      });
-    }
-
-    await seedUserData('munboi');
-    await db.execute(
-      "INSERT OR REPLACE INTO app_state (key, value) VALUES ('db_initialized', 'true')"
-    );
-    console.log('✅ Siembra inicial completada exitosamente.');
   })();
 
   return initPromise;
@@ -482,10 +525,24 @@ export async function seedDemoData() {
 }
 
 export function getDatabaseConnectionInfo() {
+  const url = clientConfig.url || '';
+  let displayUrl = url;
+  try {
+    if (url.includes('://')) {
+      const parsed = new URL(url.replace('libsql://', 'https://'));
+      displayUrl = `libsql://${parsed.host}`;
+    }
+  } catch (_) {
+    displayUrl = url;
+  }
+
   return {
     isRemoteTurso,
-    clientUrl: clientConfig.url,
+    provider: isRemoteTurso ? 'Turso Cloud (libSQL)' : 'SQLite Local',
+    clientUrl: displayUrl,
     syncUrl: clientConfig.syncUrl || null,
     hasAuthToken: Boolean(clientConfig.authToken),
+    isVercel: Boolean(process.env.VERCEL),
+    status: 'connected',
   };
 }

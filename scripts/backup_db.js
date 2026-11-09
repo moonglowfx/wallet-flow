@@ -9,23 +9,29 @@ const rootDir = path.resolve(__dirname, '..');
 const backupsDir = path.join(rootDir, 'backups');
 
 export async function createDatabaseBackup() {
-  if (!fs.existsSync(backupsDir)) {
-    fs.mkdirSync(backupsDir, { recursive: true });
+  const isVercel = Boolean(process.env.VERCEL);
+  if (!isVercel) {
+    try {
+      if (!fs.existsSync(backupsDir)) {
+        fs.mkdirSync(backupsDir, { recursive: true });
+      }
+    } catch (_) {}
   }
 
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
-  // 1. Copy SQLite binary database file if present
+  // 1. Copy SQLite binary database file if present and filesystem is writable
   const sourceDb = path.join(rootDir, 'wallet_flow.db');
   let binaryBackupPath = null;
-  if (fs.existsSync(sourceDb)) {
-    binaryBackupPath = path.join(backupsDir, `wallet_flow_backup_${timestamp}.db`);
-    fs.copyFileSync(sourceDb, binaryBackupPath);
-    // Also update wallet_flow.db.bak as quick latest copy
-    fs.copyFileSync(sourceDb, path.join(rootDir, 'wallet_flow.db.bak'));
-    console.log(`📦 Backup binario creado: ${binaryBackupPath}`);
+  if (!isVercel && fs.existsSync(sourceDb)) {
+    try {
+      binaryBackupPath = path.join(backupsDir, `wallet_flow_backup_${timestamp}.db`);
+      fs.copyFileSync(sourceDb, binaryBackupPath);
+      fs.copyFileSync(sourceDb, path.join(rootDir, 'wallet_flow.db.bak'));
+      console.log(`📦 Backup binario creado: ${binaryBackupPath}`);
+    } catch (_) {}
   }
 
   // 2. Export full high-fidelity JSON snapshot from active libSQL/Turso connection
@@ -69,17 +75,24 @@ export async function createDatabaseBackup() {
     const latestJsonPath = path.join(backupsDir, 'wallet_flow_snapshot_latest.json');
     const jsonStr = JSON.stringify(snapshot, null, 2);
 
-    fs.writeFileSync(jsonBackupPath, jsonStr, 'utf-8');
-    fs.writeFileSync(latestJsonPath, jsonStr, 'utf-8');
+    if (!isVercel) {
+      try {
+        fs.writeFileSync(jsonBackupPath, jsonStr, 'utf-8');
+        fs.writeFileSync(latestJsonPath, jsonStr, 'utf-8');
+        console.log(`📄 Snapshot JSON creado: ${jsonBackupPath}`);
+      } catch (writeErr) {
+        console.warn('⚠️ No se pudo escribir snapshot en disco (filesystem read-only):', writeErr.message);
+      }
+    }
 
-    console.log(`📄 Snapshot JSON creado: ${jsonBackupPath}`);
     console.log(`✨ Backup completado exitosamente:`, snapshot.metadata);
     return {
       success: true,
       timestamp,
       binaryBackupPath,
-      jsonBackupPath,
+      jsonBackupPath: isVercel ? null : jsonBackupPath,
       metadata: snapshot.metadata,
+      snapshot: isVercel ? snapshot : undefined,
     };
   } catch (err) {
     console.error('Error generando snapshot JSON desde la base de datos:', err);
