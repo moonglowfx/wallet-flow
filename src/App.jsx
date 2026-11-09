@@ -20,7 +20,8 @@ const SettingsView = React.lazy(() =>
   import('./components/SettingsView.jsx').then((m) => ({ default: m.SettingsView }))
 );
 
-export const APP_BUILD_VERSION = 'v2026.11.07-liquid-glass';
+import { APP_VERSION, APP_BUILD_VERSION, APP_EDITION } from './version.js';
+export { APP_VERSION, APP_BUILD_VERSION, APP_EDITION };
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');

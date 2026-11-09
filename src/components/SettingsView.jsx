@@ -40,6 +40,7 @@ import {
 import { getUserPin, setUserPin, setUserProfile } from '../data/users.js';
 import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
 import { api } from '../services/api.js';
+import { APP_VERSION, APP_BUILD_DATE, APP_EDITION } from '../version.js';
 
 export const SettingsView = ({
   currentUser,
@@ -761,6 +762,16 @@ export const SettingsView = ({
               Usuario: <strong className="text-white">{currentUser.username}</strong>
             </span>
 
+            {/* Version Label Badge */}
+            <span
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.05] border border-purple-400/30 text-purple-200 flex items-center gap-1.5 shadow-sm"
+              title={`Wallet Flow ${APP_VERSION} • ${APP_EDITION} (${APP_BUILD_DATE})`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span>Versión:</span>
+              <strong className="text-white font-mono">{APP_VERSION}</strong>
+            </span>
+
             <button
               type="button"
               onClick={() => {
@@ -1417,9 +1428,14 @@ export const SettingsView = ({
                   </strong>
                 </span>
               </div>
-              <span className="text-zinc-500 font-mono text-[10px]">
-                {dbLiveInfo?.clientUrl || 'wallet_flow.db'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-zinc-400">
+                  Versión App: <strong className="text-purple-300 font-mono">{APP_VERSION}</strong>
+                </span>
+                <span className="text-zinc-500 font-mono text-[10px]">
+                  {dbLiveInfo?.clientUrl || 'wallet_flow.db'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1444,6 +1460,27 @@ export const SettingsView = ({
           </div>
         </div>
       )}
+
+      {/* ---------------- VERSION & SYSTEM METADATA FOOTER ---------------- */}
+      <div className="pt-8 pb-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10 text-zinc-500 text-xs mt-8">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          <span className="text-zinc-300 font-semibold">Wallet Flow</span>
+          <span className="text-zinc-600">•</span>
+          <span className="text-zinc-400 font-medium">{APP_EDITION}</span>
+          <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/35 text-purple-300 font-mono font-bold text-[11px]">
+            {APP_VERSION}
+          </span>
+        </div>
+        <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+          <span>Compilación: <strong className="font-mono text-zinc-300">{APP_BUILD_DATE}</strong></span>
+          <span className="text-zinc-600">•</span>
+          <span className="text-emerald-400 font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Turso Cloud + SQLite Engine
+          </span>
+        </div>
+      </div>
 
       {/* ---------------- EDIT ACCOUNT MODAL ---------------- */}
       {editingAccount && typeof document !== 'undefined' && createPortal(
