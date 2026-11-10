@@ -304,3 +304,24 @@ export function todayLocalISO(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+/**
+ * Monto de un movimiento en SU moneda nativa (pesos como pesos, dólares como dólares), sin conversión.
+ */
+export function formatTxAmount(tx, showCode = true) {
+  const original = Number(tx?.originalAmount);
+  const value = Number.isFinite(original) && original !== 0 ? original : Number(tx?.amount) || 0;
+  return formatNativeCurrency(value, tx?.currency || 'USD', showCode);
+}
+
+/**
+ * Valor en USD de un movimiento según la tasa fija vigente. Los movimientos en COP se derivan de su monto
+ * original (sin redondear) para que USD -> COP reproduzca exactamente los pesos registrados.
+ */
+export function txUsdValue(tx, rate = DEFAULT_USD_COP_RATE) {
+  const original = Number(tx?.originalAmount);
+  const safeRate = Number(rate) > 0 ? Number(rate) : DEFAULT_USD_COP_RATE;
+  if ((tx?.currency || 'USD') === 'COP' && Number.isFinite(original) && original !== 0) return original / safeRate;
+  return Number(tx?.amount) || 0;
+}
+ 

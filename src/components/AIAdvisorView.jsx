@@ -35,6 +35,7 @@ import {
   DEFAULT_USD_COP_RATE,
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
+  formatTxAmount,
 } from '../data/finance.js';
 
 const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
@@ -926,7 +927,7 @@ export const AIAdvisorView = ({
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="font-bold text-rose-300 font-tabular">
-                              -{formatCurrency(tx.amount, currency, exchangeRate)}
+                              -{formatTxAmount(tx)}
                             </span>
                             {onEditTransaction && <Pencil className="w-3 h-3 text-purple-300" />}
                           </div>

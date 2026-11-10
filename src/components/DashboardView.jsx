@@ -17,6 +17,7 @@ import {
   TIMEFRAME_CONFIG,
   DEFAULT_USD_COP_RATE,
   filterTransactionsByPeriod,
+  formatTxAmount,
 } from '../data/finance.js';
 
 export const DashboardView = ({
@@ -345,9 +346,8 @@ export const DashboardView = ({
                           isIncome ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
-                        {isIncome
-                          ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
-                          : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
+                        {isIncome ? '+' : '-'}
+                        {formatTxAmount(tx)}
                       </p>
                       {tx.notes && (
                         <p className="text-[11px] text-zinc-500 truncate max-w-[200px] hidden sm:block">

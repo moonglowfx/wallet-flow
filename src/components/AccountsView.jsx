@@ -31,6 +31,7 @@ import {
   DEFAULT_USD_COP_RATE,
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
+  formatTxAmount,
 } from '../data/finance.js';
 import { api } from '../services/api.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
@@ -394,7 +395,7 @@ export const AccountsView = ({
                   }`}
                 />
 
-                <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2.5 mb-3.5 relative z-10">
+                <div className="flex items-start justify-between gap-2.5 mb-3.5 relative z-10">
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-1">
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
@@ -408,49 +409,19 @@ export const AccountsView = ({
                       <Icon className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-white text-sm tracking-tight truncate">
+                      <h3 className="font-bold text-white text-sm leading-snug tracking-tight break-words line-clamp-2">
                         {acc.name}
                       </h3>
                       <p className="text-xs text-zinc-400 truncate">{acc.institution}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <span
                       className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.color}`}
                     >
                       {badge.label}
                     </span>
-
-                    {/* Reordering Controls (Desktop & Mobile) */}
-                    {!activeAccountId && (
-                      <div className="flex items-center gap-0.5 bg-white/5 rounded-lg border border-white/10 p-0.5">
-                        <button
-                          type="button"
-                          disabled={accounts.findIndex((a) => a.id === acc.id) === 0}
-                          onClick={(e) => handleMoveAccount(acc.id, -1, e)}
-                          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
-                          title="Mover cuenta hacia la izquierda / arriba"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <span
-                          className="px-0.5 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing"
-                          title="Arrastrar para ordenar"
-                        >
-                          <GripVertical className="w-3 h-3" />
-                        </span>
-                        <button
-                          type="button"
-                          disabled={accounts.findIndex((a) => a.id === acc.id) === accounts.length - 1}
-                          onClick={(e) => handleMoveAccount(acc.id, 1, e)}
-                          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
-                          title="Mover cuenta hacia la derecha / abajo"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
 
                     <button
                       type="button"
@@ -464,20 +435,52 @@ export const AccountsView = ({
                 </div>
 
                 {/* Main Balance Display */}
-                <div className="space-y-1 mb-4 relative z-10">
-                  <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                    {acc.type === 'credit' ? `Saldo Deudor (${acc.currency || 'USD'})` : `Saldo Disponible (${acc.currency || 'USD'})`}
-                  </span>
-                  <p
-                    className={`text-2xl font-black tracking-tight font-mono ${
-                      isNegative ? 'text-rose-400' : 'text-white'
-                    }`}
-                  >
-                    <AnimatedCounter
-                      value={acc.balance}
-                      formatter={(v) => formatNativeCurrency(v, acc.currency || 'USD')}
-                    />
-                  </p>
+                <div className="flex items-end justify-between gap-3 mb-4 relative z-10">
+                  <div className="space-y-1 min-w-0">
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
+                      {acc.type === 'credit' ? `Saldo Deudor (${acc.currency || 'USD'})` : `Saldo Disponible (${acc.currency || 'USD'})`}
+                    </span>
+                    <p
+                      className={`text-2xl font-black tracking-tight font-mono truncate ${
+                        isNegative ? 'text-rose-400' : 'text-white'
+                      }`}
+                    >
+                      <AnimatedCounter
+                        value={acc.balance}
+                        formatter={(v) => formatNativeCurrency(v, acc.currency || 'USD')}
+                      />
+                    </p>
+                  </div>
+
+                  {/* Control de orden: junto al saldo para no robarle espacio al nombre */}
+                  {!activeAccountId && (
+                    <div className="flex items-center gap-0.5 bg-white/5 rounded-lg border border-white/10 p-0.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={accounts.findIndex((a) => a.id === acc.id) === 0}
+                        onClick={(e) => handleMoveAccount(acc.id, -1, e)}
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                        title="Mover cuenta hacia la izquierda / arriba"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span
+                        className="px-0.5 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing"
+                        title="Arrastrar para ordenar"
+                      >
+                        <GripVertical className="w-3 h-3" />
+                      </span>
+                      <button
+                        type="button"
+                        disabled={accounts.findIndex((a) => a.id === acc.id) === accounts.length - 1}
+                        onClick={(e) => handleMoveAccount(acc.id, 1, e)}
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                        title="Mover cuenta hacia la derecha / abajo"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Account Meta & Badges */}
@@ -754,9 +757,8 @@ export const AccountsView = ({
                           isIncome ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
-                        {isIncome
-                          ? `+${formatCurrency(tx.amount, currency, exchangeRate)}`
-                          : `-${formatCurrency(tx.amount, currency, exchangeRate)}`}
+                        {isIncome ? '+' : '-'}
+                        {formatTxAmount(tx)}
                       </p>
                       {tx.notes && (
                         <p className="text-[11px] text-zinc-500 max-w-[240px] truncate hidden sm:block">

@@ -21,7 +21,11 @@ import {
   CreditCard,
   Banknote,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/finance.js';
+import {
+  formatCurrency,
+  DEFAULT_USD_COP_RATE,
+  formatTxAmount,
+} from '../data/finance.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 export const MonthlyExpensesView = ({
@@ -615,9 +619,7 @@ export const MonthlyExpensesView = ({
                             }`}
                           >
                             {isIncome ? '+' : '-'}
-                            {tx.currency === 'COP' && currency === 'COP' && tx.originalAmount
-                              ? `$${Math.round(tx.originalAmount).toLocaleString('es-CO')} COP`
-                              : formatCurrency(tx.amount, currency, exchangeRate, true, 'USD')}
+                            {formatTxAmount(tx)}
                           </span>
                         </div>
                       </div>

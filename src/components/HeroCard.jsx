@@ -34,8 +34,27 @@ export const HeroCard = ({
   const usdAccounts = accounts.filter((a) => (a.currency || 'USD') === 'USD');
   const copAccounts = accounts.filter((a) => a.currency === 'COP');
 
-  const totalUSD = usdAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
-  const totalCOP = copAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+  const sumBalances = (list) => list.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+  const isCredit = (a) => a.type === 'credit';
+
+  // Netos por moneda (incluyen el saldo deudor de tarjetas): base del capital neto consolidado
+  const totalUSD = sumBalances(usdAccounts);
+  const totalCOP = sumBalances(copAccounts);
+
+  // Tarjetas "Cuentas en …": total de lo que tienes en cada moneda, SIN restar deudas de tarjetas
+  const assetsUSD = sumBalances(usdAccounts.filter((a) => !isCredit(a)));
+  const assetsCOP = sumBalances(copAccounts.filter((a) => !isCredit(a)));
+
+  // Deuda de tarjetas en su moneda nativa (pesos como pesos, dólares como dólares)
+  const creditDebtNativeUSD = sumBalances(usdAccounts.filter(isCredit));
+  const creditDebtNativeCOP = sumBalances(copAccounts.filter(isCredit));
+  const creditDebtLabel =
+    [
+      creditDebtNativeUSD !== 0 ? formatNativeCurrency(creditDebtNativeUSD, 'USD') : null,
+      creditDebtNativeCOP !== 0 ? formatNativeCurrency(creditDebtNativeCOP, 'COP') : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || formatNativeCurrency(0, currency);
 
   // Consolidated Net Capital in USD base
   const netCapital = totalUSD + (totalCOP / (exchangeRate || DEFAULT_USD_COP_RATE));
@@ -159,7 +178,7 @@ export const HeroCard = ({
             <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Dólares</span>
             <span className="text-xs sm:text-sm font-semibold text-purple-200 block truncate font-mono">
               {showValues ? (
-                <AnimatedCounter value={totalUSD} formatter={(v) => formatNativeCurrency(v, 'USD')} />
+                <AnimatedCounter value={assetsUSD} formatter={(v) => formatNativeCurrency(v, 'USD')} />
               ) : (
                 '••••'
               )}
@@ -169,7 +188,7 @@ export const HeroCard = ({
             <span className="text-zinc-400 block text-[11px] truncate">Cuentas en Pesos (COP)</span>
             <span className="text-xs sm:text-sm font-semibold text-emerald-300 block truncate font-mono">
               {showValues ? (
-                <AnimatedCounter value={totalCOP} formatter={(v) => formatNativeCurrency(v, 'COP')} />
+                <AnimatedCounter value={assetsCOP} formatter={(v) => formatNativeCurrency(v, 'COP')} />
               ) : (
                 '••••'
               )}
@@ -178,14 +197,7 @@ export const HeroCard = ({
           <div className="liquid-pill p-2.5 min-w-0">
             <span className="text-zinc-400 block text-[11px] truncate">Deuda en TDC</span>
             <span className="text-xs sm:text-sm font-semibold text-rose-300 block truncate font-mono">
-              {showValues ? (
-                <AnimatedCounter
-                  value={creditDebtUSD}
-                  formatter={(v) => formatCurrency(v, currency, exchangeRate)}
-                />
-              ) : (
-                '••••'
-              )}
+              {showValues ? creditDebtLabel : '••••'}
             </span>
           </div>
           <div className="liquid-pill p-2.5 min-w-0">

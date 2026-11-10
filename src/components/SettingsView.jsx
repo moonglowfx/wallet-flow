@@ -76,7 +76,13 @@ export const SettingsView = ({
   const [profileRole, setProfileRole] = useState(currentUser?.role || '');
 
   // Currency Edit State
-  const [customRate, setCustomRate] = useState(exchangeRate.toString());
+  const [customRate, setCustomRate] = useState(String(exchangeRate));
+  const [rateError, setRateError] = useState('');
+
+  // Mantiene el campo alineado con la tasa vigente (p. ej. tras sincronizar desde otro dispositivo)
+  useEffect(() => {
+    setCustomRate(String(exchangeRate));
+  }, [exchangeRate]);
 
   // Account Edit Modal State
   const [editingAccount, setEditingAccount] = useState(null);
@@ -177,11 +183,14 @@ export const SettingsView = ({
   // ----------------- CURRENCY HANDLER -----------------
   const handleSaveCurrency = (e) => {
     e.preventDefault();
-    const rateNum = parseFloat(customRate);
-    if (rateNum && rateNum > 0) {
-      setExchangeRate(rateNum);
-      if (showToast) showToast(`Tipo de cambio guardado: 1 USD = $${rateNum.toLocaleString('es-CO')} COP`);
+    const rateNum = Number(customRate);
+    if (!Number.isFinite(rateNum) || rateNum <= 0 || rateNum > 1000000) {
+      setRateError('Ingresa una tasa válida mayor a 0 (ej. 4000).');
+      return;
     }
+    setRateError('');
+    setExchangeRate(rateNum);
+    if (showToast) showToast(`Tasa fija guardada: 1 USD = ${rateNum.toLocaleString('es-CO')} COP`);
   };
 
   // ----------------- ACCOUNT EDIT HANDLERS -----------------
@@ -1025,20 +1034,31 @@ export const SettingsView = ({
             </div>
 
             <div>
-              <label className="block text-zinc-300 font-semibold mb-1">
-                Tasa de Conversión (1 USD = X COP)
+              <label htmlFor="wf-fixed-rate" className="block text-zinc-300 font-semibold mb-1">
+                Tasa Fija de Conversión (1 USD = X COP)
               </label>
               <input
-                type="tel"
+                id="wf-fixed-rate"
+                type="text"
                 inputMode="decimal"
                 required
                 value={customRate}
-                onChange={(e) => setCustomRate(e.target.value.replace(/[^0-9.]/g, ''))}
-                className="liquid-input text-xs font-mono font-bold"
+                onChange={(e) => {
+                  setCustomRate(e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''));
+                  if (rateError) setRateError('');
+                }}
+                aria-invalid={Boolean(rateError)}
+                className="liquid-input text-base font-mono font-bold"
               />
-              <p className="text-[11px] text-zinc-400 mt-1">
-                Valor predeterminado del sistema: 3,200 COP por dólar
-              </p>
+              {rateError ? (
+                <p role="alert" className="text-[11px] text-rose-300 mt-1">{rateError}</p>
+              ) : (
+                <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                  Tasa vigente: <strong className="text-purple-200">1 USD = ${Number(exchangeRate).toLocaleString('es-CO')} COP</strong>.
+                  Es fija: solo cambia cuando la editas aquí. Cada cuenta y movimiento se muestra en su propia moneda;
+                  la tasa se usa únicamente para los totales consolidados y las transferencias entre monedas.
+                </p>
+              )}
             </div>
 
             <button

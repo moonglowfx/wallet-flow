@@ -9,7 +9,13 @@ import { MonthlyExpensesView } from './components/MonthlyExpensesView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
 import { AuthScreen } from './components/AuthScreen.jsx';
-import { DEFAULT_USD_COP_RATE, createId, isSubscriptionChargedInMonth, todayLocalISO } from './data/finance.js';
+import {
+  DEFAULT_USD_COP_RATE,
+  createId,
+  isSubscriptionChargedInMonth,
+  todayLocalISO,
+  txUsdValue,
+} from './data/finance.js';
 import { api } from './services/api.js';
 
 // Vistas auxiliares pesadas: se cargan bajo demanda para acelerar el primer render
@@ -533,6 +539,20 @@ export function App() {
     [accounts, rate]
   );
 
+  /**
+   * Vista de movimientos para analítica: el valor en USD de cada movimiento en pesos se deriva de su monto
+   * original con la tasa fija vigente. Así todos los totales responden al cambiar la tasa en Ajustes y
+   * USD <-> COP nunca acumula errores de redondeo. Los datos persistidos (`transactions`) no se alteran.
+   */
+  const viewTransactions = useMemo(
+    () =>
+      transactions.map((t) => {
+        const usd = txUsdValue(t, rate);
+        return usd === t.amount ? t : { ...t, amount: usd };
+      }),
+    [transactions, rate]
+  );
+
   const antAlertCount = useMemo(() => transactions.filter((t) => t.isAntExpense).length, [transactions]);
 
   // ----------------- RENDER -----------------
@@ -584,7 +604,7 @@ export function App() {
           {activeTab === 'dashboard' && (
             <DashboardView
               accounts={accounts}
-              transactions={transactions}
+              transactions={viewTransactions}
               timeframe={timeframe}
               setTimeframe={setTimeframe}
               selectedYear={selectedYear}
@@ -607,7 +627,7 @@ export function App() {
               currentUser={currentUser}
               accounts={accounts}
               setAccounts={setAccounts}
-              transactions={transactions}
+              transactions={viewTransactions}
               timeframe={timeframe}
               setTimeframe={setTimeframe}
               selectedYear={selectedYear}
@@ -626,7 +646,7 @@ export function App() {
 
           {activeTab === 'monthly-expenses' && (
             <MonthlyExpensesView
-              transactions={transactions}
+              transactions={viewTransactions}
               accounts={accounts}
               timeframe={timeframe}
               selectedYear={selectedYear}
@@ -652,7 +672,7 @@ export function App() {
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
-              transactions={transactions}
+              transactions={viewTransactions}
               onLogPaymentTransaction={handleSaveTransaction}
               onExecuteDueSubscriptions={handleExecuteDueSubscriptions}
               onOpenNewTransaction={handleOpenNewTransaction}
@@ -664,7 +684,7 @@ export function App() {
               <AIAdvisorView
                 userId={currentUser.id}
                 accounts={accounts}
-                transactions={transactions}
+                transactions={viewTransactions}
                 subscriptions={subscriptions}
                 debts={debts}
                 timeframe={timeframe}
