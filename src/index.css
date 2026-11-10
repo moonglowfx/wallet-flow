@@ -394,3 +394,79 @@
 .animate-float-orb-2 {
   animation: floatOrb2 18s ease-in-out infinite alternate;
 }
+
+/* ==========================================================================
+   MOBILE-FIRST: objetivos táctiles, foco accesible y movimiento reducido
+   ========================================================================== */
+
+/* Pantallas táctiles: todo control interactivo ofrece un área de toque ≥ 44×44px (Apple HIG / WCAG 2.5.5).
+   Los controles pequeños (iconos de 20–28px, píldoras de 30px) conservan su tamaño visual: el área se
+   amplía con un pseudo-elemento invisible centrado, sin alterar el layout. */
+@media (hover: none), (pointer: coarse) {
+  button,
+  a[href],
+  summary,
+  [role='button'],
+  [role='tab'] {
+    position: relative;
+    touch-action: manipulation;
+  }
+
+  button::after,
+  a[href]::after,
+  summary::after,
+  [role='button']::after,
+  [role='tab']::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Acciones principales, píldoras y filtros en tiras deslizables: altura mínima real de 44px
+     (un contenedor con scroll recorta el pseudo-elemento, por eso ahí el alto debe ser real) */
+  button.liquid-button-primary,
+  button.liquid-pill,
+  .overflow-x-auto.no-scrollbar button {
+    min-height: 44px;
+  }
+
+  /* Segmentos y filtros de texto (`truncate` recorta su propio pseudo-elemento): alto real de 40px,
+     que con el relleno de su contenedor segmentado completa los 44–48px táctiles */
+  button.truncate {
+    min-height: 40px;
+  }
+}
+
+/* Foco visible solo con teclado (no al tocar) */
+:where(button, a, select, summary, [role='tab'], [role='button']):focus-visible {
+  outline: 2px solid rgba(192, 132, 252, 0.9);
+  outline-offset: 2px;
+}
+
+/* Micro-interacción táctil uniforme: respuesta inmediata al presionar */
+@media (hover: none) {
+  button:active:not(:disabled) {
+    filter: brightness(1.12);
+  }
+}
+
+/* Evita el rebote/scroll encadenado del fondo al llegar al final de un modal */
+[role='dialog'] {
+  overscroll-behavior: contain;
+}
+
+/* Respeta la preferencia del sistema: sin animaciones decorativas continuas */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

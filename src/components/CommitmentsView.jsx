@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { SubscriptionsView } from './SubscriptionsView.jsx';
 import { DebtsView } from './DebtsView.jsx';
-import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG, isSubscriptionChargedInMonth } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, TIMEFRAME_CONFIG, isSubscriptionChargedInMonth } from '../data/finance.js';
 
 export const CommitmentsView = ({
   currentUser,
@@ -74,7 +74,7 @@ export const CommitmentsView = ({
   // Global Auto-Charge Master Configuration State
   const [isAutoChargeGlobal, setIsAutoChargeGlobal] = useState(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`wf_autocharge_enabled_${currentUser?.id || 'munboi'}`);
+      const stored = localStorage.getItem(`wf_autocharge_enabled_${currentUser?.id || 'anon'}`);
       return stored !== null ? stored === 'true' : true;
     }
     return true;
@@ -84,7 +84,7 @@ export const CommitmentsView = ({
     const next = !isAutoChargeGlobal;
     setIsAutoChargeGlobal(next);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`wf_autocharge_enabled_${currentUser?.id || 'munboi'}`, String(next));
+      localStorage.setItem(`wf_autocharge_enabled_${currentUser?.id || 'anon'}`, String(next));
     }
   };
 

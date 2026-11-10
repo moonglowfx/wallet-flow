@@ -21,7 +21,7 @@ import {
   CreditCard,
   Banknote,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/finance.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 export const MonthlyExpensesView = ({
@@ -211,7 +211,7 @@ export const MonthlyExpensesView = ({
             <button
               onClick={handlePrevMonth}
               disabled={activeIndex >= monthGroups.length - 1}
-              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer shrink-0"
+              className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer shrink-0"
               title="Mes Anterior"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -238,7 +238,7 @@ export const MonthlyExpensesView = ({
             <button
               onClick={handleNextMonth}
               disabled={activeIndex <= 0}
-              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer shrink-0"
+              className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-30 disabled:pointer-events-none text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer shrink-0"
               title="Mes Siguiente"
             >
               <ChevronRight className="w-4 h-4" />

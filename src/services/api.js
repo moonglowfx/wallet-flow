@@ -1,318 +1,153 @@
-// SQLite REST API Client (100% Database-Backed — Zero localStorage)
-import { getUserInitialData, syncUsersFromDatabase } from '../data/users.js';
+// Cliente REST de Wallet Flow.
+// La identidad viaja en una cookie HttpOnly firmada: el cliente nunca envía ni decide el userId.
 
 const API_BASE = '/api';
+const DEFAULT_TIMEOUT_MS = 15000;
 
-async function sqliteFetch(url, options = {}) {
-  const timeoutMs = options.timeout || 12000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    const ct = res.headers.get('content-type');
-    if (res.ok && ct && ct.includes('application/json')) {
-      return await res.json();
-    }
-    if (!res.ok) {
-      let errorMsg = `HTTP ${res.status}`;
-      try {
-        const errJson = await res.json();
-        if (errJson && errJson.error) errorMsg = errJson.error;
-      } catch (_) {}
-      console.warn(`sqliteFetch error on ${url}:`, errorMsg);
-      return { ok: false, error: errorMsg, status: res.status };
-    }
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.warn(`sqliteFetch network error on ${url}:`, err.message);
+export class ApiError extends Error {
+  constructor(message, status = 0, data = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status; // 0 = sin conexión / tiempo de espera agotado
+    this.data = data;
   }
-  return null;
+
+  get isNetwork() {
+    return this.status === 0;
+  }
 }
 
+const handlers = { unauthorized: null, writeError: null };
+const activity = { pendingWrites: 0, writeEpoch: 0 };
+
+async function request(path, { method = 'GET', body, timeout = DEFAULT_TIMEOUT_MS, isAuthFlow = false } = {}) {
+  const isWrite = method !== 'GET';
+  if (isWrite) {
+    activity.pendingWrites += 1;
+    activity.writeEpoch += 1;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      credentials: 'same-origin',
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(data?.error || `Error ${res.status}`, res.status, data);
+    return data;
+  } catch (err) {
+    const apiError =
+      err instanceof ApiError
+        ? err
+        : new ApiError(
+            err?.name === 'AbortError' ? 'El servidor tardó demasiado en responder.' : 'Sin conexión con el servidor.'
+          );
+    // Un 401 fuera del flujo de login significa que la sesión expiró o fue revocada.
+    if (apiError.status === 401 && !isAuthFlow) handlers.unauthorized?.();
+    throw apiError;
+  } finally {
+    clearTimeout(timer);
+    if (isWrite) activity.pendingWrites -= 1;
+  }
+}
+
+/**
+ * Escritura optimista: la UI ya aplicó el cambio. Si el servidor lo rechaza se notifica al manejador global
+ * (que avisa al usuario y resincroniza con la verdad del servidor) y se resuelve `null` en lugar de lanzar.
+ */
+async function write(path, method, body, options) {
+  try {
+    return await request(path, { ...options, method, body });
+  } catch (err) {
+    if (err.status !== 401) handlers.writeError?.(err);
+    return null;
+  }
+}
+
+const enc = encodeURIComponent;
+const withId = (entityOrId, maybeEntity) =>
+  typeof entityOrId === 'string' ? { ...maybeEntity, id: entityOrId } : entityOrId;
+
 export const api = {
-  // Full SQLite State Snapshot (Users, Active Session, Accounts, Transactions, Subscriptions, Debts)
-  async getState(userId) {
-    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
-    const data = await sqliteFetch(`${API_BASE}/state${query}`);
-    if (data && Array.isArray(data.users)) {
-      syncUsersFromDatabase(data.users);
-    }
-    return data;
+  // ----- Infraestructura -----
+  onUnauthorized(fn) {
+    handlers.unauthorized = fn;
+  },
+  onWriteError(fn) {
+    handlers.writeError = fn;
+  },
+  /** Hay escrituras en vuelo: no es seguro reemplazar el estado local con una lectura del servidor. */
+  get isWriting() {
+    return activity.pendingWrites > 0;
+  },
+  /** Cambia con cada escritura: permite descartar lecturas iniciadas antes de una mutación. */
+  get writeEpoch() {
+    return activity.writeEpoch;
   },
 
-  // Users & Session in SQLite
-  async getUsers() {
-    const data = await sqliteFetch(`${API_BASE}/users`);
-    if (data && Array.isArray(data.users)) {
-      syncUsersFromDatabase(data.users);
-    }
-    return data;
-  },
+  // ----- Autenticación y sesión (lanzan ApiError) -----
+  login: (username, pin) => request('/auth/login', { method: 'POST', body: { username, pin }, isAuthFlow: true }),
+  register: (username, pin) => request('/auth/register', { method: 'POST', body: { username, pin }, isAuthFlow: true }),
+  logout: () => request('/auth/logout', { method: 'POST', isAuthFlow: true }).catch(() => null),
+  changePin: (currentPin, newPin) => request('/auth/change-pin', { method: 'POST', body: { currentPin, newPin } }),
+  updateProfile: (updates) => write('/users/me', 'PUT', updates),
 
-  async updateUser(userId, updates) {
-    return await sqliteFetch(`${API_BASE}/users/${encodeURIComponent(userId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
-  },
+  // ----- Estado completo del usuario autenticado (lanza ApiError) -----
+  getState: () => request('/state'),
 
-  async setActiveSession(userId) {
-    return await sqliteFetch(`${API_BASE}/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    });
+  // ----- Cuentas -----
+  createAccount: (account) => write('/accounts', 'POST', account),
+  updateAccount(accountOrId, maybeAccount) {
+    const account = withId(accountOrId, maybeAccount);
+    return write(`/accounts/${enc(account.id)}`, 'PUT', account);
   },
+  deleteAccount: (id) => write(`/accounts/${enc(id)}`, 'DELETE'),
+  reorderAccounts: (accountIds = []) => write('/accounts/reorder', 'PUT', { accountIds }),
 
-  async clearDeviceSession() {
-    return await sqliteFetch(`${API_BASE}/session/device`, {
-      method: 'DELETE',
-    });
+  // ----- Movimientos y transferencias -----
+  createTransaction: (transaction) => write('/transactions', 'POST', transaction),
+  updateTransaction(txOrId, maybeTx) {
+    const tx = withId(txOrId, maybeTx);
+    return write(`/transactions/${enc(tx.id)}`, 'PUT', tx);
   },
+  deleteTransaction: (id) => write(`/transactions/${enc(id)}`, 'DELETE'),
+  createTransfer: (transfer) => write('/transfers', 'POST', transfer),
 
-  // Accounts
-  async getAccounts(userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/accounts?userId=${encodeURIComponent(userId)}`);
-    if (Array.isArray(data)) return data;
-    return getUserInitialData(userId).accounts;
+  // ----- Suscripciones -----
+  createSubscription: (subscription) => write('/subscriptions', 'POST', subscription),
+  updateSubscription(subOrId, maybeSub) {
+    const sub = withId(subOrId, maybeSub);
+    return write(`/subscriptions/${enc(sub.id)}`, 'PUT', sub);
   },
+  toggleSubscription: (id) => write(`/subscriptions/${enc(id)}/toggle`, 'PATCH'),
+  deleteSubscription: (id) => write(`/subscriptions/${enc(id)}`, 'DELETE'),
 
-  async createAccount(account, userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/accounts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...account, userId }),
-    });
-    return data || account;
+  // ----- Deudas -----
+  createDebt: (debt) => write('/debts', 'POST', debt),
+  updateDebt(debtOrId, maybeDebt) {
+    const debt = withId(debtOrId, maybeDebt);
+    return write(`/debts/${enc(debt.id)}`, 'PUT', debt);
   },
+  deleteDebt: (id) => write(`/debts/${enc(id)}`, 'DELETE'),
+  addDebtPayment: (debtId, payment) => write(`/debts/${enc(debtId)}/payment`, 'POST', { payment }),
 
-  async updateAccount(accountOrId, maybeAccount, userId = 'munboi') {
-    const account = typeof accountOrId === 'string' ? { ...maybeAccount, id: accountOrId } : accountOrId;
-    const uid = account?.userId || userId || 'munboi';
-    const data = await sqliteFetch(`${API_BASE}/accounts/${encodeURIComponent(account.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...account, userId: uid }),
-    });
-    return data || account;
-  },
+  // ----- Operaciones masivas (lanzan ApiError: quien llama decide cómo informar) -----
+  bulkImport: (data, mode = 'replace') =>
+    request('/import', { method: 'POST', body: { ...data, mode }, timeout: 45000 }),
+  clearUserData: () => request('/clear', { method: 'POST', timeout: 20000 }),
+  resetUserData: () => request('/reset-demo', { method: 'POST', timeout: 30000 }),
 
-  async deleteAccount(accountId, userId = 'munboi') {
-    return await sqliteFetch(
-      `${API_BASE}/accounts/${encodeURIComponent(accountId)}?userId=${encodeURIComponent(userId)}`,
-      { method: 'DELETE' }
-    );
-  },
+  // ----- Base de datos (respaldo y snapshot: solo administrador) -----
+  backupDatabase: () => request('/database/backup', { method: 'POST', timeout: 30000 }),
+  getLatestSnapshot: () => request('/database/snapshot/latest'),
+  getDatabaseInfo: () => request('/database/info').catch(() => null),
 
-  async reorderAccounts(accountIds = [], userId = 'munboi') {
-    return await sqliteFetch(`${API_BASE}/accounts/reorder`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountIds, userId }),
-    });
-  },
-
-  // Transfers between accounts
-  async createTransfer(transferData, userId = 'munboi') {
-    return await sqliteFetch(`${API_BASE}/transfers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...transferData, userId }),
-    });
-  },
-
-  // Transactions
-  async getTransactions(userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/transactions?userId=${encodeURIComponent(userId)}`);
-    if (Array.isArray(data)) return data;
-    return getUserInitialData(userId).transactions;
-  },
-
-  async createTransaction(transaction, userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/transactions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...transaction, userId }),
-    });
-    return data || transaction;
-  },
-
-  async updateTransaction(transactionOrId, maybeTx, userId = 'munboi') {
-    const tx = typeof transactionOrId === 'string' ? { ...maybeTx, id: transactionOrId } : transactionOrId;
-    const uid = tx?.userId || userId || 'munboi';
-    const data = await sqliteFetch(`${API_BASE}/transactions/${encodeURIComponent(tx.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...tx, userId: uid }),
-    });
-    return data || tx;
-  },
-
-  async deleteTransaction(transactionId, userId = 'munboi') {
-    return await sqliteFetch(
-      `${API_BASE}/transactions/${encodeURIComponent(transactionId)}?userId=${encodeURIComponent(userId)}`,
-      { method: 'DELETE' }
-    );
-  },
-
-  // Subscriptions
-  async getSubscriptions(userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/subscriptions?userId=${encodeURIComponent(userId)}`);
-    if (Array.isArray(data)) return data;
-    return getUserInitialData(userId).subscriptions;
-  },
-
-  async createSubscription(subscription, userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/subscriptions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...subscription, userId }),
-    });
-    return data || subscription;
-  },
-
-  async updateSubscription(subOrId, maybeSub, userId = 'munboi') {
-    const subscription = typeof subOrId === 'string' ? { ...maybeSub, id: subOrId } : subOrId;
-    const uid = subscription?.userId || userId || 'munboi';
-    const data = await sqliteFetch(`${API_BASE}/subscriptions/${encodeURIComponent(subscription.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...subscription, userId: uid }),
-    });
-    return data || subscription;
-  },
-
-  async toggleSubscription(id) {
-    const data = await sqliteFetch(`${API_BASE}/subscriptions/${encodeURIComponent(id)}/toggle`, {
-      method: 'PATCH',
-    });
-    return data || null;
-  },
-
-  async deleteSubscription(id, userId = 'munboi') {
-    return await sqliteFetch(
-      `${API_BASE}/subscriptions/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`,
-      { method: 'DELETE' }
-    );
-  },
-
-  // Debts
-  async getDebts(userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/debts?userId=${encodeURIComponent(userId)}`);
-    if (Array.isArray(data)) return data;
-    return getUserInitialData(userId).debts;
-  },
-
-  async createDebt(debt, userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/debts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...debt, userId }),
-    });
-    return data || debt;
-  },
-
-  async updateDebt(debtOrId, maybeDebt, userId = 'munboi') {
-    const debt = typeof debtOrId === 'string' ? { ...maybeDebt, id: debtOrId } : debtOrId;
-    const uid = debt?.userId || userId || 'munboi';
-    const data = await sqliteFetch(`${API_BASE}/debts/${encodeURIComponent(debt.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...debt, userId: uid }),
-    });
-    return data || debt;
-  },
-
-  async deleteDebt(id, userId = 'munboi') {
-    return await sqliteFetch(
-      `${API_BASE}/debts/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`,
-      { method: 'DELETE' }
-    );
-  },
-
-  async addDebtPayment(debtId, payment, userId = 'munboi') {
-    const data = await sqliteFetch(`${API_BASE}/debts/${encodeURIComponent(debtId)}/payment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment, userId }),
-    });
-    return data || payment;
-  },
-
-  // Bulk Import / Sync
-  async bulkImport(data, mode = 'replace', userId = 'munboi') {
-    return await sqliteFetch(`${API_BASE}/import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, mode, userId }),
-      timeout: 40000,
-    });
-  },
-
-  // Clear or Reset User Data in SQLite
-  async clearUserData(userId = 'munboi') {
-    return await sqliteFetch(`${API_BASE}/clear`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-      timeout: 15000,
-    });
-  },
-
-  async resetUserData(userId = 'munboi') {
-    return await sqliteFetch(`${API_BASE}/reset-demo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-      timeout: 20000,
-    });
-  },
-
-  // Database Backup, Snapshot & Restore
-  async backupDatabase() {
-    return await sqliteFetch(`${API_BASE}/database/backup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 30000,
-    });
-  },
-
-  async restoreDatabase(snapshotOrUseLatest = true) {
-    const body =
-      typeof snapshotOrUseLatest === 'object' && snapshotOrUseLatest !== null
-        ? { snapshot: snapshotOrUseLatest }
-        : { useLatest: true };
-    return await sqliteFetch(`${API_BASE}/database/restore`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      timeout: 45000,
-    });
-  },
-
-  async getLatestSnapshot() {
-    return await sqliteFetch(`${API_BASE}/database/snapshot/latest`, {
-      timeout: 15000,
-    });
-  },
-
-  async getDatabaseInfo() {
-    return await sqliteFetch(`${API_BASE}/database/info`);
-  },
-
-  // Prisma Capital OS Settings & Bucket Allocations
-  async getPrismaSettings(userId) {
-    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
-    return await sqliteFetch(`${API_BASE}/prisma${query}`);
-  },
-
-  async savePrismaSettings(settings, userId) {
-    return await sqliteFetch(`${API_BASE}/prisma`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...settings, userId }),
-    });
-  },
+  // ----- Prisma Capital OS -----
+  getPrismaSettings: () => request('/prisma').catch(() => null),
+  savePrismaSettings: (settings) => request('/prisma', { method: 'POST', body: settings }).catch(() => null),
 };

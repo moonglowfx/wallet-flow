@@ -16,7 +16,7 @@ import {
   formatNativeCurrency,
   TIMEFRAME_CONFIG,
   DEFAULT_USD_COP_RATE,
-} from '../data/mockData.js';
+} from '../data/finance.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
 
 export const HeroCard = ({
@@ -85,7 +85,7 @@ export const HeroCard = ({
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-purple-200/50 to-transparent" />
       {/* Dynamic Moving Liquid Glow Orbs */}
       <div className="pointer-events-none absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-br from-purple-500/30 to-fuchsia-600/25 blur-3xl animate-float-orb-1" />
-      <div className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-gradient-to-tr from-indigo-600/20 to-purple-800/18 blur-3xl animate-float-orb-2" />
+      <div className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full bg-gradient-to-tr from-indigo-600/20 to-purple-800/[0.18] blur-3xl animate-float-orb-2" />
 
       {/* Top Banner Row */}
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-5 sm:mb-6">

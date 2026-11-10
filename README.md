@@ -67,6 +67,39 @@ Aplicación web de finanzas personales de nivel empresarial, diseñada bajo la e
 
 ---
 
+## 🔐 Autenticación, Sesiones y Seguridad (v3)
+
+- **Registro e inicio de sesión:** la pantalla inicial pide únicamente `Usuario` y `PIN` (4 dígitos). El usuario se escribe en un campo de texto (sin distinguir mayúsculas); no hay selección de usuarios por botones.
+- **Sesión de 30 días por dispositivo:** al autenticarse, el servidor emite una cookie `wf_session` `HttpOnly` + `SameSite=Lax` (+ `Secure` bajo HTTPS) con un token firmado HMAC-SHA256 y `Max-Age` de 30 días.
+- **PIN nunca en claro:** se almacena con `scrypt` + sal aleatoria y jamás viaja al cliente. Los PIN heredados en texto plano se migran a hash automáticamente en el primer arranque.
+- **Anti fuerza bruta:** 5 intentos fallidos bloquean la cuenta 15 min, con bloqueo exponencial hasta 24 h (contador atómico en base de datos, válido en serverless).
+- **Aislamiento por usuario:** la identidad sale exclusivamente del token firmado; cualquier `userId` enviado por el cliente se ignora. Respaldos y restauración globales requieren usuario administrador.
+- **Cambio de PIN:** invalida la sesión en todos los demás dispositivos.
+
+### Variables de entorno
+
+| Variable | Descripción |
+| --- | --- |
+| `SESSION_SECRET` | Recomendado en producción (≥ 32 caracteres). Si falta, se genera uno aleatorio y se persiste en la base de datos. |
+| `ALLOW_REGISTRATION` | `false` deshabilita el registro de nuevos usuarios. Por defecto está abierto. |
+| `SEED_DEMO_DATA` | `false` evita sembrar el portafolio demo en una base local vacía (en Vercel nunca se siembra). |
+
+### Arquitectura del servidor
+
+```
+server/
+  index.js        Ensamblado de Express (rutas públicas de auth + rutas protegidas)
+  db.js           Cliente libSQL, esquema versionado, migraciones aditivas y transacciones
+  auth.js         Cookie de sesión firmada, requireAuth / requireAdmin
+  security.js     scrypt, tokens HMAC, validación de usuario y PIN
+  models.js       Normalización de entidades y constructores SQL compartidos
+  http.js         Errores tipados, limitador y manejador de errores central
+  routes/         auth · accounts · transactions · commitments · data · prisma
+  seedData.js     Portafolio demo (solo servidor: nunca viaja en el bundle del cliente)
+```
+
+---
+
 ## 💻 Instalación y Ejecución Local
 
 ```bash

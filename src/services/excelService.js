@@ -1,4 +1,4 @@
-import { DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { DEFAULT_USD_COP_RATE } from '../data/finance.js';
 
 // Dynamic loader for XLSX: avoids bundling 500 KB into initial bundle load
 let xlsxModule = null;

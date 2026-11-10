@@ -15,7 +15,7 @@ import {
   Clock,
   X,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth, createId } from '../data/finance.js';
 import { api } from '../services/api.js';
 
 export const SubscriptionsView = ({
@@ -103,7 +103,7 @@ export const SubscriptionsView = ({
     const nextAutoCharge = sub.autoCharge === false ? true : false;
     const updated = { ...sub, autoCharge: nextAutoCharge };
     setSubscriptions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    api.updateSubscription(updated, currentUser?.id || 'munboi').catch((err) =>
+    api.updateSubscription(updated).catch((err) =>
       console.error('Error SQLite toggleAutoCharge:', err)
     );
   };
@@ -130,7 +130,7 @@ export const SubscriptionsView = ({
     const existing = editingSubId ? subscriptions.find((s) => s.id === editingSubId) : null;
 
     const subPayload = {
-      id: editingSubId || `sub-${Date.now()}`,
+      id: editingSubId || createId('sub'),
       name: name.trim(),
       category,
       amount: Math.round(finalUSDAmount * 100) / 100,
@@ -144,12 +144,12 @@ export const SubscriptionsView = ({
 
     if (editingSubId) {
       setSubscriptions((prev) => prev.map((s) => (s.id === editingSubId ? subPayload : s)));
-      api.updateSubscription(subPayload, currentUser?.id || 'munboi').catch((err) =>
+      api.updateSubscription(subPayload).catch((err) =>
         console.error('Error SQLite updateSubscription:', err)
       );
     } else {
       setSubscriptions([subPayload, ...subscriptions]);
-      api.createSubscription(subPayload, currentUser?.id || 'munboi').catch((err) =>
+      api.createSubscription(subPayload).catch((err) =>
         console.error('Error SQLite createSubscription:', err)
       );
     }
@@ -162,7 +162,7 @@ export const SubscriptionsView = ({
   const handleDeleteSub = (id) => {
     setSubscriptions((prev) => prev.filter((s) => s.id !== id));
     api
-      .deleteSubscription(id, currentUser?.id || 'munboi')
+      .deleteSubscription(id)
       .catch((err) => console.error('Error SQLite deleteSubscription:', err));
     setEditingSubId(null);
     setShowAddModal(false);

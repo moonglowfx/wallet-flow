@@ -19,7 +19,8 @@ import {
   EXPENSE_CATEGORIES,
   formatNativeCurrency,
   DEFAULT_USD_COP_RATE,
-} from '../data/mockData.js';
+  todayLocalISO,
+} from '../data/finance.js';
 
 export const TransactionModal = ({
   isOpen,
@@ -40,7 +41,7 @@ export const TransactionModal = ({
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id || accounts[0]?.id || '');
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayLocalISO());
   const [notes, setNotes] = useState('');
   const [isAntExpense, setIsAntExpense] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +66,7 @@ export const TransactionModal = ({
           editingTransaction.category ||
             (editingTransaction.type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0])
         );
-        setDate(editingTransaction.date || new Date().toISOString().split('T')[0]);
+        setDate(editingTransaction.date || todayLocalISO());
         setNotes(editingTransaction.notes || '');
         setIsAntExpense(Boolean(editingTransaction.isAntExpense));
       } else {
@@ -83,7 +84,7 @@ export const TransactionModal = ({
           setInputCurrency(currency || 'USD');
         }
         setCategory(EXPENSE_CATEGORIES[0]);
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(todayLocalISO());
         setNotes('');
         setIsAntExpense(false);
       }

@@ -31,7 +31,7 @@ import {
   DEFAULT_USD_COP_RATE,
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
-} from '../data/mockData.js';
+} from '../data/finance.js';
 import { api } from '../services/api.js';
 import { AnimatedCounter } from './AnimatedCounter.jsx';
 
@@ -119,7 +119,7 @@ export const AccountsView = ({
     });
     setAccounts(updated);
     if (editedObj) {
-      api.updateAccount(editedObj.id, editedObj, currentUser?.id || 'munboi');
+      api.updateAccount(editedObj.id, editedObj);
     }
     setEditingAccount(null);
     if (showToast) showToast('Cuenta actualizada en SQLite');
@@ -131,7 +131,7 @@ export const AccountsView = ({
     if (!setAccounts) return;
     setAccounts(newAccs);
     const orderIds = newAccs.map((a) => a.id);
-    await api.reorderAccounts(orderIds, currentUser?.id || 'munboi');
+    await api.reorderAccounts(orderIds);
     if (showToast) showToast('Orden de cuentas guardado');
   };
 
@@ -429,10 +429,10 @@ export const AccountsView = ({
                           type="button"
                           disabled={accounts.findIndex((a) => a.id === acc.id) === 0}
                           onClick={(e) => handleMoveAccount(acc.id, -1, e)}
-                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
                           title="Mover cuenta hacia la izquierda / arriba"
                         >
-                          <ChevronLeft className="w-3 h-3" />
+                          <ChevronLeft className="w-4 h-4" />
                         </button>
                         <span
                           className="px-0.5 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing"
@@ -444,10 +444,10 @@ export const AccountsView = ({
                           type="button"
                           disabled={accounts.findIndex((a) => a.id === acc.id) === accounts.length - 1}
                           onClick={(e) => handleMoveAccount(acc.id, 1, e)}
-                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none cursor-pointer transition-colors"
                           title="Mover cuenta hacia la derecha / abajo"
                         >
-                          <ChevronRight className="w-3 h-3" />
+                          <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
                     )}

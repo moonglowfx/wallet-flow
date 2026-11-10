@@ -17,7 +17,7 @@ import {
   TIMEFRAME_CONFIG,
   DEFAULT_USD_COP_RATE,
   filterTransactionsByPeriod,
-} from '../data/mockData.js';
+} from '../data/finance.js';
 
 export const DashboardView = ({
   accounts = [],

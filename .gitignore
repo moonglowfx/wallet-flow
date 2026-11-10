@@ -42,3 +42,6 @@ backups/wallet_flow_snapshot_20*.json
 
 # Vercel
 .vercel
+
+# Scratch de pruebas locales
+.tmp

@@ -12,7 +12,7 @@ import {
   Coins,
 } from 'lucide-react';
 import { downloadExcelTemplate, parseExcelFile } from '../services/excelService.js';
-import { DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { DEFAULT_USD_COP_RATE } from '../data/finance.js';
 
 export const ExcelImportModal = ({
   isOpen,

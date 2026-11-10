@@ -44,7 +44,8 @@ export async function createDatabaseBackup() {
         db.execute('SELECT * FROM subscriptions'),
         db.execute('SELECT * FROM debts'),
         db.execute('SELECT * FROM debt_payments'),
-        db.execute('SELECT * FROM app_state'),
+        // El secreto de firma de sesiones jamás se exporta a un respaldo.
+        db.execute("SELECT * FROM app_state WHERE key != 'session_secret'"),
         db.execute('SELECT * FROM prisma_settings').catch(() => ({ rows: [] })),
       ]);
 

@@ -35,12 +35,12 @@ import {
   DEFAULT_USD_COP_RATE,
   TIMEFRAME_CONFIG,
   filterTransactionsByPeriod,
-} from '../data/mockData.js';
+} from '../data/finance.js';
 
 const TIMEFRAMES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
 export const AIAdvisorView = ({
-  userId = 'munboi',
+  userId,
   accounts = [],
   transactions = [],
   subscriptions = [],

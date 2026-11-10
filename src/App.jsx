@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw, Wallet, WifiOff } from 'lucide-react';
 import { Navbar } from './components/Navbar.jsx';
 import { Header } from './components/Header.jsx';
 import { DashboardView } from './components/DashboardView.jsx';
@@ -7,12 +8,11 @@ import { CommitmentsView } from './components/CommitmentsView.jsx';
 import { MonthlyExpensesView } from './components/MonthlyExpensesView.jsx';
 import { TransactionModal } from './components/TransactionModal.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
-import { LoginModal } from './components/LoginModal.jsx';
-import { USERS, getUserInitialData } from './data/users.js';
-import { DEFAULT_USD_COP_RATE, isSubscriptionChargedInMonth } from './data/mockData.js';
+import { AuthScreen } from './components/AuthScreen.jsx';
+import { DEFAULT_USD_COP_RATE, createId, isSubscriptionChargedInMonth, todayLocalISO } from './data/finance.js';
 import { api } from './services/api.js';
 
-// Lazy-load heavier auxiliary views to make initial app load instantaneous
+// Vistas auxiliares pesadas: se cargan bajo demanda para acelerar el primer render
 const AIAdvisorView = React.lazy(() =>
   import('./components/AIAdvisorView.jsx').then((m) => ({ default: m.AIAdvisorView }))
 );
@@ -23,40 +23,124 @@ const SettingsView = React.lazy(() =>
 import { APP_VERSION, APP_BUILD_VERSION, APP_EDITION } from './version.js';
 export { APP_VERSION, APP_BUILD_VERSION, APP_EDITION };
 
+// ---------------------------------------------------------------------------
+// Caché local (solo acelera el arranque y permite consulta sin conexión; la fuente de verdad es el servidor)
+// ---------------------------------------------------------------------------
+const SESSION_USER_KEY = 'wf_session_user';
+const snapshotKey = (userId) => `wf_saved_state_${userId}`;
+const PRIVATE_KEY_PREFIXES = ['wf_saved_state_', 'wf_prisma_settings_'];
+const FOCUS_SYNC_MIN_INTERVAL_MS = 10000;
+const TOAST_DURATION_MS = 3200;
+
+const asArray = (value) => (Array.isArray(value) ? value : []);
+
+function readCachedSession() {
+  try {
+    const user = JSON.parse(localStorage.getItem(SESSION_USER_KEY) || 'null');
+    if (!user?.id) return null;
+    const snapshot = JSON.parse(localStorage.getItem(snapshotKey(user.id)) || 'null');
+    return { user, snapshot: snapshot && typeof snapshot === 'object' ? snapshot : null };
+  } catch {
+    return null;
+  }
+}
+
+/** Al cerrar sesión no debe quedar información financiera en el dispositivo. */
+function clearLocalSession() {
+  try {
+    localStorage.removeItem(SESSION_USER_KEY);
+    for (const key of Object.keys(localStorage)) {
+      if (PRIVATE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+    }
+    sessionStorage.removeItem('wf_session_unlocked'); // residuo de versiones anteriores
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Aritmética de saldos (idéntica a server/models.js -> signedAccountDelta)
+// ---------------------------------------------------------------------------
+const roundBalance = (value, currency) => (currency === 'COP' ? Math.round(value) : Math.round(value * 100) / 100);
+
+function txDelta(account, tx, rate) {
+  const usd = Number(tx.amount) || 0;
+  let magnitude = usd;
+  if (account.currency === 'COP') {
+    const original = Number(tx.originalAmount);
+    magnitude = tx.currency === 'COP' && Number.isFinite(original) ? original : usd * rate;
+  }
+  return tx.type === 'income' ? magnitude : -magnitude;
+}
+
+/** Aplica una lista de efectos `[transacción, signo]` sobre las cuentas (signo -1 revierte el movimiento). */
+function applyTxEffects(accounts, effects, rate) {
+  return accounts.map((account) => {
+    let delta = 0;
+    for (const [tx, sign] of effects) {
+      if (tx && tx.accountId === account.id) delta += sign * txDelta(account, tx, rate);
+    }
+    return delta === 0 ? account : { ...account, balance: roundBalance(account.balance + delta, account.currency) };
+  });
+}
+
+const SplashScreen = ({ message }) => (
+  <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#09080E] px-6 text-center select-none">
+    <div className="w-[60px] h-[60px] rounded-[20px] bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center border border-white/20 shadow-neon-purple animate-glow-pulse">
+      <Wallet className="w-[30px] h-[30px] text-white" aria-hidden="true" />
+    </div>
+    <div>
+      <p className="font-extrabold text-[17px] tracking-tight text-white">WALLET FLOW</p>
+      <p className="mt-1.5 text-xs text-zinc-400" role="status">
+        {message}
+      </p>
+    </div>
+  </div>
+);
+
+const OfflineScreen = ({ onRetry }) => (
+  <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#09080E] px-6 text-center">
+    <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/15 flex items-center justify-center">
+      <WifiOff className="w-6 h-6 text-purple-300" aria-hidden="true" />
+    </div>
+    <div className="max-w-xs">
+      <h1 className="text-lg font-black text-white">No pudimos conectar</h1>
+      <p className="mt-1.5 text-sm text-zinc-400">Revisa tu conexión a internet e inténtalo de nuevo.</p>
+    </div>
+    <button
+      type="button"
+      onClick={onRetry}
+      className="liquid-button-primary min-h-[48px] px-6 text-sm font-bold flex items-center gap-2 cursor-pointer"
+    >
+      <RefreshCw className="w-4 h-4" aria-hidden="true" />
+      <span>Reintentar</span>
+    </button>
+  </div>
+);
+
+const ViewFallback = ({ label }) => (
+  <div className="liquid-glass p-8 text-center text-purple-300 animate-pulse text-xs">{label}</div>
+);
+
 export function App() {
+  const [boot] = useState(readCachedSession);
+
+  // Sesión: 'loading' | 'guest' | 'authed' | 'offline'
+  const [authStatus, setAuthStatus] = useState(boot?.snapshot ? 'authed' : 'loading');
+  const [authNotice, setAuthNotice] = useState('');
+  const [currentUser, setCurrentUser] = useState(boot?.user ?? null);
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('monthly');
-  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
 
-  // Multi-user authentication state backed by SQLite: Munboi (PIN: 0800) | Tiago (PIN: 5678)
-  const [currentUser, setCurrentUser] = useState(() => USERS[0]);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.sessionStorage?.getItem('wf_session_unlocked') !== 'true';
-  });
+  const [currency, setCurrency] = useState(boot?.user?.currency || 'USD');
+  const [exchangeRate, setExchangeRate] = useState(Number(boot?.user?.exchangeRate) || DEFAULT_USD_COP_RATE);
 
-  // Currency State persisted in SQLite per user: USD as primary, COP as secondary
-  const [currency, setCurrency] = useState('USD');
-  const [exchangeRate, setExchangeRate] = useState(DEFAULT_USD_COP_RATE);
-
-  // Isolated Application Data State per User (seeded immediately and synced with SQLite)
-  const [accounts, setAccounts] = useState(() => getUserInitialData(USERS[0].id).accounts);
-  const [transactions, setTransactions] = useState(() => getUserInitialData(USERS[0].id).transactions);
-  const [subscriptions, setSubscriptions] = useState(() => getUserInitialData(USERS[0].id).subscriptions);
-  const [debts, setDebts] = useState(() => getUserInitialData(USERS[0].id).debts);
-
-  // Dynamically compute available fiscal years from transactions (newest to oldest)
-  const availableYears = React.useMemo(() => {
-    const yrSet = new Set();
-    transactions.forEach((t) => {
-      if (t.date && t.date.length >= 4) {
-        yrSet.add(t.date.slice(0, 4));
-      }
-    });
-    const sorted = Array.from(yrSet).sort((a, b) => b.localeCompare(a));
-    if (sorted.length === 0) return ['2026', 'all'];
-    return [...sorted, 'all'];
-  }, [transactions]);
+  const [accounts, setAccounts] = useState(() => asArray(boot?.snapshot?.accounts));
+  const [transactions, setTransactions] = useState(() => asArray(boot?.snapshot?.transactions));
+  const [subscriptions, setSubscriptions] = useState(() => asArray(boot?.snapshot?.subscriptions));
+  const [debts, setDebts] = useState(() => asArray(boot?.snapshot?.debts));
 
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -64,488 +148,409 @@ export function App() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
-  const activeUserRef = React.useRef(currentUser.id);
-  const isSwitchingUserRef = React.useRef(false);
 
-  const showToast = useCallback((msg) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3200);
+  const toastTimerRef = useRef(null);
+  const syncSeqRef = useRef(0);
+  const lastSyncAtRef = useRef(0);
+  const resyncTimerRef = useRef(null);
+  const isChargingRef = useRef(false);
+  const userRef = useRef(currentUser);
+  userRef.current = currentUser;
+
+  const rate = exchangeRate || DEFAULT_USD_COP_RATE;
+
+  const showToast = useCallback((message) => {
+    clearTimeout(toastTimerRef.current);
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), TOAST_DURATION_MS);
   }, []);
 
-  // Load user data directly from SQLite database
-  const loadUserFromSQLite = useCallback(async (targetUserId) => {
-    const state = await api.getState(targetUserId);
-    if (state && !state.error && state.user) {
-      if (!targetUserId) {
-        const isSessionUnlocked =
-          typeof window !== 'undefined' &&
-          window.sessionStorage?.getItem('wf_session_unlocked') === 'true';
-        setIsLoginModalOpen(!isSessionUnlocked);
-      }
-      if (state.user) {
-        setCurrentUser((prev) => ({
-          ...prev,
-          ...state.user,
-        }));
-        if (state.user.currency) setCurrency(state.user.currency);
-        if (state.user.exchangeRate) setExchangeRate(Number(state.user.exchangeRate));
-      }
-      if (Array.isArray(state.accounts)) setAccounts(state.accounts);
-      if (Array.isArray(state.transactions)) setTransactions(state.transactions);
-      if (Array.isArray(state.subscriptions)) setSubscriptions(state.subscriptions);
-      if (Array.isArray(state.debts)) setDebts(state.debts);
-      return;
-    }
+  // ----------------- SINCRONIZACIÓN CON EL SERVIDOR -----------------
+  const applyState = useCallback((state) => {
+    setCurrentUser(state.user);
+    setCurrency(state.user.currency || 'USD');
+    setExchangeRate(Number(state.user.exchangeRate) || DEFAULT_USD_COP_RATE);
+    setAccounts(asArray(state.accounts));
+    setTransactions(asArray(state.transactions));
+    setSubscriptions(asArray(state.subscriptions));
+    setDebts(asArray(state.debts));
+    setAuthStatus('authed');
+    setAuthNotice('');
+    lastSyncAtRef.current = Date.now();
+  }, []);
 
-    // Resilient fallback: restore saved manual changes from offline backup before mock
-    const uid = targetUserId || 'munboi';
-    if (typeof window !== 'undefined') {
+  /**
+   * Descarga el estado del servidor y lo aplica solo si sigue siendo válido:
+   *  - se descarta si hubo una lectura más reciente (respuestas fuera de orden), y
+   *  - se descarta si hay o hubo escrituras desde que inició (no pisar cambios optimistas con datos viejos).
+   * `force` se usa al hidratar tras el login, cuando aún no existe estado local que proteger.
+   */
+  const refresh = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && api.isWriting) return false;
+      const seq = ++syncSeqRef.current;
+      const epoch = api.writeEpoch;
       try {
-        const saved = localStorage.getItem(`wf_saved_state_${uid}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
-          if (Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
-          if (Array.isArray(parsed.subscriptions)) setSubscriptions(parsed.subscriptions);
-          if (Array.isArray(parsed.debts)) setDebts(parsed.debts);
-          return;
-        }
-      } catch (_) {}
-    }
+        const state = await api.getState();
+        if (seq !== syncSeqRef.current) return false;
+        if (!force && (api.isWriting || epoch !== api.writeEpoch)) return false;
+        applyState(state);
+        return true;
+      } catch (err) {
+        if (err.status === 401) return false; // ya gestionado por onUnauthorized
+        throw err;
+      }
+    },
+    [applyState]
+  );
 
-    const initial = getUserInitialData(uid);
-    setAccounts(initial.accounts);
-    setTransactions(initial.transactions);
-    setSubscriptions(initial.subscriptions);
-    setDebts(initial.debts);
+  /** Resincroniza cuando no queden escrituras en vuelo (tras un guardado rechazado por el servidor). */
+  const scheduleResync = useCallback(() => {
+    clearTimeout(resyncTimerRef.current);
+    resyncTimerRef.current = setTimeout(() => {
+      if (api.isWriting) return scheduleResync();
+      return refresh().catch(() => {});
+    }, 400);
+  }, [refresh]);
+
+  const resetSession = useCallback((notice = '') => {
+    clearLocalSession();
+    clearTimeout(resyncTimerRef.current);
+    syncSeqRef.current += 1; // invalida cualquier lectura en vuelo de la sesión anterior
+    setCurrentUser(null);
+    setAccounts([]);
+    setTransactions([]);
+    setSubscriptions([]);
+    setDebts([]);
+    setSelectedAccountId(null);
+    setEditingTransaction(null);
+    setIsTransactionModalOpen(false);
+    setIsAccountModalOpen(false);
+    setActiveTab('dashboard');
+    setAuthNotice(notice);
+    setAuthStatus('guest');
   }, []);
 
-  // Initial load from SQLite on mount
+  // Manejadores globales del cliente API
   useEffect(() => {
-    loadUserFromSQLite();
-  }, [loadUserFromSQLite]);
-
-  // Sincronización automática en segundo plano al enfocar pestaña o recuperar internet (estabilidad multi-dispositivo)
-  useEffect(() => {
-    const handleSyncOnFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !isSwitchingUserRef.current) {
-        loadUserFromSQLite(activeUserRef.current);
-      }
-    };
-    const handleSyncOnOnline = () => {
-      loadUserFromSQLite(activeUserRef.current);
-      showToast('🌐 Conexión restablecida: datos sincronizados');
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('visibilitychange', handleSyncOnFocus);
-      window.addEventListener('online', handleSyncOnOnline);
-    }
-
+    api.onUnauthorized(() => resetSession(userRef.current ? 'Tu sesión expiró. Inicia sesión de nuevo.' : ''));
+    api.onWriteError((err) => {
+      showToast(`⚠️ No se pudo guardar: ${err.message}`);
+      scheduleResync();
+    });
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('visibilitychange', handleSyncOnFocus);
-        window.removeEventListener('online', handleSyncOnOnline);
-      }
+      api.onUnauthorized(null);
+      api.onWriteError(null);
     };
-  }, [loadUserFromSQLite, showToast]);
+  }, [resetSession, scheduleResync, showToast]);
 
-  // Persist currency change in SQLite
-  const handleSetCurrency = useCallback(
-    (nextCurrency) => {
-      setCurrency(nextCurrency);
-      api.updateUser(currentUser.id, { currency: nextCurrency });
+  // Arranque: valida la cookie de sesión y carga los datos (la UI ya muestra la caché si existía)
+  useEffect(() => {
+    let cancelled = false;
+    refresh({ force: true }).catch(() => {
+      if (cancelled) return;
+      if (boot?.snapshot) showToast('Sin conexión: mostrando tus últimos datos guardados');
+      else setAuthStatus('offline');
+    });
+    return () => {
+      cancelled = true;
+      clearTimeout(toastTimerRef.current);
+      clearTimeout(resyncTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sincronización al volver a la pestaña o recuperar la conexión (multi-dispositivo)
+  useEffect(() => {
+    if (authStatus !== 'authed') return undefined;
+
+    const syncOnFocus = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastSyncAtRef.current < FOCUS_SYNC_MIN_INTERVAL_MS) return;
+      refresh().catch(() => {});
+    };
+    const syncOnOnline = () => {
+      refresh()
+        .then((applied) => applied && showToast('🌐 Conexión restablecida: datos sincronizados'))
+        .catch(() => {});
+    };
+
+    document.addEventListener('visibilitychange', syncOnFocus);
+    window.addEventListener('online', syncOnOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', syncOnFocus);
+      window.removeEventListener('online', syncOnOnline);
+    };
+  }, [authStatus, refresh, showToast]);
+
+  // Instantánea local con debounce para arranque inmediato y consulta sin conexión
+  useEffect(() => {
+    if (authStatus !== 'authed' || !currentUser?.id) return undefined;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser));
+        localStorage.setItem(
+          snapshotKey(currentUser.id),
+          JSON.stringify({ accounts, transactions, subscriptions, debts, currency, exchangeRate, updatedAt: Date.now() })
+        );
+      } catch {
+        /* cuota excedida o almacenamiento no disponible */
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [authStatus, accounts, transactions, subscriptions, debts, currency, exchangeRate, currentUser]);
+
+  // ----------------- SESIÓN -----------------
+  const hydrate = useCallback(async () => {
+    setAuthStatus('loading');
+    try {
+      await refresh({ force: true });
+      return true;
+    } catch {
+      setAuthStatus('offline');
+      return false;
+    }
+  }, [refresh]);
+
+  const handleAuthenticated = useCallback(
+    async (user) => {
+      setCurrentUser(user);
+      if (await hydrate()) showToast(`Hola, ${user.displayName || user.username} 👋`);
     },
-    [currentUser.id]
+    [hydrate, showToast]
   );
 
-  // Persist exchange rate change in SQLite
-  const handleSetExchangeRate = useCallback(
-    (nextRate) => {
-      setExchangeRate(nextRate);
-      api.updateUser(currentUser.id, { exchangeRate: nextRate });
-    },
-    [currentUser.id]
-  );
+  const handleLogout = useCallback(async () => {
+    if (!window.confirm('¿Cerrar sesión en este dispositivo? Tendrás que ingresar tu usuario y PIN de nuevo.')) return;
+    await api.logout();
+    resetSession();
+  }, [resetSession]);
 
-  // When active user switches, persist session in SQLite and load their isolated data
-  const handleLoginSuccess = async (user) => {
-    isSwitchingUserRef.current = true;
-    setCurrentUser(user);
-    if (typeof window !== 'undefined') {
-      window.sessionStorage?.setItem('wf_session_unlocked', 'true');
-    }
-    setIsLoginModalOpen(false);
-    setSelectedAccountId(null);
+  // ----------------- PREFERENCIAS DE DIVISA -----------------
+  const handleSetCurrency = useCallback((nextCurrency) => {
+    setCurrency(nextCurrency);
+    setCurrentUser((prev) => (prev ? { ...prev, currency: nextCurrency } : prev));
+    api.updateProfile({ currency: nextCurrency });
+  }, []);
 
-    // Load immediate baseline while SQLite responds
-    const initial = getUserInitialData(user.id);
-    setAccounts(initial.accounts);
-    setTransactions(initial.transactions);
-    setSubscriptions(initial.subscriptions);
-    setDebts(initial.debts);
+  const handleSetExchangeRate = useCallback((nextRate) => {
+    setExchangeRate(nextRate);
+    setCurrentUser((prev) => (prev ? { ...prev, exchangeRate: nextRate } : prev));
+    api.updateProfile({ exchangeRate: nextRate });
+  }, []);
 
-    await api.setActiveSession(user.id);
-    await loadUserFromSQLite(user.id);
-    activeUserRef.current = user.id;
-    isSwitchingUserRef.current = false;
-    showToast(`Sesión activa en SQLite: ${user.username} (${user.role})`);
-  };
-
-  // Reset clean data only for current user in SQLite
-  const handleResetDemoData = async () => {
-    const initial = getUserInitialData(currentUser.id);
-    setAccounts(initial.accounts);
-    setTransactions(initial.transactions);
-    setSubscriptions(initial.subscriptions);
-    setDebts(initial.debts);
-    setSelectedAccountId(null);
-
-    await api.resetUserData(currentUser.id);
-    await loadUserFromSQLite(currentUser.id);
-    showToast(`Datos SQLite de ${currentUser.username} restablecidos`);
-  };
-
-  const calcDelta = (acc, tx) => {
-    if (!acc || !tx) return 0;
-    const isInc = tx.type === 'income';
-    const txCur = tx.currency || 'USD';
-    const accCur = acc.currency || 'USD';
-    const orig = Number.isFinite(Number(tx.originalAmount)) ? Number(tx.originalAmount) : Number(tx.amount) || 0;
-    const usd = Number(tx.amount) || 0;
-    let mag = 0;
-    if (accCur === 'COP') {
-      mag = txCur === 'COP' ? orig : usd * (exchangeRate || DEFAULT_USD_COP_RATE);
-    } else {
-      mag = usd;
-    }
-    return isInc ? mag : -mag;
-  };
-
-  // Handle adding or editing a transaction and updating linked account balances in SQLite
-  const handleSaveTransaction = async (txData) => {
+  // ----------------- MOVIMIENTOS (actualización optimista + persistencia atómica en servidor) -----------------
+  const handleSaveTransaction = (txData) => {
     if (txData.id) {
       const prevTx = transactions.find((t) => t.id === txData.id);
-      const updatedTx = {
-        ...prevTx,
-        ...txData,
-        userId: currentUser.id,
-      };
+      if (!prevTx) return;
+      const updatedTx = { ...prevTx, ...txData };
 
       setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)));
-
-      if (prevTx) {
-        setAccounts((prevAccs) =>
-          prevAccs.map((acc) => {
-            const oldDelta = calcDelta(acc, prevTx);
-            const newDelta = calcDelta(acc, updatedTx);
-            if (prevTx.accountId === updatedTx.accountId && acc.id === updatedTx.accountId) {
-              const diff = newDelta - oldDelta;
-              const nextBal = acc.balance + diff;
-              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-            }
-            if (acc.id === prevTx.accountId) {
-              const nextBal = acc.balance - oldDelta;
-              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-            }
-            if (acc.id === updatedTx.accountId) {
-              const nextBal = acc.balance + newDelta;
-              return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-            }
-            return acc;
-          })
-        );
-      }
-
+      setAccounts((prev) => applyTxEffects(prev, [[prevTx, -1], [updatedTx, 1]], rate));
       setEditingTransaction(null);
-      await api.updateTransaction(updatedTx.id, updatedTx, currentUser.id);
+      api.updateTransaction(updatedTx);
       showToast(`Movimiento actualizado: ${updatedTx.title}`);
       return;
     }
 
-    const newTx = {
-      id: `tx-${Date.now()}`,
-      userId: currentUser.id,
-      ...txData,
-    };
-
+    const newTx = { ...txData, id: createId('tx') };
     setTransactions((prev) => [newTx, ...prev]);
-
-    setAccounts((prevAccounts) =>
-      prevAccounts.map((acc) => {
-        if (acc.id === newTx.accountId) {
-          const delta = calcDelta(acc, newTx);
-          const nextBal = acc.balance + delta;
-          return {
-            ...acc,
-            balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100,
-          };
-        }
-        return acc;
-      })
-    );
-
-    await api.createTransaction(newTx, currentUser.id);
-    showToast(`Movimiento guardado en SQLite: ${newTx.title}`);
+    setAccounts((prev) => applyTxEffects(prev, [[newTx, 1]], rate));
+    api.createTransaction(newTx);
+    showToast(`Movimiento guardado: ${newTx.title}`);
   };
 
-  const handleDeleteTransaction = async (txId) => {
+  const handleDeleteTransaction = (txId) => {
     const prevTx = transactions.find((t) => t.id === txId);
+    if (!prevTx) return;
+
     setTransactions((prev) => prev.filter((t) => t.id !== txId));
-
-    if (prevTx) {
-      setAccounts((prevAccs) =>
-        prevAccs.map((acc) => {
-          if (acc.id === prevTx.accountId) {
-            const delta = calcDelta(acc, prevTx);
-            const nextBal = acc.balance - delta;
-            return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-          }
-          return acc;
-        })
-      );
-    }
-
+    setAccounts((prev) => applyTxEffects(prev, [[prevTx, -1]], rate));
     setEditingTransaction(null);
-    await api.deleteTransaction(txId, currentUser.id);
-    showToast('Movimiento eliminado de SQLite');
+    api.deleteTransaction(txId);
+    showToast('Movimiento eliminado');
   };
 
-  const handleSaveTransfer = async ({ fromAccountId, toAccountId, amount, currency: trfCur, date, notes }) => {
+  const handleSaveTransfer = ({ fromAccountId, toAccountId, amount, currency: trfCur, date, notes }) => {
     const fromAcc = accounts.find((a) => a.id === fromAccountId);
     const toAcc = accounts.find((a) => a.id === toAccountId);
-    if (!fromAcc || !toAcc) return;
-
-    const rate = exchangeRate || DEFAULT_USD_COP_RATE;
     const numAmt = Number(amount) || 0;
-    const usdAmount = trfCur === 'COP' ? Math.round((numAmt / rate) * 100) / 100 : Math.round(numAmt * 100) / 100;
-    const txDate = date || new Date().toISOString().split('T')[0];
+    if (!fromAcc || !toAcc || fromAcc.id === toAcc.id || numAmt <= 0) return;
 
-    const nowTs = Date.now();
-    const outTx = {
-      id: `tx-trf-out-${nowTs}`,
-      title: `Transferencia a ${toAcc.name}`,
-      amount: usdAmount,
+    const base = {
+      amount: trfCur === 'COP' ? Math.round((numAmt / rate) * 100) / 100 : Math.round(numAmt * 100) / 100,
       originalAmount: numAmt,
       currency: trfCur,
-      type: 'expense',
       category: 'Transferencias & Cambio',
-      accountId: fromAccountId,
-      date: txDate,
-      notes: notes || `Transferencia enviada hacia ${toAcc.name}`,
-      userId: currentUser.id,
+      date: date || todayLocalISO(),
       isAntExpense: false,
     };
-
+    const outTx = {
+      ...base,
+      id: createId('tx-trf-out'),
+      title: `Transferencia a ${toAcc.name}`,
+      type: 'expense',
+      accountId: fromAccountId,
+      notes: notes || `Transferencia enviada hacia ${toAcc.name}`,
+    };
     const inTx = {
-      id: `tx-trf-in-${nowTs + 1}`,
+      ...base,
+      id: createId('tx-trf-in'),
       title: `Transferencia desde ${fromAcc.name}`,
-      amount: usdAmount,
-      originalAmount: numAmt,
-      currency: trfCur,
       type: 'income',
-      category: 'Transferencias & Cambio',
       accountId: toAccountId,
-      date: txDate,
       notes: notes || `Transferencia recibida desde ${fromAcc.name}`,
-      userId: currentUser.id,
-      isAntExpense: false,
     };
 
     setTransactions((prev) => [outTx, inTx, ...prev]);
-
-    setAccounts((prevAccs) =>
-      prevAccs.map((acc) => {
-        if (acc.id === fromAccountId) {
-          const delta = calcDelta(acc, outTx);
-          const nextBal = acc.balance + delta;
-          return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-        }
-        if (acc.id === toAccountId) {
-          const delta = calcDelta(acc, inTx);
-          const nextBal = acc.balance + delta;
-          return { ...acc, balance: acc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100 };
-        }
-        return acc;
-      })
-    );
-
-    await api.createTransfer({
+    setAccounts((prev) => applyTxEffects(prev, [[outTx, 1], [inTx, 1]], rate));
+    // Los ids viajan al servidor para que el estado optimista y el persistido coincidan.
+    api.createTransfer({
       fromAccountId,
       toAccountId,
       amount: numAmt,
       currency: trfCur,
-      date: txDate,
+      date: base.date,
       notes,
-      userId: currentUser.id,
+      outId: outTx.id,
+      inId: inTx.id,
     });
-
     showToast(`Transferencia realizada: ${fromAcc.name} ➔ ${toAcc.name}`);
   };
 
-  // Automatic execution of active subscriptions / fixed expenses on billing dates
+  /**
+   * Ejecuta los gastos fijos vencidos del mes. Es seguro ante doble disparo: un candado local evita la
+   * reentrada y el id determinista `auto-sub-<sub>-<mes>` hace el alta idempotente en el servidor
+   * (dos dispositivos cobrando a la vez generan un solo cargo).
+   */
   const handleExecuteDueSubscriptions = useCallback(
     async (subsToProcess, accsToProcess, txsToProcess, forceManual = false) => {
-      if (!forceManual && typeof window !== 'undefined') {
-        const stored = localStorage.getItem(`wf_autocharge_enabled_${currentUser.id}`);
-        if (stored === 'false') return { executed: 0, reason: 'global_paused' };
+      if (isChargingRef.current || !currentUser) return { executed: 0 };
+      if (!forceManual && localStorage.getItem(`wf_autocharge_enabled_${currentUser.id}`) === 'false') {
+        return { executed: 0, reason: 'global_paused' };
       }
 
-      const activeSubs = (subsToProcess || subscriptions || []).filter((s) => s.active);
-      if (activeSubs.length === 0) return { executed: 0 };
-
       const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-      const currentDay = now.getDate();
-      const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-      const currentTxs = txsToProcess || transactions || [];
+      const monthPrefix = todayLocalISO(now).slice(0, 7);
+      const today = now.getDate();
+      const knownTxs = txsToProcess || transactions;
+      const knownAccounts = accsToProcess || accounts;
 
-      const dueSubs = activeSubs.filter((sub) => {
-        if (sub.autoCharge === false) return false;
-        const billingDay = Number(sub.billingDay) || 1;
-        if (currentDay < billingDay) return false;
-        return !isSubscriptionChargedInMonth(sub, currentTxs, monthPrefix);
-      });
-
+      const dueSubs = (subsToProcess || subscriptions).filter(
+        (sub) =>
+          sub.active &&
+          sub.autoCharge !== false &&
+          today >= (Number(sub.billingDay) || 1) &&
+          !isSubscriptionChargedInMonth(sub, knownTxs, monthPrefix)
+      );
       if (dueSubs.length === 0) return { executed: 0 };
 
       const newTxs = [];
-      let updatedAccs = [...(accsToProcess || accounts || [])];
-
       for (const sub of dueSubs) {
+        const targetAcc = knownAccounts.find((a) => a.id === sub.accountId) || knownAccounts[0];
+        if (!targetAcc) continue; // sin cuentas no hay dónde cargar el gasto
         const billingDay = Number(sub.billingDay) || 1;
-        const safeDay = String(Math.min(28, billingDay)).padStart(2, '0');
-        const targetAcc = updatedAccs.find((a) => a.id === sub.accountId) || updatedAccs[0];
-
-        const autoTx = {
+        const amount = Number(sub.amount) || 0;
+        if (amount <= 0) continue;
+        newTxs.push({
           id: `auto-sub-${sub.id}-${monthPrefix}`,
           subscriptionId: sub.id,
           title: `${sub.name} (Gasto Fijo)`,
-          amount: Number(sub.amount) || 0,
-          originalAmount: Number(sub.amount) || 0,
+          amount,
+          originalAmount: amount,
           currency: 'USD',
           type: 'expense',
           category: sub.category || 'Suscripciones & Fijos',
-          accountId: targetAcc?.id || 'acc-bofa-checking',
-          date: `${monthPrefix}-${safeDay}`,
-          userId: currentUser.id,
+          accountId: targetAcc.id,
+          date: `${monthPrefix}-${String(Math.min(28, billingDay)).padStart(2, '0')}`,
           isRecurringAuto: true,
           notes: `Cobro automático recurrente ejecutado el día ${billingDay}`,
-        };
+        });
+      }
+      if (newTxs.length === 0) return { executed: 0 };
 
-        newTxs.push(autoTx);
-
-        if (targetAcc) {
-          const delta = calcDelta(targetAcc, autoTx);
-          const nextBal = targetAcc.balance + delta;
-          const formattedBal = targetAcc.currency === 'COP' ? Math.round(nextBal) : Math.round(nextBal * 100) / 100;
-          updatedAccs = updatedAccs.map((a) => (a.id === targetAcc.id ? { ...a, balance: formattedBal } : a));
-        }
-
-        await api.createTransaction(autoTx, currentUser.id);
-        if (targetAcc) {
-          const updatedTarget = updatedAccs.find((a) => a.id === targetAcc.id);
-          await api.updateAccount(targetAcc.id, { balance: updatedTarget.balance }, currentUser.id);
-        }
+      isChargingRef.current = true;
+      try {
+        setTransactions((prev) => {
+          const existing = new Set(prev.map((t) => t.id));
+          return [...newTxs.filter((t) => !existing.has(t.id)), ...prev];
+        });
+        setAccounts((prev) => applyTxEffects(prev, newTxs.map((tx) => [tx, 1]), rate));
+        // El servidor ajusta el saldo de forma atómica junto con cada movimiento.
+        await Promise.all(newTxs.map((tx) => api.createTransaction(tx)));
+      } finally {
+        isChargingRef.current = false;
       }
 
-      setTransactions((prev) => [...newTxs, ...prev]);
-      setAccounts(updatedAccs);
-      showToast(`⚡ ${newTxs.length} gasto(s) fijo(s) ejecutado(s) automáticamente según fecha de cobro`);
+      showToast(`⚡ ${newTxs.length} gasto(s) fijo(s) ejecutado(s) según su fecha de cobro`);
       return { executed: newTxs.length };
     },
-    [subscriptions, accounts, transactions, currentUser.id, exchangeRate, showToast]
+    [subscriptions, accounts, transactions, currentUser, rate, showToast]
   );
 
-
-
-  const handleOpenSwitchUser = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage?.removeItem('wf_session_unlocked');
-    }
-    setIsLoginModalOpen(true);
-  }, []);
-
-  // Resilient Local Snapshot: Keep offline manual changes synchronized in localStorage
-  useEffect(() => {
-    if (isSwitchingUserRef.current || activeUserRef.current !== currentUser.id) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined' && (accounts.length > 0 || transactions.length > 0)) {
-          localStorage.setItem(
-            `wf_saved_state_${currentUser.id}`,
-            JSON.stringify({
-              user: currentUser,
-              accounts,
-              transactions,
-              subscriptions,
-              debts,
-              currency,
-              exchangeRate,
-              updatedAt: Date.now(),
-            })
-          );
-        }
-      } catch (_) {}
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [accounts, transactions, subscriptions, debts, currency, exchangeRate, currentUser]);
-
-  const handleOpenEditTransaction = useCallback((tx) => {
-    setEditingTransaction(tx);
-    setModalInitialType(null);
-    setIsTransactionModalOpen(true);
-  }, []);
-
-  const handleOpenNewTransaction = useCallback(() => {
-    setEditingTransaction(null);
-    setModalInitialType(null);
-    setIsTransactionModalOpen(true);
-  }, []);
-
-  const handleOpenTransfer = useCallback(() => {
-    setEditingTransaction(null);
-    setModalInitialType('transfer');
-    setIsTransactionModalOpen(true);
-  }, []);
-
-  // Handle adding a new account in SQLite
-  const handleSaveAccount = async (newAcc) => {
-    const userAccount = {
-      ...newAcc,
-      userId: currentUser.id,
-    };
-    setAccounts((prev) => [userAccount, ...prev]);
-    await api.createAccount(userAccount, currentUser.id);
-    showToast(`Cuenta guardada en SQLite: ${userAccount.name}`);
+  const handleSaveAccount = (newAcc) => {
+    setAccounts((prev) => [newAcc, ...prev]);
+    api.createAccount(newAcc);
+    showToast(`Cuenta guardada: ${newAcc.name}`);
   };
 
-  // Calculate Net Worth: sum of all account balances normalized to USD without double-conversion
-  const netWorth = accounts.reduce((sum, a) => {
-    const b = Number(a.balance) || 0;
-    return sum + (a.currency === 'COP' ? b / (exchangeRate || DEFAULT_USD_COP_RATE) : b);
-  }, 0);
+  // ----------------- MODALES -----------------
+  const openTransactionModal = useCallback((tx = null, initialType = null) => {
+    setEditingTransaction(tx);
+    setModalInitialType(initialType);
+    setIsTransactionModalOpen(true);
+  }, []);
+  const handleOpenNewTransaction = useCallback(() => openTransactionModal(), [openTransactionModal]);
+  const handleOpenEditTransaction = useCallback((tx) => openTransactionModal(tx), [openTransactionModal]);
+  const handleOpenTransfer = useCallback(() => openTransactionModal(null, 'transfer'), [openTransactionModal]);
+  const handleCloseTransactionModal = useCallback(() => {
+    setIsTransactionModalOpen(false);
+    setEditingTransaction(null);
+    setModalInitialType(null);
+  }, []);
+  const handleOpenNewAccount = useCallback(() => setIsAccountModalOpen(true), []);
 
-  // Ant expenses count for alert badges
-  const antAlertCount = transactions.filter((t) => t.isAntExpense).length;
+  // ----------------- DERIVADOS -----------------
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    for (const t of transactions) if (t.date?.length >= 4) years.add(t.date.slice(0, 4));
+    if (years.size === 0) years.add(String(new Date().getFullYear()));
+    return [...Array.from(years).sort((a, b) => b.localeCompare(a)), 'all'];
+  }, [transactions]);
+
+  // Si el año seleccionado deja de existir en los datos (p. ej. tras importar), se elige el más reciente
+  useEffect(() => {
+    if (!availableYears.includes(selectedYear)) setSelectedYear(availableYears[0]);
+  }, [availableYears, selectedYear]);
+
+  const netWorth = useMemo(
+    () =>
+      accounts.reduce((sum, a) => {
+        const balance = Number(a.balance) || 0;
+        return sum + (a.currency === 'COP' ? balance / rate : balance);
+      }, 0),
+    [accounts, rate]
+  );
+
+  const antAlertCount = useMemo(() => transactions.filter((t) => t.isAntExpense).length, [transactions]);
+
+  // ----------------- RENDER -----------------
+  if (authStatus === 'guest') return <AuthScreen onAuthenticated={handleAuthenticated} notice={authNotice} />;
+  if (authStatus === 'offline') return <OfflineScreen onRetry={hydrate} />;
+  if (authStatus === 'loading' || !currentUser) {
+    return <SplashScreen message={currentUser ? 'Abriendo tu bóveda financiera…' : 'Verificando tu sesión…'} />;
+  }
 
   return (
-    <div className="min-h-screen bg-[#09080E] text-white flex flex-col font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-clip">
-      {/* Background Liquid Glass Ambient Glows with Organic Floating Movement */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div className="min-h-[100dvh] bg-[#09080E] text-white flex flex-col font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-clip">
+      {/* Luces ambientales Liquid Glass */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
         <div className="absolute -top-36 -left-36 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-purple-600/25 to-indigo-600/15 blur-[130px] animate-float-orb-1" />
         <div className="absolute top-1/4 -right-36 w-[30rem] h-[30rem] rounded-full bg-gradient-to-br from-fuchsia-600/20 to-purple-800/15 blur-[140px] animate-float-orb-2" />
-        <div className="absolute -bottom-36 left-1/4 w-[34rem] h-[34rem] rounded-full bg-gradient-to-tr from-indigo-700/22 to-fuchsia-900/18 blur-[150px] animate-float-orb-1" />
+        <div className="absolute -bottom-36 left-1/4 w-[34rem] h-[34rem] rounded-full bg-gradient-to-tr from-indigo-700/[0.22] to-fuchsia-900/[0.18] blur-[150px] animate-float-orb-1" />
       </div>
 
-      {/* Main Navigation (Desktop Sidebar & Mobile iOS Tab Bar) */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -555,10 +560,9 @@ export function App() {
         currency={currency}
         exchangeRate={exchangeRate}
         currentUser={currentUser}
-        onOpenSwitchUser={handleOpenSwitchUser}
+        onLogout={handleLogout}
       />
 
-      {/* Main Content Area (offset by desktop sidebar and mobile bottom tab bar) */}
       <div className="lg:pl-80 flex-1 flex flex-col relative z-10 min-w-0">
         <Header
           activeTab={activeTab}
@@ -571,13 +575,12 @@ export function App() {
           setCurrency={handleSetCurrency}
           exchangeRate={exchangeRate}
           currentUser={currentUser}
-          onOpenSwitchUser={handleOpenSwitchUser}
+          onLogout={handleLogout}
           onOpenNewTransaction={handleOpenNewTransaction}
-          onResetDemoData={handleResetDemoData}
           onNavigateAI={() => setActiveTab('ai-advisor')}
         />
 
-        <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-6 lg:p-8 pb-28 lg:pb-8 min-w-0">
+        <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 min-w-0">
           {activeTab === 'dashboard' && (
             <DashboardView
               accounts={accounts}
@@ -590,12 +593,12 @@ export function App() {
               onOpenNewTransaction={handleOpenNewTransaction}
               onEditTransaction={handleOpenEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
-              onOpenNewAccount={() => setIsAccountModalOpen(true)}
+              onOpenNewAccount={handleOpenNewAccount}
               onSelectAccount={(accId) => {
                 setSelectedAccountId(accId);
                 setActiveTab('accounts');
               }}
-              onNavigateTab={(tab) => setActiveTab(tab)}
+              onNavigateTab={setActiveTab}
             />
           )}
 
@@ -610,7 +613,7 @@ export function App() {
               selectedYear={selectedYear}
               currency={currency}
               exchangeRate={exchangeRate}
-              onOpenNewAccount={() => setIsAccountModalOpen(true)}
+              onOpenNewAccount={handleOpenNewAccount}
               onOpenNewTransaction={handleOpenNewTransaction}
               onOpenTransfer={handleOpenTransfer}
               onEditTransaction={handleOpenEditTransaction}
@@ -657,15 +660,9 @@ export function App() {
           )}
 
           {activeTab === 'ai-advisor' && (
-            <React.Suspense
-              fallback={
-                <div className="liquid-glass p-8 text-center text-purple-300 animate-pulse text-xs">
-                  Cargando Smart AI Advisor...
-                </div>
-              }
-            >
+            <React.Suspense fallback={<ViewFallback label="Cargando Smart AI Advisor..." />}>
               <AIAdvisorView
-                userId={currentUser?.id || 'munboi'}
+                userId={currentUser.id}
                 accounts={accounts}
                 transactions={transactions}
                 subscriptions={subscriptions}
@@ -684,13 +681,7 @@ export function App() {
           )}
 
           {activeTab === 'settings' && (
-            <React.Suspense
-              fallback={
-                <div className="liquid-glass p-8 text-center text-purple-300 animate-pulse text-xs">
-                  Cargando Panel de Ajustes...
-                </div>
-              }
-            >
+            <React.Suspense fallback={<ViewFallback label="Cargando Panel de Ajustes..." />}>
               <SettingsView
                 currentUser={currentUser}
                 setCurrentUser={setCurrentUser}
@@ -706,8 +697,8 @@ export function App() {
                 setSubscriptions={setSubscriptions}
                 debts={debts}
                 setDebts={setDebts}
-                onOpenNewAccount={() => setIsAccountModalOpen(true)}
-                onResetUserData={handleResetDemoData}
+                onOpenNewAccount={handleOpenNewAccount}
+                onLogout={handleLogout}
                 showToast={showToast}
               />
             </React.Suspense>
@@ -715,14 +706,9 @@ export function App() {
         </main>
       </div>
 
-      {/* Quick Movement Registration & Edit Modal */}
       <TransactionModal
         isOpen={isTransactionModalOpen}
-        onClose={() => {
-          setIsTransactionModalOpen(false);
-          setEditingTransaction(null);
-          setModalInitialType(null);
-        }}
+        onClose={handleCloseTransactionModal}
         accounts={accounts}
         currency={currency}
         exchangeRate={exchangeRate}
@@ -733,7 +719,6 @@ export function App() {
         initialType={modalInitialType}
       />
 
-      {/* Create Account Modal */}
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
@@ -742,20 +727,15 @@ export function App() {
         onSaveAccount={handleSaveAccount}
       />
 
-      {/* Multi-User Security PIN Modal */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onLoginSuccess={handleLoginSuccess}
-        currentUserId={currentUser?.id}
-      />
-
-      {/* Floating Toast Notification (Responsive on Mobile & Desktop with Safe-Area) */}
-      {toastMessage && (
-        <div className="fixed top-[max(1.2rem,calc(env(safe-area-inset-top,0px)+0.85rem))] inset-x-3 sm:inset-x-auto sm:top-5 sm:right-5 z-50 bg-[#161324]/98 border border-purple-500/40 text-purple-200 px-4 py-2.5 rounded-2xl shadow-liquid-purple text-xs font-semibold flex items-center justify-center sm:justify-start gap-2 animate-fade-in max-w-md mx-auto sm:mx-0">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-ping" />
-          <span className="truncate">{toastMessage}</span>
-        </div>
-      )}
+      {/* Notificación flotante accesible (respeta safe-area en móvil) */}
+      <div aria-live="polite" role="status">
+        {toastMessage && (
+          <div className="fixed top-[max(1rem,calc(env(safe-area-inset-top,0px)+0.75rem))] inset-x-3 sm:inset-x-auto sm:right-5 z-[60] bg-[#161324]/[0.98] border border-purple-500/40 text-purple-100 px-4 py-3 rounded-2xl shadow-liquid-purple text-xs font-semibold flex items-center gap-2.5 animate-fade-in max-w-md mx-auto sm:mx-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 break-words leading-snug">{toastMessage}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE, createId, todayLocalISO } from '../data/finance.js';
 import { api } from '../services/api.js';
 
 export const DebtsView = ({
@@ -96,9 +96,9 @@ export const DebtsView = ({
     const finalAmountUSD = Math.round(amountNum * 100) / 100;
 
     const newPayment = {
-      id: `dp-${Date.now()}`,
+      id: createId('dp'),
       amount: finalAmountUSD,
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocalISO(),
       note: paymentNote.trim() || 'Abono a capital ordinario',
       accountId: paymentAccount,
     };
@@ -118,7 +118,7 @@ export const DebtsView = ({
     );
 
     api
-      .addDebtPayment(selectedDebtForPayment.id, newPayment, currentUser?.id || 'munboi')
+      .addDebtPayment(selectedDebtForPayment.id, newPayment)
       .catch((err) => console.error('Error SQLite addDebtPayment:', err));
 
     // Also trigger global transaction hook to keep accounts updated
@@ -129,7 +129,7 @@ export const DebtsView = ({
         type: 'expense',
         category: 'Abono a Deuda / TDC',
         accountId: paymentAccount,
-        date: new Date().toISOString().split('T')[0],
+        date: todayLocalISO(),
         notes: paymentNote || `Abono registrado a ${selectedDebtForPayment.counterparty}`,
       });
     }
@@ -169,7 +169,7 @@ export const DebtsView = ({
   const handleDeleteDebt = (id) => {
     setDebts((prev) => prev.filter((d) => d.id !== id));
     api
-      .deleteDebt(id, currentUser?.id || 'munboi')
+      .deleteDebt(id)
       .catch((err) => console.error('Error SQLite deleteDebt:', err));
     setEditingDebtId(null);
     setShowNewDebtModal(false);
@@ -192,7 +192,7 @@ export const DebtsView = ({
 
     const existing = editingDebtId ? debts.find((d) => d.id === editingDebtId) : null;
     const debtPayload = {
-      id: editingDebtId || `debt-${Date.now()}`,
+      id: editingDebtId || createId('debt'),
       title: newTitle.trim(),
       counterparty: newCounterparty.trim() || 'Entidad Financiera',
       category: newCategory,
@@ -207,12 +207,12 @@ export const DebtsView = ({
     if (editingDebtId) {
       setDebts((prev) => prev.map((d) => (d.id === editingDebtId ? debtPayload : d)));
       api
-        .updateDebt(debtPayload, currentUser?.id || 'munboi')
+        .updateDebt(debtPayload)
         .catch((err) => console.error('Error SQLite updateDebt:', err));
     } else {
       setDebts([debtPayload, ...debts]);
       api
-        .createDebt(debtPayload, currentUser?.id || 'munboi')
+        .createDebt(debtPayload)
         .catch((err) => console.error('Error SQLite createDebt:', err));
     }
     setNewTitle('');

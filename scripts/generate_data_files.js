@@ -350,7 +350,7 @@ const debts = [
   },
 ];
 
-// Write to src/data/mockData.js
+// Write to server/seedData.js (solo servidor: los datos reales no deben viajar en el bundle del cliente)
 const mockDataContent = `// Real Personal Finance Data generated from 2026-11-06.xlsx (2024 - 2026)
 
 export const INITIAL_ACCOUNTS = ${JSON.stringify(accounts, null, 2)};
@@ -360,134 +360,10 @@ export const INITIAL_TRANSACTIONS = ${JSON.stringify(transactions, null, 2)};
 export const INITIAL_SUBSCRIPTIONS = ${JSON.stringify(subscriptions, null, 2)};
 
 export const INITIAL_DEBTS = ${JSON.stringify(debts, null, 2)};
-
-export const DEMO_ACCOUNTS = INITIAL_ACCOUNTS;
-export const DEMO_TRANSACTIONS = INITIAL_TRANSACTIONS;
-export const DEMO_SUBSCRIPTIONS = INITIAL_SUBSCRIPTIONS;
-export const DEMO_DEBTS = INITIAL_DEBTS;
-
-export const TIMEFRAME_CONFIG = {
-  weekly: {
-    label: 'Esta Semana',
-    shortLabel: 'Semanal',
-    days: 7,
-    multiplier: 0.25,
-  },
-  monthly: {
-    label: 'Este Mes',
-    shortLabel: 'Mensual',
-    days: 30,
-    multiplier: 1.0,
-  },
-  quarterly: {
-    label: 'Último Trimestre',
-    shortLabel: 'Trimestral',
-    days: 90,
-    multiplier: 3.0,
-  },
-  yearly: {
-    label: 'Año en Curso',
-    shortLabel: 'Anual',
-    days: 365,
-    multiplier: 12.0,
-  },
-};
-
-export const CATEGORY_COLORS = {
-  'Alimentación': '#A855F7',
-  'Suscripciones': '#EC4899',
-  'Transporte': '#06B6D4',
-  'Inversión & Educación': '#10B981',
-  'Salario / Clientes': '#34D399',
-  'Viajes & Ocio': '#F59E0B',
-  'Mascotas': '#8B5CF6',
-  'Estilo de Vida': '#F43F5E',
-  'Salud & Cuidado': '#14B8A6',
-  'Entretenimiento & Gaming': '#6366F1',
-  'Compras & Envíos': '#EAB308',
-  'Regalos & Familia': '#FB7185',
-  'Ropa & Calzado': '#38BDF8',
-  'Herramientas de Trabajo': '#64748B',
-  'Hogar & Alojamiento': '#D946EF',
-  'Transferencias': '#94A3B8',
-  'Otros': '#71717A',
-};
-
-export const INCOME_CATEGORIES = [
-  'Salario / Clientes',
-  'Trading & Inversiones',
-  'Devoluciones / Reembolsos',
-  'Cobro de Deudas',
-  'Transferencias & Cambio',
-  'Otros Ingresos',
-];
-
-export const EXPENSE_CATEGORIES = [
-  'Alimentación',
-  'Suscripciones',
-  'Transporte',
-  'Inversión & Educación',
-  'Viajes & Ocio',
-  'Mascotas',
-  'Estilo de Vida',
-  'Salud & Cuidado',
-  'Entretenimiento & Gaming',
-  'Compras & Envíos',
-  'Regalos & Familia',
-  'Ropa & Calzado',
-  'Herramientas de Trabajo',
-  'Hogar & Alojamiento',
-  'Transferencias & Cambio',
-  'Otros',
-];
-
-export const DEFAULT_USD_COP_RATE = 4150; // Tasa de cambio base: 1 USD = 4,150 COP
-
-export const formatCurrency = (
-  valueInUSD,
-  currency = 'USD',
-  rate = DEFAULT_USD_COP_RATE,
-  showCode = true
-) => {
-  const num = Number(valueInUSD) || 0;
-  const isNegative = num < 0;
-  const absVal = Math.abs(num);
-
-  if (currency === 'COP') {
-    const copVal = Math.round(absVal * rate);
-    const formatted = new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(copVal);
-    const result = isNegative ? \`-\${formatted}\` : formatted;
-    return showCode ? \`\${result} COP\` : result;
-  }
-
-  // Moneda Principal: USD
-  const formatted = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: Math.abs(num % 1) > 0 ? 2 : 0,
-    maximumFractionDigits: 2,
-  }).format(absVal);
-  const result = isNegative ? \`-\${formatted}\` : formatted;
-  return showCode ? \`\${result} USD\` : result;
-};
-
-export const formatSecondaryCurrency = (
-  valueInUSD,
-  activeCurrency = 'USD',
-  rate = DEFAULT_USD_COP_RATE
-) => {
-  const targetCurrency = activeCurrency === 'USD' ? 'COP' : 'USD';
-  return formatCurrency(valueInUSD, targetCurrency, rate, true);
-};
 `;
 
-fs.writeFileSync('src/data/mockData.js', mockDataContent, 'utf8');
-console.log('✅ Generated src/data/mockData.js successfully with all 726 transactions!');
+fs.writeFileSync('server/seedData.js', mockDataContent, 'utf8');
+console.log('✅ Generated server/seedData.js successfully with all 726 transactions!');
 
 // Also populate SQLite database
 async function updateSQLite() {

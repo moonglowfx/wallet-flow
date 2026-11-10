@@ -9,7 +9,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
-import { DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { DEFAULT_USD_COP_RATE, createId } from '../data/finance.js';
 
 export const AccountModal = ({
   isOpen,
@@ -75,7 +75,7 @@ export const AccountModal = ({
     const finalBalance = type === 'credit' ? -Math.abs(rawBalance) : Math.abs(rawBalance);
 
     const newAccount = {
-      id: `acc-${type}-${Date.now()}`,
+      id: createId(`acc-${type}`),
       name: name.trim(),
       institution: institution.trim() || (type === 'cash' ? 'Billetera Líquida' : 'Entidad Financiera'),
       type,

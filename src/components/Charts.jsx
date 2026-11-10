@@ -10,7 +10,7 @@ import {
   TIMEFRAME_CONFIG,
   CATEGORY_COLORS,
   DEFAULT_USD_COP_RATE,
-} from '../data/mockData.js';
+} from '../data/finance.js';
 
 export const FluidLineChart = ({
   timeframe = 'monthly',

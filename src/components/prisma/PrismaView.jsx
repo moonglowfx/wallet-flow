@@ -63,7 +63,7 @@ function getPrismaCachedSettings(uid) {
 }
 
 export const PrismaView = ({
-  userId = "munboi",
+  userId,
   initialIncome = 7504,
   initialFixed = 200,
   initialGoal = 4000,
@@ -131,7 +131,7 @@ export const PrismaView = ({
 
     setSaveStatus("saving");
     try {
-      const res = await api.savePrismaSettings(payload, payload.userId);
+      const res = await api.savePrismaSettings(payload);
       if (res && res.success) {
         setSaveStatus("synced");
         const now = new Date();
@@ -170,7 +170,7 @@ export const PrismaView = ({
     let isMounted = true;
     async function loadSettings() {
       try {
-        const data = await api.getPrismaSettings(userId);
+        const data = await api.getPrismaSettings();
         if (!isMounted) return;
 
         if (data && !data.error) {
@@ -237,7 +237,7 @@ export const PrismaView = ({
         clearTimeout(autoSaveTimerRef.current);
       }
       if (hasPendingSaveRef.current && latestStateRef.current) {
-        api.savePrismaSettings(latestStateRef.current, latestStateRef.current.userId).catch(() => {});
+        api.savePrismaSettings(latestStateRef.current);
       }
     };
   }, []);

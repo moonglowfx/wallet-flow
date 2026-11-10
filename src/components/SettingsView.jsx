@@ -37,8 +37,7 @@ import {
   HardDrive,
   Search,
 } from 'lucide-react';
-import { getUserPin, setUserPin, setUserProfile } from '../data/users.js';
-import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/mockData.js';
+import { formatCurrency, DEFAULT_USD_COP_RATE } from '../data/finance.js';
 import { api } from '../services/api.js';
 import { APP_VERSION, APP_BUILD_DATE, APP_EDITION } from '../version.js';
 
@@ -58,7 +57,7 @@ export const SettingsView = ({
   debts = [],
   setDebts,
   onOpenNewAccount,
-  onResetUserData,
+  onLogout,
   showToast,
 }) => {
   const [activeTab, setActiveTab] = useState('seguridad'); // seguridad, perfil, divisas, cuentas, suscripciones, deudas, datos
@@ -70,6 +69,7 @@ export const SettingsView = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinSuccess, setPinSuccess] = useState('');
+  const [isSavingPin, setIsSavingPin] = useState(false);
 
   // Profile Edit State
   const [profileName, setProfileName] = useState(currentUser?.displayName || currentUser?.username || '');
@@ -127,35 +127,39 @@ export const SettingsView = ({
   }, [isBreakdownModalOpen, editingAccount, editingSub, editingDebt]);
 
   // ----------------- PIN CHANGE HANDLER -----------------
-  const handleUpdatePin = (e) => {
+  const handleUpdatePin = async (e) => {
     e.preventDefault();
+    if (isSavingPin) return;
     setPinError('');
     setPinSuccess('');
-
-    const actualPin = getUserPin(currentUser.id);
-
-    if (currentPin !== actualPin) {
-      setPinError('El PIN actual no es correcto.');
-      return;
-    }
 
     if (!/^\d{4}$/.test(newPin)) {
       setPinError('El nuevo PIN debe ser exactamente de 4 dígitos numéricos.');
       return;
     }
-
     if (newPin !== confirmPin) {
       setPinError('La confirmación del nuevo PIN no coincide.');
       return;
     }
+    if (newPin === currentPin) {
+      setPinError('El nuevo PIN debe ser distinto al actual.');
+      return;
+    }
 
-    setUserPin(currentUser.id, newPin);
-    api.updateUser(currentUser.id, { pin: newPin }).catch((err) => console.error('Error SQLite updatePin:', err));
-    setPinSuccess('¡Tu PIN de seguridad ha sido actualizado con éxito!');
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
-    if (showToast) showToast('PIN actualizado en la base de datos SQLite');
+    setIsSavingPin(true);
+    try {
+      // El servidor verifica el PIN actual, guarda solo el hash y cierra las demás sesiones abiertas.
+      await api.changePin(currentPin, newPin);
+      setPinSuccess('¡PIN actualizado! Se cerró la sesión en tus otros dispositivos.');
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      if (showToast) showToast('PIN de seguridad actualizado');
+    } catch (err) {
+      setPinError(err?.message || 'No se pudo actualizar el PIN.');
+    } finally {
+      setIsSavingPin(false);
+    }
   };
 
   // ----------------- PROFILE HANDLER -----------------
@@ -163,12 +167,11 @@ export const SettingsView = ({
     e.preventDefault();
     const displayName = profileName.trim() || currentUser.username;
     const role = profileRole.trim() || currentUser.role;
-    setUserProfile(currentUser.id, { displayName, role });
     if (setCurrentUser) {
       setCurrentUser((prev) => ({ ...prev, displayName, role }));
     }
-    api.updateUser(currentUser.id, { displayName, role }).catch((err) => console.error('Error SQLite updateProfile:', err));
-    if (showToast) showToast('Perfil actualizado en la base de datos SQLite');
+    api.updateProfile({ displayName, role });
+    if (showToast) showToast('Perfil actualizado');
   };
 
   // ----------------- CURRENCY HANDLER -----------------
@@ -220,7 +223,7 @@ export const SettingsView = ({
     setAccounts(updated);
     if (editedObj) {
       api
-        .updateAccount(editedObj.id, editedObj, currentUser?.id)
+        .updateAccount(editedObj)
         .catch((err) => console.error('Error SQLite updateAccount:', err));
     }
     setEditingAccount(null);
@@ -232,9 +235,9 @@ export const SettingsView = ({
       const updated = accounts.filter((a) => a.id !== accId);
       setAccounts(updated);
       api
-        .deleteAccount(accId, currentUser?.id)
+        .deleteAccount(accId)
         .catch((err) => console.error('Error SQLite deleteAccount:', err));
-      if (showToast) showToast('Cuenta eliminada de SQLite');
+      if (showToast) showToast('Cuenta eliminada');
     }
   };
 
@@ -269,11 +272,11 @@ export const SettingsView = ({
     setSubscriptions(updated);
     if (editedSub) {
       api
-        .updateSubscription(editedSub.id, editedSub, currentUser?.id)
+        .updateSubscription(editedSub)
         .catch((err) => console.error('Error SQLite updateSub:', err));
     }
     setEditingSub(null);
-    if (showToast) showToast('Suscripción actualizada en SQLite');
+    if (showToast) showToast('Suscripción actualizada');
   };
 
   const handleDeleteSub = (subId) => {
@@ -281,7 +284,7 @@ export const SettingsView = ({
       const updated = subscriptions.filter((s) => s.id !== subId);
       setSubscriptions(updated);
       api
-        .deleteSubscription(subId, currentUser?.id)
+        .deleteSubscription(subId)
         .catch((err) => console.error('Error SQLite deleteSub:', err));
       if (showToast) showToast('Suscripción eliminada');
     }
@@ -322,11 +325,11 @@ export const SettingsView = ({
     setDebts(updated);
     if (editedDebt) {
       api
-        .updateDebt(editedDebt.id, editedDebt, currentUser?.id)
+        .updateDebt(editedDebt)
         .catch((err) => console.error('Error SQLite updateDebt:', err));
     }
     setEditingDebt(null);
-    if (showToast) showToast('Deuda actualizada en SQLite');
+    if (showToast) showToast('Deuda actualizada');
   };
 
   const handleDeleteDebt = (debtId) => {
@@ -334,7 +337,7 @@ export const SettingsView = ({
       const updated = debts.filter((d) => d.id !== debtId);
       setDebts(updated);
       api
-        .deleteDebt(debtId, currentUser?.id)
+        .deleteDebt(debtId)
         .catch((err) => console.error('Error SQLite deleteDebt:', err));
       if (showToast) showToast('Deuda eliminada');
     }
@@ -351,8 +354,7 @@ export const SettingsView = ({
           subscriptions,
           debts,
         },
-        'replace',
-        currentUser.id
+        'replace'
       );
 
       if (typeof window !== 'undefined') {
@@ -527,10 +529,6 @@ export const SettingsView = ({
   const handleLoadLatestServerSnapshot = async () => {
     try {
       const snapshot = await api.getLatestSnapshot();
-      if (!snapshot || snapshot.error) {
-        alert(snapshot?.error || 'No se encontró un snapshot previo en el servidor.');
-        return;
-      }
       prepareAndOpenBreakdown(snapshot, 'Snapshot del Servidor (Turso / SQLite)');
     } catch (err) {
       alert('Error al cargar snapshot del servidor: ' + err.message);
@@ -574,8 +572,7 @@ export const SettingsView = ({
           currency: pendingImportData.currency,
           exchangeRate: pendingImportData.exchangeRate,
         },
-        importMode,
-        currentUser.id
+        importMode
       );
 
       setAccounts(finalAccounts);
@@ -588,15 +585,6 @@ export const SettingsView = ({
       }
       if (pendingImportData.exchangeRate && setExchangeRate) {
         setExchangeRate(pendingImportData.exchangeRate);
-      }
-
-      if (pendingImportData.currency || pendingImportData.exchangeRate) {
-        api
-          .updateUser(currentUser.id, {
-            currency: pendingImportData.currency,
-            exchangeRate: pendingImportData.exchangeRate,
-          })
-          .catch(() => {});
       }
 
       if (typeof window !== 'undefined') {
@@ -634,17 +622,22 @@ export const SettingsView = ({
 
   const handleClearAllUserData = async () => {
     if (
-      window.confirm(
-        `¿Confirmas que deseas BORRAR TODOS los movimientos, cuentas y deudas de ${currentUser.username} en SQLite? Esta acción dejará tu cuenta en 0.`
+      !window.confirm(
+        `¿Confirmas que deseas BORRAR TODOS los movimientos, cuentas, suscripciones y deudas de ${currentUser.username}? Esta acción no se puede deshacer.`
       )
     ) {
+      return;
+    }
+    try {
+      await api.clearUserData();
       setAccounts([]);
       setTransactions([]);
       setSubscriptions([]);
       setDebts([]);
-      await api.clearUserData(currentUser.id).catch((err) => console.error('Error SQLite clearUserData:', err));
       fetchLiveDbInfo();
-      if (showToast) showToast(`Datos de ${currentUser.username} limpiados a 0 en SQLite`);
+      if (showToast) showToast(`Datos de ${currentUser.username} eliminados`);
+    } catch (err) {
+      if (showToast) showToast(`⚠️ No se pudieron borrar los datos: ${err?.message || 'error de conexión'}`);
     }
   };
 
@@ -839,7 +832,7 @@ export const SettingsView = ({
             <div>
               <h3 className="text-base font-bold text-white">Cambiar PIN de Acceso</h3>
               <p className="text-xs text-zinc-400">
-                Define un PIN de 4 dígitos exclusivo para tu sesión ({currentUser.username})
+                Define un nuevo PIN de 4 dígitos para {currentUser.username}. Se cerrará la sesión en tus demás dispositivos.
               </p>
             </div>
           </div>
@@ -868,6 +861,8 @@ export const SettingsView = ({
                 inputMode="numeric"
                 maxLength={4}
                 required
+                pattern="[0-9]*"
+                autoComplete="current-password"
                 placeholder="Ingresa tu PIN actual"
                 value={currentPin}
                 onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
@@ -884,6 +879,8 @@ export const SettingsView = ({
                 inputMode="numeric"
                 maxLength={4}
                 required
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 placeholder="Nuevo PIN de 4 dígitos"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
@@ -900,6 +897,8 @@ export const SettingsView = ({
                 inputMode="numeric"
                 maxLength={4}
                 required
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 placeholder="Repite el nuevo PIN"
                 value={confirmPin}
                 onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
@@ -909,10 +908,11 @@ export const SettingsView = ({
 
             <button
               type="submit"
-              className="w-full liquid-button-primary py-3 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple mt-2"
+              disabled={isSavingPin}
+              className="w-full liquid-button-primary min-h-[48px] py-3 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-neon-purple mt-2 disabled:opacity-70 disabled:cursor-wait"
             >
               <Lock className="w-4 h-4" />
-              <span>Guardar Nuevo PIN</span>
+              <span>{isSavingPin ? 'Guardando…' : 'Guardar Nuevo PIN'}</span>
             </button>
           </form>
         </div>
@@ -1294,7 +1294,7 @@ export const SettingsView = ({
               Al seleccionar una fuente, se abrirá el <strong>Modal de Desglose Completo</strong> para revisar cada cuenta, transacción, suscripción y deuda antes de persistirla en la base de datos de <strong>{currentUser.username}</strong>.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 relative z-10">
+            <div className={`grid grid-cols-1 ${currentUser.isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 pt-2 relative z-10`}>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -1315,15 +1315,17 @@ export const SettingsView = ({
                 <span className="text-[10px] text-zinc-400">Guardado en este navegador</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleLoadLatestServerSnapshot}
-                className="liquid-glass p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer border-purple-500/30 hover:border-purple-400/60 active:scale-95 transition-all text-purple-200 hover:text-white"
-              >
-                <Database className="w-5 h-5 text-emerald-400" />
-                <span className="text-xs font-bold text-white">Snapshot Servidor</span>
-                <span className="text-[10px] text-zinc-400">Turso Cloud / SQLite</span>
-              </button>
+              {currentUser.isAdmin && (
+                <button
+                  type="button"
+                  onClick={handleLoadLatestServerSnapshot}
+                  className="liquid-glass p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer border-purple-500/30 hover:border-purple-400/60 active:scale-95 transition-all text-purple-200 hover:text-white"
+                >
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <span className="text-xs font-bold text-white">Snapshot Servidor</span>
+                  <span className="text-[10px] text-zinc-400">Turso Cloud / SQLite</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1346,26 +1348,28 @@ export const SettingsView = ({
                 <span>Descargar Respaldo JSON ({currentUser.username})</span>
               </button>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await api.backupDatabase();
-                    if (res && res.success) {
-                      if (showToast) showToast('Backup binario y JSON de Turso/SQLite creado');
-                      fetchLiveDbInfo();
-                    } else {
-                      handleExportBackup();
+              {currentUser.isAdmin && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await api.backupDatabase();
+                      if (res?.success) {
+                        if (showToast) showToast('Snapshot completo de la base de datos creado');
+                        fetchLiveDbInfo();
+                      } else if (showToast) {
+                        showToast('⚠️ No se pudo generar el snapshot del servidor');
+                      }
+                    } catch (err) {
+                      if (showToast) showToast(`⚠️ No se pudo generar el snapshot: ${err?.message || 'error de conexión'}`);
                     }
-                  } catch (_) {
-                    handleExportBackup();
-                  }
-                }}
-                className="liquid-pill px-4 py-2.5 text-xs font-bold text-purple-200 hover:text-white flex items-center gap-2 cursor-pointer border-purple-500/40 active:scale-95"
-              >
-                <ShieldCheck className="w-4 h-4 text-purple-400" />
-                <span>Generar Snapshot SQLite / Turso</span>
-              </button>
+                  }}
+                  className="liquid-pill min-h-[44px] px-4 py-2.5 text-xs font-bold text-purple-200 hover:text-white flex items-center gap-2 cursor-pointer border-purple-500/40 active:scale-95"
+                >
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>Generar Snapshot del Servidor</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1443,19 +1447,28 @@ export const SettingsView = ({
           <div className="liquid-glass p-6 border border-rose-500/20 space-y-3">
             <h3 className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400" />
-              Zona de Mantenimiento & Reinicio de Sesión
+              Zona de Mantenimiento & Sesión
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Si deseas vaciar completamente la sesión de <strong>{currentUser.username}</strong> en SQLite para comenzar de cero, puedes hacerlo aquí. Ten en cuenta que los datos de otros usuarios permanecen intactos.
+              Puedes vaciar por completo los datos de <strong>{currentUser.username}</strong> para comenzar de cero (los datos de otros usuarios permanecen intactos) o cerrar la sesión en este dispositivo.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
                 onClick={handleClearAllUserData}
-                className="liquid-pill px-4 py-2 text-xs font-bold text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/40 cursor-pointer transition-all"
+                className="liquid-pill min-h-[44px] px-4 py-2 text-xs font-bold text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/40 cursor-pointer transition-all"
               >
-                Limpiar datos de {currentUser.username} a 0 en SQLite
+                Borrar todos los datos de {currentUser.username}
               </button>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="liquid-pill min-h-[44px] px-4 py-2 text-xs font-bold text-zinc-200 hover:text-white cursor-pointer transition-all"
+                >
+                  Cerrar sesión
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2222,7 +2235,7 @@ export const SettingsView = ({
             </div>
 
             {/* Modal Footer - Always Sticky & 100% Touchable on Mobile */}
-            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0E0C18]/98 backdrop-blur-2xl pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+0.85rem))] space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3 relative z-20">
+            <div className="p-3.5 sm:p-5 border-t border-white/10 shrink-0 bg-[#0E0C18]/[0.98] backdrop-blur-2xl pb-[max(1.5rem,calc(env(safe-area-inset-bottom,0px)+0.85rem))] space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3 relative z-20">
               <span className="text-[11px] text-zinc-400 block text-center sm:text-left">
                 <span className="hidden sm:inline">Se persistirán en SQLite/Turso: </span>
                 <strong className="text-white">
