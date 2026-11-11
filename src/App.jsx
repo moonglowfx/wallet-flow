@@ -40,6 +40,9 @@ const TOAST_DURATION_MS = 3200;
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
+/** Cookie-pista emitida por el servidor junto con la sesión: existe aunque el navegador borre localStorage. */
+const hasSessionHint = () => typeof document !== 'undefined' && /(?:^|;\s*)wf_auth=1/.test(document.cookie);
+
 function readCachedSession() {
   try {
     const user = JSON.parse(localStorage.getItem(SESSION_USER_KEY) || 'null');
@@ -90,7 +93,17 @@ function applyTxEffects(accounts, effects, rate) {
   });
 }
 
-const SplashScreen = ({ message }) => (
+const SLOW_LOAD_HINT_MS = 4000;
+
+const SplashScreen = ({ message }) => {
+  // Si el servidor tarda (arranque en frío) se avisa, en lugar de dejar una pantalla muda
+  const [isSlow, setIsSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsSlow(true), SLOW_LOAD_HINT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
   <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#09080E] px-6 text-center select-none">
     <div className="w-[60px] h-[60px] rounded-[20px] bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center border border-white/20 shadow-neon-purple animate-glow-pulse">
       <Wallet className="w-[30px] h-[30px] text-white" aria-hidden="true" />
@@ -98,11 +111,15 @@ const SplashScreen = ({ message }) => (
     <div>
       <p className="font-extrabold text-[17px] tracking-tight text-white">WALLET FLOW</p>
       <p className="mt-1.5 text-xs text-zinc-400" role="status">
-        {message}
+        {isSlow ? 'Conectando con tu bóveda… la primera carga puede tardar unos segundos' : message}
       </p>
     </div>
+    {isSlow && (
+      <span className="w-6 h-6 rounded-full border-2 border-purple-400/30 border-t-purple-300 animate-spin" aria-hidden="true" />
+    )}
   </div>
-);
+  );
+};
 
 const OfflineScreen = ({ onRetry }) => (
   <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#09080E] px-6 text-center">
@@ -132,7 +149,11 @@ export function App() {
   const [boot] = useState(readCachedSession);
 
   // Sesión: 'loading' | 'guest' | 'authed' | 'offline'
-  const [authStatus, setAuthStatus] = useState(boot?.snapshot ? 'authed' : 'loading');
+  // Sin datos locales ni cookie-pista no puede haber sesión: se muestra el login al instante, sin esperar a la red
+  const [authStatus, setAuthStatus] = useState(() => {
+    if (boot?.snapshot) return 'authed';
+    return boot?.user || hasSessionHint() ? 'loading' : 'guest';
+  });
   const [authNotice, setAuthNotice] = useState('');
   const [currentUser, setCurrentUser] = useState(boot?.user ?? null);
 
@@ -253,6 +274,7 @@ export function App() {
   // Arranque: valida la cookie de sesión y carga los datos (la UI ya muestra la caché si existía)
   useEffect(() => {
     let cancelled = false;
+    if (authStatus === 'guest') return undefined;
     refresh({ force: true }).catch(() => {
       if (cancelled) return;
       if (boot?.snapshot) showToast('Sin conexión: mostrando tus últimos datos guardados');

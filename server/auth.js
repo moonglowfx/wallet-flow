@@ -6,6 +6,8 @@ import { SESSION_TTL_SECONDS, signSessionToken, verifySessionToken } from './sec
 
 const SESSION_COOKIE = 'wf_session';
 const LEGACY_COOKIE = 'wf_account_id'; // cookie insegura de versiones anteriores: se elimina activamente
+// Pista legible por el cliente (sin datos sensibles): permite decidir al instante, sin red, si mostrar login o cargar datos.
+const HINT_COOKIE = 'wf_auth';
 
 let secretPromise = null;
 
@@ -54,6 +56,11 @@ function cookieAttributes(req, maxAge) {
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${isHttps ? '; Secure' : ''}`;
 }
 
+/** Precalienta el secreto de firma en paralelo con la inicialización del esquema (ahorra una ida y vuelta a la BD). */
+export function warmSessionSecret() {
+  getSessionSecret().catch(() => {}); // si el esquema aún no existe se reintenta en la primera petición autenticada
+}
+
 export async function startSession(req, res, user) {
   const token = signSessionToken(
     { userId: user.id, sessionVersion: Number(user.sessionVersion || 1) },
@@ -61,6 +68,7 @@ export async function startSession(req, res, user) {
   );
   res.setHeader('Set-Cookie', [
     `${SESSION_COOKIE}=${token}; ${cookieAttributes(req, SESSION_TTL_SECONDS)}`,
+    `${HINT_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
     `${LEGACY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`,
   ]);
 }
@@ -68,6 +76,7 @@ export async function startSession(req, res, user) {
 export function endSession(req, res) {
   res.setHeader('Set-Cookie', [
     `${SESSION_COOKIE}=; ${cookieAttributes(req, 0)}`,
+    `${HINT_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0`,
     `${LEGACY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`,
   ]);
 }

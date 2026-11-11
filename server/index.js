@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initDatabase } from './db.js';
-import { requireAuth } from './auth.js';
+import { requireAuth, warmSessionSecret } from './auth.js';
 import { errorHandler, notFoundHandler } from './http.js';
 import { authRouter } from './routes/auth.js';
 import { accountsRouter } from './routes/accounts.js';
@@ -27,7 +27,9 @@ app.use('/api', express.json({ limit: '15mb' }));
 
 // Garantiza el esquema antes de atender cualquier petición (1 consulta por arranque en frío).
 app.use('/api', async (_req, _res, next) => {
-  await initDatabase();
+  const ready = initDatabase();
+  warmSessionSecret();
+  await ready;
   next();
 });
 

@@ -26,4 +26,13 @@ function sqliteDatabasePlugin() {
 
 export default defineConfig({
   plugins: [react(), sqliteDatabasePlugin()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+        },
+      },
+    },
+  },
 });
